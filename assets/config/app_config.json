@@ -1,0 +1,91 @@
+{
+  "appName": "Asset Recovery",
+  "appTagline": "Field Agent",
+  "defaultEnvironment": "dev",
+
+  "business": {
+    "slaDays": 90,
+    "slaWarnDays": 7,
+    "maxAttemptsPerBp": 3,
+    "allowReattemptAfterMax": false,
+    "ticketIdPrefix": "TKT",
+    "bpIdPrefix": "BP",
+    "caseIdPrefix": "AAR",
+    "customerRemarkRequiredForRefusal": true,
+    "autoExpireNoActionDays": 90,
+    "routeTrackingIntervalSeconds": 30,
+    "routeTrackingMinDistanceMeters": 50,
+    "routeTrackingMaxPoints": 500,
+    "notReturnedWarningDays": 20,
+    "nearbyPickupRadiusKm": 8
+  },
+
+  "session": {
+    "autoLogoutHours": 8,
+    "warnBeforeLogoutMinutes": 5,
+    "requireReauthOnResume": false
+  },
+
+  "location": {
+    "geofenceRadiusMeters": 50,
+    "enforceGeofenceOnRecovery": true,
+    "requireLocationServicesOn": true,
+    "distanceProvider": "google_road",
+    "allowManualDistanceRefresh": true,
+    "gpsAccuracyThresholdMeters": 30
+  },
+
+  "proof": {
+    "mandatoryForCall": true,
+    "mandatoryForVisit": true,
+    "mandatoryForHomeVisit": true,
+    "mandatoryForRecovery": true,
+    "autoEmbedGpsTimestamp": true,
+    "allowRetake": true,
+    "imageMaxSizeMb": 5,
+    "imageMinWidthPx": 640
+  },
+
+  "qr": {
+    "enabled": true,
+    "validateAgainstAssignedBp": true,
+    "blockOnMismatch": true
+  },
+
+  "features": {
+    "inAppCalling": true,
+    "callingProvider": "ozonetel",
+    "callRecording": true,
+    "mapView": true,
+    "inAppMapNavigation": true,
+    "storeHandoverOtp": true,
+    "firDocumentUpload": true,
+    "firDocumentMandatory": true,
+    "customerDetailUpdate": true,
+    "multiLanguage": true,
+    "offlineQueue": true,
+    "auditLogging": true,
+    "riskVisibility": true,
+    "actualRouteCapture": true,
+    "compressUploads": true
+  },
+
+  "taskList": {
+    "defaultSort": "distance",
+    "availableSorts": ["distance", "pendingDuration", "slaRemaining"],
+    "segments": ["all_tasks", "in_progress", "completed"]
+  },
+
+  "navigation": {
+    "items": [
+      { "id": "tasks", "labelKey": "nav.tasks", "icon": "checklist" },
+      { "id": "map", "labelKey": "nav.map", "icon": "map" },
+      { "id": "profile", "labelKey": "nav.profile", "icon": "person" }
+    ]
+  },
+
+  "localization": {
+    "defaultLanguage": "en",
+    "supportedLanguages": ["en", "hi", "ta", "te", "kn", "mr"]
+  }
+}

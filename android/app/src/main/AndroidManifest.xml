@@ -1,0 +1,70 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Network (API client, maps, proof upload). -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Online/offline detection for the sync queue (CC-04). -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- GPS capture + geo-fence validation (PRD §4.3 / §4.8). -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <!-- QR scan + geo-tagged proof photos (PRD §4.9 / §4.3). -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <!-- In-app calling via Ozonetel (Rule 8a) — needed once the real Cloud
+         Agent SDK is wired in; the current stub doesn't use the mic. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+
+    <application
+        android:label="Asset Recovery"
+        android:name="${applicationName}"
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true">
+        <!-- Cleartext allowed for local dev/emulator testing against a plain-HTTP
+             backend (10.0.2.2). Real deployments use HTTPS apiBaseUrl values,
+             so this has no effect once prod.json is used. -->
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:taskAffinity=""
+            android:theme="@style/LaunchTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+
+            <meta-data
+                android:name="io.flutter.embedding.android.NormalTheme"
+                android:resource="@style/NormalTheme" />
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- google_maps_flutter requires this at the native layer (it can't read
+             assets/config/environments/*.json — that's Dart-side only). Keep it
+             in sync with the active environment's mapsApiKey. -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="AIzaSyAz8lYPfsQnT8SpG8Ei7Iie6_kthD7pXAU" />
+
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2" />
+    </application>
+
+    <!-- Required so text-processing intents resolve on Android 11+. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.PROCESS_TEXT" />
+            <data android:mimeType="text/plain" />
+        </intent>
+    </queries>
+</manifest>

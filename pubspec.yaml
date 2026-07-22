@@ -1,0 +1,77 @@
+name: asset_recovery_app
+description: >-
+  Asset Recovery — Field Agent mobile application (SUN Mobility / Smart Network).
+  Config-driven Flutter app for identifying, tracking and recovering at-risk /
+  theft battery packs (BPs). Phase 1 — Retail customer recovery workflows.
+publish_to: "none"
+version: 0.3.0+3
+
+environment:
+  sdk: ">=3.5.0 <4.0.0"
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # State management
+  provider: ^6.1.2
+
+  # Dependency injection (service locator / composition root)
+  get_it: ^7.7.0
+
+  # Utilities. intl range spans Flutter 3.24 (0.19.x) ↔ newer (0.20.x) so
+  # flutter_localizations' pinned version always resolves.
+  intl: ">=0.19.0 <0.21.0"
+  collection: ">=1.18.0 <2.0.0"
+
+  # Networking (used by ApiTicketRepository once endpoints are provided)
+  http: ^1.2.0
+
+  # AES-GCM for the Gupshup `encrdata` payload — ports the legacy Java
+  # encrypt() (see GupshupOtpDataSource). Pure Dart, no platform channels.
+  pointycastle: ^3.9.1
+
+  # Native dialer + Google Maps handoff (item 4 — real turn-by-turn nav still
+  # needs a Google Maps API key; this is the fallback external-intent path).
+  url_launcher: ^6.3.0
+
+  # Real device camera for proof capture (Rule 9) — opens the phone's camera
+  # app and returns the captured photo.
+  image_picker: ^1.1.2
+
+  # Local persistence (session, language, cached tickets, offline sync queue)
+  shared_preferences: ^2.2.3
+
+  # Online/offline detection — drives the offline sync queue (CC-04).
+  connectivity_plus: ^6.0.5
+
+  # Compresses captured proof photos before upload/queueing.
+  flutter_image_compress: ^2.3.0
+
+  # ---------------------------------------------------------------------------
+  # OPTIONAL NATIVE PLUGINS — uncomment when wiring real device features.
+  # The app ships with stub service implementations so it compiles and runs
+  # WITHOUT these. See lib/core/services/* and docs/API_INTEGRATION.md.
+  # ---------------------------------------------------------------------------
+  # geolocator: ^12.0.0          # GPS capture + geo-fence validation
+  google_maps_flutter: ^2.6.1
+  # mobile_scanner: ^5.1.1       # QR code scanning of BP serials
+  # camera: ^0.11.0              # Custom geo-tagged camera overlay
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  integration_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/config/
+    - assets/config/environments/
+    - assets/l10n/
+    - assets/images/

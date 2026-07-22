@@ -1,0 +1,22 @@
+{
+  "environment": "test",
+  "label": "Test / QA",
+  "useMockData": true,
+  "apiBaseUrl": "https://test-asset-recovery.sunmobility.internal/api/v1",
+  "apiTimeoutSeconds": 15,
+  "mapsApiKey": "TEST_FAKE_MAPS_KEY",
+  "callRecordingProvider": "none",
+  "enableNetworkLogging": true,
+  "deterministicSeed": 42,
+  "gupshup": {
+    "baseUrl": "https://enterprise.smsgupshup.com/GatewayAPI/rest",
+    "username": "TEST_GUPSHUP_USER",
+    "password": "TEST_GUPSHUP_PASS",
+    "encryptionKey": "",
+    "otpMessageTemplate": "The OTP token for your ISEPL Application access request for Rider App is %code%",
+    "otpCodeLength": 4,
+    "otpCodeType": "NUMERIC",
+    "useEncryptedData": false
+  },
+  "_comment": "The TEST environment forces deterministic mock data (fixed seed) so widget/integration tests are reproducible. Selected automatically when running under flutter_test."
+}

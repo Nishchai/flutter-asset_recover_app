@@ -1,0 +1,73 @@
+{
+  "_comment": "All selectable option sets. 'value' is stored/sent to the API; 'labelKey' resolves via localization. Add/remove options here without touching code.",
+
+  "callStatus": [
+    { "value": "connected", "labelKey": "opt.call.connected" },
+    { "value": "not_responding", "labelKey": "opt.call.not_responding" },
+    { "value": "call_disconnected", "labelKey": "opt.call.disconnected" },
+    { "value": "switched_off", "labelKey": "opt.call.switched_off" },
+    { "value": "wrong_number", "labelKey": "opt.call.wrong_number" },
+    { "value": "error", "labelKey": "opt.call.error" }
+  ],
+
+  "_bpLocationStatus_comment": "What happened at the BP's physical location (battery-centric, not customer-centric — item Rule 8b).",
+  "bpLocationStatus": [
+    { "value": "battery_found", "labelKey": "opt.bpLocation.battery_found" },
+    { "value": "battery_not_found", "labelKey": "opt.bpLocation.battery_not_found" },
+    { "value": "location_inaccessible", "labelKey": "opt.bpLocation.location_inaccessible" },
+    { "value": "other", "labelKey": "opt.bpLocation.other" }
+  ],
+
+  "_outcome_comment": "Swap (Organic/Assisted) is system/TIU-detected (Rule 1) and is NEVER a Field Agent choice — intentionally absent from this list. FIR and Lost are separate from each other; Lost is folded into Not Found / Refused (Rule 2). Customer Not Cooperating is a distinct terminal outcome the FA can close directly, handing the case to the central team (Rule 6).",
+  "outcome": [
+    { "value": "recovered", "labelKey": "opt.outcome.recovered", "resolution": "Recovered", "terminal": true, "requiresApproval": true, "requiresOtp": true },
+    { "value": "fir", "labelKey": "opt.outcome.fir", "resolution": "FIR", "terminal": true, "requiresApproval": true, "requiresDocument": true },
+    { "value": "not_found_refused", "labelKey": "opt.outcome.not_found_refused", "resolution": "Not Found / Refused", "terminal": false, "requiresApproval": false },
+    { "value": "customer_not_cooperating", "labelKey": "opt.outcome.customer_not_cooperating", "resolution": "Customer Not Cooperating", "terminal": true, "requiresApproval": false }
+  ],
+
+  "helpingFactor": [
+    { "value": "over_call", "labelKey": "opt.help.over_call" },
+    { "value": "field_visit", "labelKey": "opt.help.field_visit" },
+    { "value": "dealer_support", "labelKey": "opt.help.dealer_support" },
+    { "value": "legal_notice", "labelKey": "opt.help.legal_notice" },
+    { "value": "none", "labelKey": "opt.help.none" }
+  ],
+
+  "_firReason_comment": "Pending reason shown only for outcome=fir (Rule 3) — distinct from the generic pendingReason list, which no longer appears anywhere (Rule 4 removed it from Not Found/Refused).",
+  "firReason": [
+    { "value": "battery_stolen_confirmed", "labelKey": "opt.firReason.battery_stolen_confirmed" },
+    { "value": "battery_lost_confirmed", "labelKey": "opt.firReason.battery_lost_confirmed" },
+    { "value": "fir_filed_awaiting_ac_review", "labelKey": "opt.firReason.fir_filed_awaiting_ac_review" },
+    { "value": "other", "labelKey": "opt.firReason.other" }
+  ],
+
+  "caseType": [
+    { "value": "Theft", "labelKey": "opt.case.theft" },
+    { "value": "At-Risk", "labelKey": "opt.case.at_risk" },
+    { "value": "Impound", "labelKey": "opt.case.impound" },
+    { "value": "AMD", "labelKey": "opt.case.amd" },
+    { "value": "Manual", "labelKey": "opt.case.manual" }
+  ],
+
+  "homeVisitStatus": [
+    { "value": "visit_done", "labelKey": "opt.visit.done" },
+    { "value": "not_available", "labelKey": "opt.visit.not_available" },
+    { "value": "address_not_found", "labelKey": "opt.visit.address_not_found" }
+  ],
+
+  "batteryRemarkReason": [
+    { "value": "battery_damaged", "labelKey": "opt.batteryRemark.damaged" },
+    { "value": "bp_not_with_customer", "labelKey": "opt.batteryRemark.not_with_customer" },
+    { "value": "condition_unknown", "labelKey": "opt.batteryRemark.condition_unknown" },
+    { "value": "other", "labelKey": "opt.batteryRemark.other" }
+  ],
+
+  "customerRemarkReason": [
+    { "value": "uncooperative", "labelKey": "opt.customerRemark.uncooperative" },
+    { "value": "disputes_amount", "labelKey": "opt.customerRemark.disputes_amount" },
+    { "value": "denies_payment", "labelKey": "opt.customerRemark.denies_payment" },
+    { "value": "unreachable", "labelKey": "opt.customerRemark.unreachable" },
+    { "value": "other", "labelKey": "opt.customerRemark.other" }
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "brand": "SUN Mobility — Asset Recovery",
+  "colors": {
+    "primary": "#E2E300",
+    "primaryDark": "#BFC000",
+    "primaryLight": "#FAFBD6",
+    "onPrimary": "#15171C",
+    "secondary": "#1B2335",
+    "background": "#F6F6F3",
+    "surface": "#FFFFFF",
+    "onSurface": "#16181F",
+    "muted": "#8A8F98",
+    "border": "#E6E7E9",
+    "success": "#2EA86A",
+    "warning": "#E6A312",
+    "danger": "#E5484D",
+    "info": "#5B6CFF",
+
+    "heroTop": "#0A0D14",
+    "heroBottom": "#1B2336",
+    "darkSurface": "#141A27",
+    "darkBorder": "#2A3142",
+    "onDark": "#FFFFFF",
+    "mutedDark": "#8A93A6",
+    "pillDark": "#101319",
+
+    "chipBg": "#F1F2F4",
+    "scannerBackground": "#0A0D14"
+  },
+  "caseTypeColors": {
+    "Theft": "#E5484D",
+    "At-Risk": "#E6A312",
+    "Impound": "#5B6CFF",
+    "AMD": "#2EA86A",
+    "Manual": "#6B7280"
+  },
+  "outcomeColors": {
+    "Swap (Organic)": "#2EA86A",
+    "Swap (Assisted)": "#2EA86A",
+    "Recovered": "#2EA86A",
+    "FIR": "#E5484D",
+    "Not Found / Refused": "#E6A312",
+    "Customer Not Cooperating": "#6B7280",
+    "Auto-expired": "#6B7280"
+  },
+  "typography": {
+    "fontFamily": "Roboto",
+    "headingSize": 22.0,
+    "titleSize": 16.0,
+    "bodySize": 14.0,
+    "captionSize": 12.0
+  },
+  "shape": {
+    "cardRadius": 16.0,
+    "buttonRadius": 30.0,
+    "chipRadius": 20.0,
+    "inputRadius": 12.0
+  },
+  "spacing": {
+    "xs": 4.0,
+    "sm": 8.0,
+    "md": 16.0,
+    "lg": 24.0,
+    "xl": 32.0
+  }
+}

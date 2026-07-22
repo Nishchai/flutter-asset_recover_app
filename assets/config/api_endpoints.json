@@ -1,0 +1,58 @@
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          {
+  "_comment": "API endpoint paths (relative to apiBaseUrl in the active environment file). These are placeholders — confirm/replace once backend integration details are provided. ApiTicketRepository reads these so endpoint changes need no code edits.",
+
+  "auth": {
+    "requestOtp": "POST /auth/otp/request",
+    "verifyOtp": "POST /auth/otp/verify",
+    "refresh": "POST /auth/refresh",
+    "logout": "POST /auth/logout",
+    "me": "GET /auth/me"
+  },
+  "tickets": {
+    "assigned": "GET /agents/{agentId}/tickets",
+    "stats": "GET /agents/{agentId}/tickets/stats",
+    "detail": "GET /tickets/{ticketId}",
+    "byBp": "GET /batteries/{bpId}/ticket",
+    "nearbyUnassigned": "GET /tickets/nearby-unassigned",
+    "pickup": "POST /tickets/{ticketId}/pickup"
+  },
+  "shift": {
+    "start": "POST /agents/{agentId}/shift/start",
+    "endOtpRequest": "POST /agents/{agentId}/shift/end/otp",
+    "endOtpVerify": "POST /agents/{agentId}/shift/end/verify"
+  },
+  "attempts": {
+    "create": "POST /tickets/{ticketId}/batteries/{bpId}/attempts",
+    "history": "GET /batteries/{bpId}/attempts"
+  },
+  "proof": {
+    "upload": "POST /proof/upload"
+  },
+  "customer": {
+    "update": "PATCH /batteries/{bpId}/customer"
+  },
+  "qr": {
+    "validate": "POST /batteries/validate-scan"
+  },
+  "distance": {
+    "roadDistance": "GET /maps/road-distance"
+  },
+  "otp": {
+    "request": "POST /handover/otp/request",
+    "verify": "POST /handover/otp/verify"
+  },
+  "drafts": {
+    "get": "GET /batteries/{bpId}/draft",
+    "save": "PUT /batteries/{bpId}/draft"
+  },
+  "audit": {
+    "log": "POST /audit/events"
+  },
+  "bp": {
+    "liveLocation": "GET /batteries/{bpId}/live-location"
+  },
+  "calls": {
+    "start": "POST /calls/ozonetel/click-to-call",
+    "recordings": "GET /batteries/{bpId}/call-recordings"
+  }
+}

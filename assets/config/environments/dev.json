@@ -1,0 +1,21 @@
+{
+  "environment": "dev",
+  "label": "Development",
+  "useMockData": false,
+  "apiBaseUrl": "http://10.0.2.2:5250/api/v1",
+  "apiTimeoutSeconds": 30,
+  "mapsApiKey": "AIzaSyAz8lYPfsQnT8SpG8Ei7Iie6_kthD7pXAU",
+  "callRecordingProvider": "none",
+  "enableNetworkLogging": true,
+  "gupshup": {
+    "baseUrl": "https://enterprise.smsgupshup.com/GatewayAPI/rest",
+    "username": "2000201153",
+    "password": "HLwK*dhf",
+    "encryptionKey": "ROhumS8HN5Ia_uxrxFvzLy9sLDB41HM30ccq25dNeaI",
+    "otpMessageTemplate": "The OTP token for your ISEPL Application access request for Rider App is %code%",
+    "otpCodeLength": 4,
+    "otpCodeType": "NUMERIC",
+    "useEncryptedData": true
+  },
+  "_comment": "API endpoints are wired in api_endpoints.json. Set useMockData=false to hit real Gupshup OTP. Fill gupshup.username/password."
+}
