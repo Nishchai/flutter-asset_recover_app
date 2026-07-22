@@ -1,0 +1,39 @@
+# Flutter / Dart
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+pubspec.lock
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+
+# Secrets — real environment/API keys must NOT be committed.
+# Copy assets/config/environments/prod.sample.json -> prod.json locally.
+assets/config/environments/prod.json
+**/*.secret.json
+
+# Build artifacts / release binaries
+*.apk
+android/.kotlin/
+
+# Analysis output & scratch notes
+analyze.log
+analyze*.txt
+fix.txt
+pubget.txt
+temp_run_test.txt
+test.txt
+
+# Claude Code local state
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+.claude/*.lock

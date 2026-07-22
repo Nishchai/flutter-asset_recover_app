@@ -1,0 +1,219 @@
+{
+  "_comment": "Config-driven recovery action sections. Each entry in 'steps' is an INDEPENDENT action the Field Agent can open, fill and save in any order from the Ticket Actions hub. 'call'/'location_visit'/'home_visit' are free-choice actions; 'outcome' is the action that finalizes/submits the attempt. Field types: readonly | text | textarea | number | dropdown | phone | proof | otp. The call-recording control and historical recordings list on the 'call' section, and the live-location fetch on 'location_visit', are hardcoded UI (not config fields) since they're stateful actions, not simple inputs.",
+
+  "id": "recovery_attempt_v1",
+  "titleKey": "wizard.title",
+  "subtitleField": "bpId",
+
+  "steps": [
+    {
+      "id": "call",
+      "icon": "phone",
+      "titleKey": "wizard.step.call",
+      "fields": [
+        {
+          "id": "callStatus",
+          "type": "dropdown",
+          "labelKey": "field.call_status",
+          "optionsRef": "callStatus",
+          "required": true
+        },
+        {
+          "id": "newCustomerMobile",
+          "type": "phone",
+          "labelKey": "field.new_mobile",
+          "required": false,
+          "featureFlag": "features.customerDetailUpdate"
+        },
+        {
+          "id": "callingRemark",
+          "type": "textarea",
+          "labelKey": "field.calling_remark",
+          "hintKey": "field.calling_remark_hint",
+          "maxLines": 4,
+          "required": false
+        }
+      ]
+    },
+    {
+      "id": "location_visit",
+      "icon": "location",
+      "titleKey": "wizard.step.location",
+      "fields": [
+        {
+          "id": "lastKnownLocation",
+          "type": "readonly",
+          "labelKey": "field.last_known_location",
+          "sourceField": "lastKnownLatLong",
+          "iconKey": "pin"
+        },
+        {
+          "id": "visitStatus",
+          "type": "dropdown",
+          "labelKey": "field.visit_status",
+          "optionsRef": "bpLocationStatus",
+          "required": true
+        },
+        {
+          "id": "latLongVisitProof",
+          "type": "proof",
+          "labelKey": "field.latlong_visit_proof",
+          "proofKind": "visit",
+          "requiredFlag": "proof.mandatoryForVisit"
+        },
+        {
+          "id": "locationRemark",
+          "type": "textarea",
+          "labelKey": "field.location_remark",
+          "maxLines": 3,
+          "required": false
+        }
+      ]
+    },
+    {
+      "id": "home_visit",
+      "icon": "home",
+      "titleKey": "wizard.step.home",
+      "fields": [
+        {
+          "id": "customerDetails",
+          "type": "readonly",
+          "labelKey": "field.customer_details",
+          "sourceField": "customerSummary",
+          "iconKey": "home"
+        },
+        {
+          "id": "homeVisitStatus",
+          "type": "dropdown",
+          "labelKey": "field.home_visit_status",
+          "optionsRef": "homeVisitStatus",
+          "required": true
+        },
+        {
+          "id": "homeVisitProof",
+          "type": "proof",
+          "labelKey": "field.home_visit_proof",
+          "proofKind": "home",
+          "requiredFlag": "proof.mandatoryForHomeVisit"
+        },
+        {
+          "id": "newCustomerAddress",
+          "type": "text",
+          "labelKey": "field.new_address",
+          "required": false,
+          "featureFlag": "features.customerDetailUpdate"
+        },
+        {
+          "id": "customerVisitRemark",
+          "type": "textarea",
+          "labelKey": "field.customer_visit_remark",
+          "maxLines": 3,
+          "required": false
+        }
+      ]
+    },
+    {
+      "id": "outcome",
+      "icon": "package",
+      "titleKey": "wizard.step.outcome",
+      "fields": [
+        {
+          "id": "outcome",
+          "type": "dropdown",
+          "labelKey": "field.outcome",
+          "optionsRef": "outcome",
+          "required": true
+        },
+        {
+          "id": "amountDemanded",
+          "type": "number",
+          "labelKey": "field.amount_demanded",
+          "group": "amounts",
+          "prefix": "₹",
+          "visibleWhen": { "field": "outcome", "in": ["recovered", "not_found_refused"] }
+        },
+        {
+          "id": "amountReleased",
+          "type": "number",
+          "labelKey": "field.amount_released",
+          "group": "amounts",
+          "prefix": "₹",
+          "visibleWhen": { "field": "outcome", "in": ["recovered", "not_found_refused"] }
+        },
+        {
+          "id": "helpingFactor",
+          "type": "dropdown",
+          "labelKey": "field.helping_factor",
+          "optionsRef": "helpingFactor",
+          "visibleWhen": { "field": "outcome", "equals": "recovered" }
+        },
+        {
+          "id": "firReason",
+          "type": "dropdown",
+          "labelKey": "field.fir_reason",
+          "optionsRef": "firReason",
+          "required": true,
+          "visibleWhen": { "field": "outcome", "equals": "fir" }
+        },
+        {
+          "id": "recoveryProof",
+          "type": "proof",
+          "labelKey": "field.recovery_proof",
+          "proofKind": "recovery",
+          "required": true,
+          "visibleWhen": { "field": "outcome", "equals": "recovered" }
+        },
+        {
+          "id": "handoverOtp",
+          "type": "otp",
+          "labelKey": "field.handover_otp",
+          "hintKey": "field.handover_otp_hint",
+          "required": true,
+          "visibleWhen": { "field": "outcome", "equals": "recovered" }
+        },
+        {
+          "id": "firDocument",
+          "type": "proof",
+          "labelKey": "field.fir_document",
+          "hintKey": "field.fir_document_hint",
+          "proofKind": "document",
+          "requiredFlag": "features.firDocumentMandatory",
+          "visibleWhen": { "field": "outcome", "equals": "fir" }
+        },
+        {
+          "id": "batteryRemarkReason",
+          "type": "dropdown",
+          "labelKey": "field.battery_remark",
+          "optionsRef": "batteryRemarkReason",
+          "required": false,
+          "visibleWhen": { "field": "outcome", "in": ["recovered", "not_found_refused"] }
+        },
+        {
+          "id": "batteryRemarkNote",
+          "type": "textarea",
+          "labelKey": "field.battery_remark_note",
+          "maxLines": 2,
+          "required": false,
+          "visibleWhen": { "field": "outcome", "in": ["recovered", "not_found_refused"] }
+        },
+        {
+          "id": "customerRemarkReason",
+          "type": "dropdown",
+          "labelKey": "field.customer_remark",
+          "optionsRef": "customerRemarkReason",
+          "required": false,
+          "requiredFlag": "business.customerRemarkRequiredForRefusal",
+          "visibleWhen": { "field": "outcome", "in": ["not_found_refused", "customer_not_cooperating"] }
+        },
+        {
+          "id": "customerRemarkNote",
+          "type": "textarea",
+          "labelKey": "field.customer_remark_note",
+          "maxLines": 2,
+          "required": false,
+          "visibleWhen": { "field": "outcome", "in": ["not_found_refused", "customer_not_cooperating"] }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "environment": "prod",
+  "label": "Production",
+  "useMockData": false,
+  "apiBaseUrl": "https://asset-recovery.sunmobility.com/api/v1",
+  "apiTimeoutSeconds": 30,
+  "mapsApiKey": "REPLACE_WITH_PROD_MAPS_KEY",
+  "callRecordingProvider": "exotel",
+  "enableNetworkLogging": false,
+  "gupshup": {
+    "baseUrl": "https://enterprise.smsgupshup.com/GatewayAPI/rest",
+    "username": "REPLACE_WITH_GUPSHUP_USERNAME",
+    "password": "REPLACE_WITH_GUPSHUP_PASSWORD",
+    "encryptionKey": "REPLACE_WITH_BASE64URL_AES_KEY",
+    "otpMessageTemplate": "The OTP token for your ISEPL Application access request for Rider App is %code%",
+    "otpCodeLength": 4,
+    "otpCodeType": "NUMERIC",
+    "useEncryptedData": true
+  },
+  "_comment": "Copy this file to prod.json and fill secrets (incl. gupshup.username/password). prod.json is git-ignored. Set useMockData=false to use real APIs."
+}
