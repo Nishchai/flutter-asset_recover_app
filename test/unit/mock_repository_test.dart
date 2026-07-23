@@ -21,6 +21,22 @@ void main() {
     expect(agent.shiftArea, 'Bengaluru South · Zone 4');
   });
 
+  test('login OTP length honours the configured otpLength', () async {
+    // Dev config uses gupshup.otpCodeLength = 4, so the mock must accept a
+    // 4-digit code and reject the old hardcoded 6-digit assumption.
+    final devRepo = MockTicketRepository(
+      seed: 42,
+      latency: Duration.zero,
+      otpLength: 4,
+    );
+    final agent = await devRepo.verifyLoginOtp('9876543210', '1234');
+    expect(agent.id, 'FA-RM-01');
+    expect(
+      () => devRepo.verifyLoginOtp('9876543210', '123456'),
+      throwsA(isA<FormatException>()),
+    );
+  });
+
   test('assignedTickets returns seeded tickets for the agent', () async {
     final tickets = await repo.assignedTickets('FA-RM-01');
     expect(tickets, isNotEmpty);

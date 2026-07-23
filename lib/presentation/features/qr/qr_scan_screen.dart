@@ -6,14 +6,17 @@ import 'package:asset_recovery_app/domain/entities/battery.dart';
 import 'package:asset_recovery_app/domain/usecases/validate_battery_scan_usecase.dart';
 import 'package:asset_recovery_app/presentation/features/qr/qr_result_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 
-/// QR scanner (Figma "Battery scanner"): dark live-camera surface, the target
-/// BP serial in yellow, a viewfinder that turns yellow on detect / red on a
-/// wrong battery, and a manual-entry fallback.
+/// QR scanner (Figma "Battery scanner"): a live `mobile_scanner` camera surface,
+/// the target BP serial in yellow, a viewfinder that turns yellow on detect /
+/// red on a wrong battery, and a manual-entry fallback.
 ///
-/// The viewfinder is a stub stand-in for `mobile_scanner`; the validation +
-/// result routing is production-ready. Demo buttons replace the live camera.
+/// The camera decodes BP serial QR codes; the first successful decode is
+/// validated via [ValidateBatteryScanUseCase] and routed to [QrResultScreen].
+/// Further decodes are ignored while a result is being handled. On platforms
+/// without a usable camera (e.g. some emulators) the manual-entry path remains.
 enum _ScanState { idle, detected, wrong }
 
 class QrScanScreen extends StatefulWidget {
@@ -27,35 +30,56 @@ class QrScanScreen extends StatefulWidget {
 }
 
 class _QrScanScreenState extends State<QrScanScreen> {
+  final MobileScannerController _controller = MobileScannerController(
+    detectionSpeed: DetectionSpeed.noDuplicates,
+    formats: const [BarcodeFormat.qrCode],
+  );
   _ScanState _state = _ScanState.idle;
   bool _busy = false;
 
-  Future<void> _simulate({required bool correct}) async {
-    setState(() {
-      _busy = true;
-      _state = correct ? _ScanState.detected : _ScanState.wrong;
-    });
-    final serial = correct ? widget.battery.bpId : 'BP-IF-10097-P';
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onDetect(BarcodeCapture capture) {
+    if (_busy) return;
+    final raw = capture.barcodes
+        .map((b) => b.rawValue)
+        .firstWhere((v) => v != null && v.isNotEmpty, orElse: () => null);
+    if (raw == null) return;
+    _process(raw);
+  }
+
+  Future<void> _process(String scannedSerial) async {
+    setState(() => _busy = true);
     final result = await sl<ValidateBatteryScanUseCase>()(ValidateScanParams(
       ticketId: widget.ticketId,
       bpId: widget.battery.bpId,
-      scannedSerial: serial,
+      scannedSerial: scannedSerial,
     ),);
     final ok = result.valueOrNull ?? false;
+    if (!mounted) return;
+    setState(() => _state = ok ? _ScanState.detected : _ScanState.wrong);
     await Future<void>.delayed(const Duration(milliseconds: 450));
     if (!mounted) return;
-    setState(() => _busy = false);
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => QrResultScreen(
           ticketId: widget.ticketId,
           expectedBpId: widget.battery.bpId,
-          scannedBpId: serial,
+          scannedBpId: scannedSerial,
           matched: ok,
         ),
       ),
     );
-    if (mounted) setState(() => _state = _ScanState.idle);
+    if (!mounted) return;
+    // Returned from the result screen — reset so the agent can scan again.
+    setState(() {
+      _state = _ScanState.idle;
+      _busy = false;
+    });
   }
 
   @override
@@ -71,6 +95,10 @@ class _QrScanScreenState extends State<QrScanScreen> {
 
     return Scaffold(
       backgroundColor: palette.scannerBackground,
+      // The manual-entry dialog floats above and handles the keyboard inset
+      // itself, so the fixed-height scanner layout must not resize (it would
+      // overflow at the bottom when the keyboard opens).
+      resizeToAvoidBottomInset: false,
       body: SafeArea(
         child: Column(
           children: [
@@ -82,7 +110,7 @@ class _QrScanScreenState extends State<QrScanScreen> {
                   _circleBtn(Icons.arrow_back,
                       () => Navigator.of(context).pop(), palette,),
                   const Spacer(),
-                  Icon(Icons.more_vert, color: Colors.white.withValues(alpha: 0.8)),
+                  _torchButton(palette),
                 ],
               ),
             ),
@@ -97,7 +125,7 @@ class _QrScanScreenState extends State<QrScanScreen> {
                   fontWeight: FontWeight.bold,
                 ),),
             const SizedBox(height: 28),
-            // Viewfinder
+            // Live-camera viewfinder
             Container(
               width: 230,
               height: 230,
@@ -106,12 +134,26 @@ class _QrScanScreenState extends State<QrScanScreen> {
                 borderRadius: BorderRadius.circular(28),
                 border: Border.all(color: frameColor, width: 3),
               ),
-              child: Icon(
-                _state == _ScanState.wrong
-                    ? Icons.error_outline
-                    : Icons.qr_code_scanner,
-                size: 56,
-                color: frameColor,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(25),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    MobileScanner(
+                      controller: _controller,
+                      onDetect: _onDetect,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, child) =>
+                          _cameraUnavailable(palette),
+                    ),
+                    if (_state == _ScanState.wrong)
+                      Container(
+                        color: palette.danger.withValues(alpha: 0.25),
+                        child: Icon(Icons.error_outline,
+                            size: 56, color: palette.danger,),
+                      ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 22),
@@ -119,40 +161,46 @@ class _QrScanScreenState extends State<QrScanScreen> {
                 textAlign: TextAlign.center,
                 style: TextStyle(color: palette.mutedDark, fontSize: 13),),
             const Spacer(),
-            // Bottom: manual entry OR wrong-battery banner + demo controls
+            // Bottom: manual entry OR wrong-battery banner
             if (_state == _ScanState.wrong)
               _bottomBanner(l.t('qr.wrongBattery'), palette.danger)
             else
               _manualEntryButton(l, palette),
-            const SizedBox(height: 14),
-            // Demo scan controls (replace with live camera in production)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed:
-                          _busy ? null : () => _simulate(correct: false),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
-                      ),
-                      child: const Text('Simulate wrong'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _busy ? null : () => _simulate(correct: true),
-                      child: const Text('Simulate scan'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            const SizedBox(height: 24),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _torchButton(AppPalette palette) {
+    return ValueListenableBuilder<MobileScannerState>(
+      valueListenable: _controller,
+      builder: (context, state, _) => _circleBtn(
+        state.torchState == TorchState.on ? Icons.flash_on : Icons.flash_off,
+        () => _controller.toggleTorch(),
+        palette,
+      ),
+    );
+  }
+
+  Widget _cameraUnavailable(AppPalette palette) {
+    return Container(
+      color: Colors.black26,
+      alignment: Alignment.center,
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.no_photography_outlined,
+              size: 48, color: Colors.white.withValues(alpha: 0.7),),
+          const SizedBox(height: 8),
+          Text(
+            AppLocalizations.of(context).t('qr.cameraUnavailable'),
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12),
+          ),
+        ],
       ),
     );
   }
@@ -176,19 +224,54 @@ class _QrScanScreenState extends State<QrScanScreen> {
   Widget _manualEntryButton(AppLocalizations l, AppPalette palette) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 40),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: palette.primary),
+      child: InkWell(
+        onTap: _busy ? null : _promptManualEntry,
+        borderRadius: BorderRadius.circular(28),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: palette.primary),
+          ),
+          child: Text(l.t('qr.enterManually'),
+              style: TextStyle(
+                  color: palette.primary, fontWeight: FontWeight.w600,),),
         ),
-        child: Text(l.t('qr.enterManually'),
-            style: TextStyle(
-                color: palette.primary, fontWeight: FontWeight.w600,),),
       ),
     );
+  }
+
+  Future<void> _promptManualEntry() async {
+    final l = AppLocalizations.of(context);
+    final controller = TextEditingController();
+    final serial = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l.t('qr.enterManually')),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          textCapitalization: TextCapitalization.characters,
+          decoration: InputDecoration(hintText: widget.battery.bpId),
+          onSubmitted: (v) => Navigator.of(ctx).pop(v.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(l.t('common.cancel')),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+            child: Text(l.t('common.confirm')),
+          ),
+        ],
+      ),
+    );
+    if (serial != null && serial.isNotEmpty) {
+      await _process(serial);
+    }
   }
 
   Widget _bottomBanner(String text, Color color) {

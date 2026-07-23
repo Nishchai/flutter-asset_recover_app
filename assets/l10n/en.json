@@ -152,6 +152,12 @@
   "map.liveLocation": "Live BP Location",
   "map.fetchingLiveLocation": "Fetching live location…",
 
+  "qr.scanningFor": "Scanning for",
+  "qr.pointCamera": "Point the camera at the battery's QR code",
+  "qr.enterManually": "Enter serial manually",
+  "qr.wrongBattery": "Wrong battery — serial does not match",
+  "qr.cameraUnavailable": "Camera unavailable — enter the serial manually",
+
   "field.call_status": "What happened on the call?",
   "field.proof_hint": "GPS & timestamp auto-embedded",
   "field.calling_remark": "What did the customer say?",

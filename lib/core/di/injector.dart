@@ -87,7 +87,10 @@ Future<void> configureDependencies({
     () =>
         repository ??
         (cfg.env.useMockData
-            ? MockTicketRepository(seed: cfg.env.deterministicSeed)
+            ? MockTicketRepository(
+                seed: cfg.env.deterministicSeed,
+                otpLength: cfg.env.gupshup.otpCodeLength,
+              )
             : ApiTicketRepository(sl(), sl())),
   );
 

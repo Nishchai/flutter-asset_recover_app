@@ -1,8 +1,8 @@
 {
   "environment": "dev",
   "label": "Development",
-  "useMockData": false,
-  "apiBaseUrl": "http://10.0.2.2:5250/api/v1",
+  "useMockData": true,
+  "apiBaseUrl": "http://10.10.51.241:5088/api/v1",
   "apiTimeoutSeconds": 30,
   "mapsApiKey": "AIzaSyAz8lYPfsQnT8SpG8Ei7Iie6_kthD7pXAU",
   "callRecordingProvider": "none",
