@@ -9,6 +9,7 @@ import 'package:asset_recovery_app/domain/entities/customer.dart';
 import 'package:asset_recovery_app/domain/entities/draft_attempt.dart';
 import 'package:asset_recovery_app/domain/entities/enums.dart';
 import 'package:asset_recovery_app/domain/entities/geo_point.dart';
+import 'package:asset_recovery_app/domain/entities/live_token_model.dart';
 import 'package:asset_recovery_app/domain/entities/ticket.dart';
 import 'package:asset_recovery_app/domain/repositories/ticket_repository.dart';
 
@@ -365,6 +366,20 @@ class MockTicketRepository implements TicketRepository {
     }
     return _delayed(_agent);
   }
+
+  @override
+  Future<LiveTokenModel> generateAuthToken({
+    required String url,
+    required String clientId,
+    required String resource,
+    required String clientSecret,
+    String grantType = 'client_credentials',
+  }) =>
+      _delayed(LiveTokenModel(
+        accessToken: 'mock-token-${clientId.hashCode.toUnsigned(32)}',
+        resource: resource,
+        expiresIn: 3599,
+      ),);
 
   @override
   Future<List<Ticket>> assignedTickets(String agentId) =>

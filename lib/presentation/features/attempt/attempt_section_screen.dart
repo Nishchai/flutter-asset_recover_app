@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:asset_recovery_app/core/localization/app_localizations.dart';
 import 'package:asset_recovery_app/core/theme/app_theme.dart';
 import 'package:asset_recovery_app/domain/entities/form_field_config.dart';
@@ -187,12 +189,19 @@ class _CallRecordingPanel extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: PillButton.yellow(
-              controller.callInProgress
-                  ? l.t('call.inProgress')
-                  : '${l.t('call.startRecording')} · $mobile',
+              '${l.t('call.startRecording')} · $mobile',
               palette: palette,
-              icon: controller.callInProgress ? Icons.call_end : Icons.call,
-              onPressed: controller.callInProgress ? null : controller.startCall,
+              icon: Icons.call,
+              onPressed: () async {
+                final seconds = await showDialog<int>(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (_) => _OngoingCallDialog(palette: palette, mobile: mobile),
+                );
+                if (seconds != null && seconds > 0) {
+                  await controller.saveCallRecording(seconds);
+                }
+              },
             ),
           ),
           const SizedBox(height: 14),
@@ -230,6 +239,97 @@ class _CallRecordingPanel extends StatelessWidget {
           const SizedBox(height: 4),
         ],
       ),
+    );
+  }
+}
+
+/// Modal shown while an in-app call is "connected": displays the on-going
+/// status with a live stopwatch and an End Call button. Popping returns the
+/// elapsed seconds so the caller can persist it as a [CallRecording].
+class _OngoingCallDialog extends StatefulWidget {
+  const _OngoingCallDialog({required this.palette, required this.mobile});
+  final AppPalette palette;
+  final String mobile;
+
+  @override
+  State<_OngoingCallDialog> createState() => _OngoingCallDialogState();
+}
+
+class _OngoingCallDialogState extends State<_OngoingCallDialog> {
+  Timer? _timer;
+  int _seconds = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      setState(() => _seconds++);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  String get _elapsed {
+    final m = (_seconds ~/ 60).toString().padLeft(2, '0');
+    final s = (_seconds % 60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final palette = widget.palette;
+    return AlertDialog(
+      backgroundColor: palette.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CircleAvatar(
+            radius: 30,
+            backgroundColor: palette.primaryLight,
+            child: Icon(Icons.phone_in_talk, size: 30, color: palette.primaryDark),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            l.t('call.inProgress'),
+            style: TextStyle(fontWeight: FontWeight.w600, color: palette.onSurface),
+          ),
+          const SizedBox(height: 4),
+          Text(widget.mobile, style: TextStyle(color: palette.muted, fontSize: 13)),
+          const SizedBox(height: 12),
+          Text(
+            _elapsed,
+            style: TextStyle(
+              fontSize: 34,
+              fontWeight: FontWeight.w700,
+              fontFeatures: const [FontFeature.tabularFigures()],
+              color: palette.onSurface,
+            ),
+          ),
+        ],
+      ),
+      actionsAlignment: MainAxisAlignment.center,
+      actions: [
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: palette.danger,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: const StadiumBorder(),
+            ),
+            icon: const Icon(Icons.call_end),
+            label: Text(l.t('call.endCall')),
+            onPressed: () => Navigator.of(context).pop(_seconds),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -19,6 +19,8 @@ pubspec.lock
 # Secrets — real environment/API keys must NOT be committed.
 # Copy assets/config/environments/prod.sample.json -> prod.json locally.
 assets/config/environments/prod.json
+# Copy lib/core/config/auth_config.sample.dart -> auth_config.dart locally.
+lib/core/config/auth_config.dart
 **/*.secret.json
 
 # Build artifacts / release binaries

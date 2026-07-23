@@ -8,6 +8,7 @@ import 'package:asset_recovery_app/domain/entities/call_recording.dart';
 import 'package:asset_recovery_app/domain/entities/customer.dart';
 import 'package:asset_recovery_app/domain/entities/draft_attempt.dart';
 import 'package:asset_recovery_app/domain/entities/geo_point.dart';
+import 'package:asset_recovery_app/domain/entities/live_token_model.dart';
 import 'package:asset_recovery_app/domain/entities/ticket.dart';
 import 'package:asset_recovery_app/domain/repositories/ticket_repository.dart';
 
@@ -53,6 +54,24 @@ class ApiTicketRepository implements TicketRepository {
       recoveredCount: 0,
       phone: mobile,
     );
+  }
+
+  @override
+  Future<LiveTokenModel> generateAuthToken({
+    required String url,
+    required String clientId,
+    required String resource,
+    required String clientSecret,
+    String grantType = 'client_credentials',
+  }) async {
+    final res = await _api.postForm(url, {
+      'client_id': clientId,
+      'resource': resource,
+      'client_secret': clientSecret,
+      'grant_type': grantType,
+    });
+    _logResponse('auth.liveToken', {...res, 'access_token': '***'}); // never log the token
+    return LiveTokenModel.fromJson(res);
   }
 
   @override

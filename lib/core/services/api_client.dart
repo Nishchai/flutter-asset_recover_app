@@ -125,6 +125,66 @@ class ApiClient {
     );
   }
 
+  /// `application/x-www-form-urlencoded` POST to an ABSOLUTE [url], returning
+  /// the decoded JSON body.
+  ///
+  /// Unlike [call], this bypasses endpoint resolution: no `apiBaseUrl` prefix
+  /// and no `stakingAgentId` query param — token endpoints (e.g. an OAuth2
+  /// identity provider) live on their own host and must not carry app-scoped
+  /// params. Used by `TicketRepository.generateAuthToken`.
+  Future<Map<String, dynamic>> postForm(
+    String url,
+    Map<String, String> fields,
+  ) async {
+    final uri = Uri.parse(url);
+    final headers = <String, String>{
+      'Content-Type': 'application/x-www-form-urlencoded',
+    };
+
+    if (_config.env.enableNetworkLogging) {
+      // Never log secrets: mask credential-bearing fields.
+      final safe = {
+        for (final e in fields.entries)
+          e.key: _isSecretField(e.key) ? '***' : e.value,
+      };
+      developer.log('REQUEST POST(form) $uri\n  fields: $safe', name: 'ApiClient');
+    }
+
+    final timeout = Duration(seconds: _config.env.apiTimeoutSeconds);
+    late http.Response res;
+    try {
+      // Passing a Map<String,String> as `body` makes package:http form-encode it.
+      res = await _client.post(uri, headers: headers, body: fields).timeout(timeout);
+    } catch (e, st) {
+      if (_config.env.enableNetworkLogging) {
+        developer.log('FAILED POST(form) $uri\n  error: $e',
+            name: 'ApiClient', error: e, stackTrace: st,);
+      }
+      rethrow;
+    }
+
+    if (_config.env.enableNetworkLogging) {
+      developer.log('RESPONSE POST(form) $uri\n  status: ${res.statusCode}',
+          name: 'ApiClient',);
+    }
+
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      final decoded = res.body.isEmpty ? null : jsonDecode(res.body);
+      if (decoded is Map<String, dynamic>) return decoded;
+      throw ApiException('Expected a JSON object from $url', body: res.body);
+    }
+    throw ApiException(
+      'HTTP ${res.statusCode} on token request',
+      statusCode: res.statusCode,
+      body: res.body,
+    );
+  }
+
+  static bool _isSecretField(String key) {
+    final k = key.toLowerCase();
+    return k.contains('secret') || k.contains('password') || k.contains('token');
+  }
+
   /// JSON-encodes [body] and gzips it (mutating [headers] to declare
   /// `Content-Encoding: gzip`) when it's worth the overhead — the API's
   /// request-decompression middleware handles the other end transparently.

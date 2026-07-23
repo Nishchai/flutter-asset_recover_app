@@ -4,6 +4,7 @@ import 'package:asset_recovery_app/domain/entities/call_recording.dart';
 import 'package:asset_recovery_app/domain/entities/customer.dart';
 import 'package:asset_recovery_app/domain/entities/draft_attempt.dart';
 import 'package:asset_recovery_app/domain/entities/geo_point.dart';
+import 'package:asset_recovery_app/domain/entities/live_token_model.dart';
 import 'package:asset_recovery_app/domain/entities/ticket.dart';
 
 /// Backend-agnostic contract for all data access.
@@ -21,6 +22,18 @@ abstract class TicketRepository {
 
   /// Verifies the OTP sent to [mobile] and returns the signed-in agent.
   Future<Agent> verifyLoginOtp(String mobile, String otp);
+
+  /// Exchanges client credentials for a live access token (OAuth2
+  /// client-credentials flow). [url] is the ABSOLUTE token endpoint — it is not
+  /// resolved against `apiBaseUrl`. Mirrors the Java `getLiveToken` Retrofit
+  /// call: a `application/x-www-form-urlencoded` POST with the given fields.
+  Future<LiveTokenModel> generateAuthToken({
+    required String url,
+    required String clientId,
+    required String resource,
+    required String clientSecret,
+    String grantType = 'client_credentials',
+  });
 
   /// Tickets assigned to [agentId], already scoped to the agent's cluster.
   Future<List<Ticket>> assignedTickets(String agentId);

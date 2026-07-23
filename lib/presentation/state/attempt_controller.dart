@@ -262,6 +262,28 @@ class AttemptController extends ChangeNotifier {
     }
   }
 
+  /// Records a completed in-app call using the duration measured by the
+  /// on-going-call dialog's timer, prepending it to the recordings list so
+  /// the field agent immediately sees the call they just made.
+  Future<void> saveCallRecording(int durationSeconds) async {
+    final now = DateTime.now();
+    final recording = CallRecording(
+      id: 'call-${now.millisecondsSinceEpoch}',
+      bpId: battery.bpId,
+      startedAt: now.subtract(Duration(seconds: durationSeconds)),
+      durationSeconds: durationSeconds,
+    );
+    _recordings = [recording, ..._recordings];
+    unawaited(_auditLog.log(
+      agentId: agentId,
+      action: 'call_recorded',
+      entityType: 'battery',
+      entityId: battery.bpId,
+      metadata: {'durationSeconds': durationSeconds},
+    ),);
+    notifyListeners();
+  }
+
   // --- Validation -------------------------------------------------------------
 
   /// Validates one section's visible fields; returns a localized error or
