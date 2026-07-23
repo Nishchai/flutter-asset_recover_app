@@ -21,11 +21,18 @@ class MockTicketRepository implements TicketRepository {
   MockTicketRepository({
     int? seed,
     this.latency = const Duration(milliseconds: 350),
+    this.otpLength = 6,
   }) : _rng = Random(seed ?? 7) {
     _seedData();
   }
 
   final Duration latency;
+
+  /// Number of digits [verifyLoginOtp] accepts, mirroring the active
+  /// environment's `gupshup.otpCodeLength` (the login OTP UI renders exactly
+  /// this many boxes). Wired from config in the injector.
+  final int otpLength;
+
   final Random _rng;
 
   late Agent _agent;
@@ -353,7 +360,7 @@ class MockTicketRepository implements TicketRepository {
 
   @override
   Future<Agent> verifyLoginOtp(String mobile, String otp) {
-    if (!RegExp(r'^\d{6}$').hasMatch(otp)) {
+    if (!RegExp('^\\d{$otpLength}\$').hasMatch(otp)) {
       throw const FormatException('Invalid OTP');
     }
     return _delayed(_agent);

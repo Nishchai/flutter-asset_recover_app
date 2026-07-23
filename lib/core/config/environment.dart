@@ -42,7 +42,7 @@ class EnvironmentConfig {
       apiTimeoutSeconds: (json['apiTimeoutSeconds'] as num?)?.toInt() ?? 30,
       mapsApiKey: json['mapsApiKey'] as String? ?? '',
       callRecordingProvider: json['callRecordingProvider'] as String? ?? 'none',
-      enableNetworkLogging: json['enableNetworkLogging'] as bool? ?? false,
+      enableNetworkLogging: json['enableNetworkLogging'] as bool? ?? true,
       gupshup: GupshupConfig.fromJson(
         (json['gupshup'] as Map<String, dynamic>?) ?? const {},
       ),
