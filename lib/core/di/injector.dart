@@ -94,6 +94,21 @@ Future<void> configureDependencies({
             : ApiTicketRepository(sl(), sl())),
   );
 
+  // On a real backend, teach the shared ApiClient to recover from a 401 by
+  // re-minting the OAuth2 token (client-credentials) and retrying the request.
+  // Resolved lazily so it reuses the same repository/ApiClient instances.
+  if (!cfg.env.useMockData) {
+    final auth = cfg.env.authToken;
+    sl<ApiClient>().onUnauthorized = () =>
+        sl<TicketRepository>().generateAuthToken(
+          url: auth.url,
+          clientId: auth.clientId,
+          resource: auth.resource,
+          clientSecret: auth.clientSecret,
+          grantType: auth.grantType,
+        );
+  }
+
   sl.registerLazySingleton<AuditRepository>(
     () => cfg.env.useMockData ? MockAuditRepository() : ApiAuditRepository(sl()),
   );
@@ -111,7 +126,7 @@ Future<void> configureDependencies({
 
   // --- Domain use cases -----------------------------------------------------
   sl.registerLazySingleton(() => RequestLoginOtpUseCase(sl()));
-  sl.registerLazySingleton(() => VerifyLoginOtpUseCase(sl()));
+  sl.registerLazySingleton(() => VerifyLoginOtpUseCase(sl(), cfg.env.authToken));
   sl.registerLazySingleton(() => GetAssignedTicketsUseCase(sl()));
   sl.registerLazySingleton(() => GetShiftStatsUseCase(sl()));
   sl.registerLazySingleton(() => SubmitAttemptUseCase(sl()));

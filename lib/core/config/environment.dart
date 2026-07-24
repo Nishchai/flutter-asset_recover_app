@@ -14,6 +14,7 @@ class EnvironmentConfig {
     required this.callRecordingProvider,
     required this.enableNetworkLogging,
     required this.gupshup,
+    required this.authToken,
     this.deterministicSeed,
   });
 
@@ -28,6 +29,10 @@ class EnvironmentConfig {
 
   /// SMS Gupshup credentials + OTP settings for login OTP send/verify.
   final GupshupConfig gupshup;
+
+  /// OAuth2 client-credentials for the backend access token, minted right after
+  /// a successful login OTP (see [TicketRepository.generateAuthToken]).
+  final AuthTokenConfig authToken;
 
   /// When set (test env only) the mock backend seeds with a fixed RNG so
   /// widget/integration tests are reproducible.
@@ -45,6 +50,9 @@ class EnvironmentConfig {
       enableNetworkLogging: json['enableNetworkLogging'] as bool? ?? true,
       gupshup: GupshupConfig.fromJson(
         (json['gupshup'] as Map<String, dynamic>?) ?? const {},
+      ),
+      authToken: AuthTokenConfig.fromJson(
+        (json['authToken'] as Map<String, dynamic>?) ?? const {},
       ),
       deterministicSeed: (json['deterministicSeed'] as num?)?.toInt(),
     );
@@ -107,5 +115,48 @@ class GupshupConfig {
         otpCodeLength: (json['otpCodeLength'] as num?)?.toInt() ?? 4,
         otpCodeType: json['otpCodeType'] as String? ?? 'NUMERIC',
         useEncryptedData: json['useEncryptedData'] as bool? ?? true,
+      );
+}
+
+/// OAuth2 client-credentials configuration for the backend access token
+/// (`TicketRepository.generateAuthToken`).
+///
+/// Mirrors the legacy Java `BuildConfig` constants `AUTH_URL` / `CLIENT_ID`.
+/// Loaded from the env JSON `authToken` block. The [clientSecret] is a secret
+/// and belongs ONLY in the git-ignored `prod.json`, never in `prod.sample.json`.
+class AuthTokenConfig {
+  const AuthTokenConfig({
+    required this.url,
+    required this.clientId,
+    required this.resource,
+    required this.clientSecret,
+    required this.grantType,
+  });
+
+  /// Absolute OAuth2 token endpoint (e.g. Azure AD `.../oauth2/token`). Hit as a
+  /// form POST; NOT resolved against `apiBaseUrl`.
+  final String url;
+
+  /// Application (client) id.
+  final String clientId;
+
+  /// The API the token is minted for (Azure AD `resource`).
+  final String resource;
+
+  /// Client secret — keep it only in the git-ignored `prod.json`.
+  final String clientSecret;
+
+  /// OAuth2 grant type; `client_credentials` for machine-to-machine auth.
+  final String grantType;
+
+  /// True once real credentials are present (empty in mock/test envs).
+  bool get isConfigured => url.isNotEmpty && clientId.isNotEmpty;
+
+  factory AuthTokenConfig.fromJson(Map<String, dynamic> json) => AuthTokenConfig(
+        url: json['url'] as String? ?? '',
+        clientId: json['clientId'] as String? ?? '',
+        resource: json['resource'] as String? ?? '',
+        clientSecret: json['clientSecret'] as String? ?? '',
+        grantType: json['grantType'] as String? ?? 'client_credentials',
       );
 }

@@ -16,6 +16,11 @@ const _gzipThresholdBytes = 2 * 1024;
 // TODO: replace with the real staking agent id once available from the session.
 const _stakingAgentId = 'FA-RM-01';
 
+/// Re-mints the access token (OAuth2 client-credentials) and applies it via
+/// [ApiClient.authToken]. Invoked automatically on a 401 so an expired session
+/// recovers transparently. Returns once a fresh token has been set.
+typedef TokenRefresher = Future<void> Function();
+
 /// Thin HTTP wrapper that resolves endpoint strings from `api_endpoints.json`
 /// (format: `"METHOD /path/with/{param}"`) against the active environment's
 /// base URL. Handles auth headers, timeouts and JSON decoding in one place.
@@ -27,7 +32,17 @@ class ApiClient {
   final http.Client _client;
   String? _authToken;
 
+  /// Called on a 401 to re-mint the token; see [onUnauthorized].
+  TokenRefresher? _onUnauthorized;
+
+  /// In-flight refresh, shared so concurrent 401s trigger a single re-mint.
+  Future<void>? _refreshing;
+
   set authToken(String? token) => _authToken = token;
+
+  /// When set, a 401 from [call] triggers a single token refresh followed by one
+  /// automatic retry of the original request with the new Bearer header.
+  set onUnauthorized(TokenRefresher? refresher) => _onUnauthorized = refresher;
 
   /// Calls the endpoint registered under [endpointPath] (dotted path into
   /// api_endpoints.json, e.g. `tickets.assigned`), filling `{param}` segments
@@ -53,22 +68,52 @@ class ApiClient {
     final uri = Uri.parse('${_config.env.apiBaseUrl}$path')
         .replace(queryParameters: mergedQuery);
 
+    final timeout = Duration(seconds: _config.env.apiTimeoutSeconds);
+
+    var res = await _dispatch(method, uri, endpointPath, body, timeout);
+
+    // Session expired mid-shift: re-mint the token once via [onUnauthorized]
+    // and replay the request with the fresh Bearer header. Concurrent 401s
+    // share a single refresh so we never stampede the token endpoint.
+    if (res.statusCode == 401 && _onUnauthorized != null) {
+      await _refreshAuth();
+      res = await _dispatch(method, uri, endpointPath, body, timeout);
+    }
+
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      return res.body.isEmpty ? null : jsonDecode(res.body);
+    }
+    throw ApiException(
+      'HTTP ${res.statusCode} on $endpointPath',
+      statusCode: res.statusCode,
+      body: res.body,
+    );
+  }
+
+  /// One HTTP attempt for [call]. Headers are rebuilt each attempt so a token
+  /// refreshed between the first try and the retry is picked up. Network-level
+  /// failures (no response) are logged and rethrown.
+  Future<http.Response> _dispatch(
+    String method,
+    Uri uri,
+    String endpointPath,
+    Object? body,
+    Duration timeout,
+  ) async {
     final headers = <String, String>{
       'Content-Type': 'application/json',
       if (_authToken != null) 'Authorization': 'Bearer $_authToken',
     };
+    final Object? encoded = _encodeBody(body, headers);
 
     if (_config.env.enableNetworkLogging) {
       developer.log(
         'REQUEST $method $uri\n'
         '  base:     ${_config.env.apiBaseUrl}\n'
-        '  endpoint: $endpointPath -> $path',
+        '  endpoint: $endpointPath -> ${uri.path}',
         name: 'ApiClient',
       );
     }
-
-    final timeout = Duration(seconds: _config.env.apiTimeoutSeconds);
-    final Object? encoded = _encodeBody(body, headers);
 
     late http.Response res;
     try {
@@ -114,15 +159,19 @@ class ApiClient {
         name: 'ApiClient',
       );
     }
+    return res;
+  }
 
-    if (res.statusCode >= 200 && res.statusCode < 300) {
-      return res.body.isEmpty ? null : jsonDecode(res.body);
-    }
-    throw ApiException(
-      'HTTP ${res.statusCode} on $endpointPath',
-      statusCode: res.statusCode,
-      body: res.body,
-    );
+  /// Runs [_onUnauthorized] at most once concurrently: the first 401 starts the
+  /// refresh and any other request that 401s meanwhile awaits the same future.
+  Future<void> _refreshAuth() {
+    return _refreshing ??= () async {
+      try {
+        await _onUnauthorized!.call();
+      } finally {
+        _refreshing = null;
+      }
+    }();
   }
 
   /// `application/x-www-form-urlencoded` POST to an ABSOLUTE [url], returning

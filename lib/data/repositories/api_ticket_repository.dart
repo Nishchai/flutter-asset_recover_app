@@ -71,7 +71,10 @@ class ApiTicketRepository implements TicketRepository {
       'grant_type': grantType,
     });
     _logResponse('auth.liveToken', {...res, 'access_token': '***'}); // never log the token
-    return LiveTokenModel.fromJson(res);
+    final model = LiveTokenModel.fromJson(res);
+    // Attach for every subsequent request; ApiClient sends it as `Bearer`.
+    _api.authToken = model.accessToken;
+    return model;
   }
 
   @override
