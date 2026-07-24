@@ -5,6 +5,7 @@ import 'package:asset_recovery_app/core/di/app_services.dart';
 import 'package:asset_recovery_app/core/error/result.dart';
 import 'package:asset_recovery_app/core/services/api_client.dart';
 import 'package:asset_recovery_app/core/services/audit_log_service.dart';
+import 'package:asset_recovery_app/core/services/blob_upload_service.dart';
 import 'package:asset_recovery_app/core/services/connectivity_service.dart';
 import 'package:asset_recovery_app/core/services/location_service.dart';
 import 'package:asset_recovery_app/core/services/proof_service.dart';
@@ -58,6 +59,13 @@ Future<void> configureDependencies({
       () => location ?? StubLocationService(seed: cfg.env.deterministicSeed),);
   sl.registerLazySingleton<ProofService>(
       () => proof ?? CameraProofService(sl<LocationService>(), cfg),);
+  // Real Azure Blob uploader only when credentials are present (dev/prod with a
+  // filled connection string); otherwise a no-op so mock/test envs never touch
+  // the network.
+  sl.registerLazySingleton<BlobUploadService>(
+      () => cfg.env.blobStorage.isConfigured
+          ? AzureBlobUploadService(cfg.env.blobStorage)
+          : const NoopBlobUploadService(),);
   sl.registerLazySingleton<AttemptFlowConfig>(
       () => AttemptFlowConfig.fromJson(cfg.attemptFlow),);
 
@@ -118,6 +126,7 @@ Future<void> configureDependencies({
         config: sl(),
         location: sl(),
         proof: sl(),
+        blobUpload: sl(),
         attemptFlow: sl(),
         auditLog: sl(),
         syncQueue: sl(),

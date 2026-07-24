@@ -11,10 +11,10 @@ import 'package:http/http.dart' as http;
 /// embedded proof images.
 const _gzipThresholdBytes = 2 * 1024;
 
-/// Every backend request is scoped to a staking agent. Hard-coded for now until
-/// the value is sourced from the authenticated session / agent profile.
-// TODO: replace with the real staking agent id once available from the session.
-const _stakingAgentId = 'FA-RM-01';
+/// Every backend request is scoped to an agent. Hard-coded for now until the
+/// value is sourced from the authenticated session / agent profile.
+// TODO: replace with the real agent id once available from the session.
+const _agentId = 'SUNMU00002340';
 
 /// Re-mints the access token (OAuth2 client-credentials) and applies it via
 /// [ApiClient.authToken]. Invoked automatically on a 401 so an expired session
@@ -58,14 +58,19 @@ class ApiClient {
     var path = spec.$2;
     pathParams.forEach((k, v) => path = path.replaceAll('{$k}', v));
 
-    // Attach the staking agent id to every request. Existing query params win
-    // if a caller ever passes an explicit `stakingAgentId`.
+    // Attach the agent id to every request. Existing query params win if a
+    // caller ever passes an explicit `agentId`.
     final mergedQuery = <String, String>{
-      'stakingAgentId': _stakingAgentId,
+      'agentId': _agentId,
       ...?query,
     };
 
-    final uri = Uri.parse('${_config.env.apiBaseUrl}$path')
+    // Join base + path with exactly one slash: apiBaseUrl carries a trailing
+    // slash and every endpoint path a leading one, so a naive concat yields a
+    // `//` segment that routers reject (404). Normalize both sides.
+    final base = _config.env.apiBaseUrl.replaceAll(RegExp(r'/+$'), '');
+    final rel = path.startsWith('/') ? path : '/$path';
+    final uri = Uri.parse('$base$rel')
         .replace(queryParameters: mergedQuery);
 
     final timeout = Duration(seconds: _config.env.apiTimeoutSeconds);
@@ -178,7 +183,7 @@ class ApiClient {
   /// the decoded JSON body.
   ///
   /// Unlike [call], this bypasses endpoint resolution: no `apiBaseUrl` prefix
-  /// and no `stakingAgentId` query param — token endpoints (e.g. an OAuth2
+  /// and no `agentId` query param — token endpoints (e.g. an OAuth2
   /// identity provider) live on their own host and must not carry app-scoped
   /// params. Used by `TicketRepository.generateAuthToken`.
   Future<Map<String, dynamic>> postForm(

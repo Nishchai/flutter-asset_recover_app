@@ -46,6 +46,7 @@ class TicketActionsHub extends StatelessWidget {
           config: services.config,
           location: services.location,
           proof: services.proof,
+          blobUpload: services.blobUpload,
           getDraft: sl<GetDraftUseCase>(),
           saveDraft: sl<SaveDraftUseCase>(),
           updateCustomer: sl<UpdateCustomerUseCase>(),

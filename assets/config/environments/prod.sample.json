@@ -24,5 +24,9 @@
     "clientSecret": "REPLACE_WITH_CLIENT_SECRET",
     "grantType": "client_credentials"
   },
-  "_comment": "Copy this file to prod.json and fill secrets (incl. gupshup.username/password and authToken.clientId/clientSecret). prod.json is git-ignored. Set useMockData=false to use real APIs."
+  "blobStorage": {
+    "connectionString": "DefaultEndpointsProtocol=https;AccountName=REPLACE_ACCOUNT_NAME;AccountKey=REPLACE_ACCOUNT_KEY;EndpointSuffix=core.windows.net",
+    "containerName": "asset-recovery"
+  },
+  "_comment": "Copy this file to prod.json and fill secrets (incl. gupshup.username/password, authToken.clientId/clientSecret and blobStorage.connectionString). prod.json is git-ignored. Set useMockData=false to use real APIs."
 }

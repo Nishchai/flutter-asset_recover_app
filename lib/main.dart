@@ -14,7 +14,7 @@ Future<void> main() async {
   await configureDependencies();
   final config = sl<ConfigService>();
 
-  final localeProvider = LocaleProvider(
+  final localeProvider = LocaleProvider( 
     defaultLanguage: config.defaultLanguage,
     supportedLanguages: config.supportedLanguages,
   );

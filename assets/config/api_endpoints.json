@@ -9,7 +9,7 @@
     "me": "GET /auth/me"
   },
   "tickets": {
-    "assigned": "GET /agents/{agentId}/tickets",
+    "assigned": "GET /tickets",
     "stats": "GET /agents/{agentId}/tickets/stats",
     "detail": "GET /tickets/{ticketId}",
     "byBp": "GET /batteries/{bpId}/ticket",

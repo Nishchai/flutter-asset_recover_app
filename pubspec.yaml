@@ -51,6 +51,12 @@ dependencies:
   # Compresses captured proof photos before upload/queueing.
   flutter_image_compress: ^2.3.0
 
+  # Azure Blob Storage client — uploads captured proof images to the
+  # `asset-recovery` container. Parses the account connection string and signs
+  # each request with Shared Key (HMAC-SHA256) internally, so no SAS token or
+  # manual request signing is needed here. See BlobUploadService.
+  azblob: ^2.0.0
+
   # ---------------------------------------------------------------------------
   # OPTIONAL NATIVE PLUGINS — uncomment when wiring real device features.
   # The app ships with stub service implementations so it compiles and runs

@@ -4,9 +4,11 @@ import 'package:asset_recovery_app/core/services/api_client.dart';
 import 'package:asset_recovery_app/data/datasources/gupshup_otp_datasource.dart';
 import 'package:asset_recovery_app/domain/entities/agent.dart';
 import 'package:asset_recovery_app/domain/entities/attempt.dart';
+import 'package:asset_recovery_app/domain/entities/battery.dart';
 import 'package:asset_recovery_app/domain/entities/call_recording.dart';
 import 'package:asset_recovery_app/domain/entities/customer.dart';
 import 'package:asset_recovery_app/domain/entities/draft_attempt.dart';
+import 'package:asset_recovery_app/domain/entities/enums.dart';
 import 'package:asset_recovery_app/domain/entities/geo_point.dart';
 import 'package:asset_recovery_app/domain/entities/live_token_model.dart';
 import 'package:asset_recovery_app/domain/entities/ticket.dart';
@@ -30,6 +32,64 @@ class ApiTicketRepository implements TicketRepository {
     developer.log('[$endpoint] response: $response',
         name: 'ApiTicketRepository',);
   }
+
+  /// Maps one entry from the backend ticket-list envelope
+  /// (`{"items":[...], "page":.., "pageSize":.., "total":..}`) into the app's
+  /// [Ticket]/[Battery] model.
+  ///
+  /// The backend returns a FLATTENED ticket+BP summary (one BP per ticket in
+  /// Phase 1), so the single [Battery] is reconstructed here rather than read
+  /// from a nested `batteries` array. Adjust only the `// MAP:` lines if the
+  /// contract changes.
+  Ticket _ticketFromListItem(Map<String, dynamic> json) {
+    final battery = Battery(
+      bpId: json['bpId'] as String? ?? '', // MAP: bpId
+      // riskTier ("theft"/"standard") is the closest field to the app's
+      // case-type concept; fall back to source, then Manual.
+      caseType:
+          (json['riskTier'] ?? json['source'] ?? 'Manual').toString(), // MAP: riskTier
+      customer: Customer(
+        name: json['customerName'] as String? ?? '', // MAP: customerName
+        mobile: json['customerMobile'] as String? ?? '',
+        address: json['customerAddress'] as String? ?? '',
+      ),
+      // lastKnownLocation is nullable on the wire (null in the current
+      // response); the model field is non-null, so fall back to (0,0) until a
+      // real fix is captured in the field.
+      lastKnownLocation: json['lastKnownLocation'] is Map<String, dynamic>
+          ? GeoPoint.fromJson(json['lastKnownLocation'] as Map<String, dynamic>)
+          : const GeoPoint(lat: 0, lng: 0), // MAP: lastKnownLocation
+      zoneStatus: zoneFromString(json['zoneStatus'] as String?),
+      bpState: bpStateFromString(json['bpState'] as String?),
+      vehicleType: json['vehicleType'] as String? ?? '', // MAP: vehicleType
+      vehicleRegNo: json['vehicleRegNo'] as String? ?? '', // MAP: vehicleRegNo
+      soc: (json['soc'] as num?)?.toInt(), // MAP: soc
+      distanceKm: (json['distanceKm'] as num?)?.toDouble(), // MAP: distanceKm
+      zone: json['zoneCode'] as String? ?? '', // MAP: zoneCode
+      lastStation: json['lastSwapStationCode'] as String? ?? '', // MAP: lastSwapStationCode
+      lastSwap: _tryDate(json['lastSwapDate']), // MAP: lastSwapDate
+    );
+
+    return Ticket(
+      // MAP: `ticketNumber` (e.g. TKT-2026-00003) is the human-facing label
+      // shown on the card and used for local lookup. The backend `id` is the
+      // resource UUID — if the attempt/pickup endpoints expect the UUID in
+      // their `{ticketId}` path segment, switch this to `json['id']`.
+      ticketId: json['ticketNumber'] as String? ?? json['id'] as String? ?? '',
+      status: TicketStatus.fromString(json['status'] as String?),
+      createdAt: _tryDate(json['createdAt']) ??
+          DateTime.fromMillisecondsSinceEpoch(0),
+      assignedAgentId: json['agentId'] as String? ?? '', // MAP: agentId
+      cluster: json['clusterCode'] as String? ?? '', // MAP: clusterCode
+      caseId: json['id'] as String? ?? '', // MAP: backend resource UUID
+      caseSource: json['source'] as String? ?? '', // MAP: source
+      batteries: [battery],
+    );
+  }
+
+  /// Lenient ISO-8601 parse for nullable date fields.
+  DateTime? _tryDate(Object? v) =>
+      v is String ? DateTime.tryParse(v) : null;
 
   @override
   Future<void> requestLoginOtp(String mobile) =>
@@ -79,10 +139,16 @@ class ApiTicketRepository implements TicketRepository {
 
   @override
   Future<List<Ticket>> assignedTickets(String agentId) async {
-    final res = await _api.call('tickets.assigned', pathParams: {'agentId': agentId});
+    // agentId is attached globally by ApiClient; only paging is passed here.
+    final res = await _api.call('tickets.assigned', query: {
+      'page': '1',
+      'pageSize': '20',
+    },);
     _logResponse('tickets.assigned', res);
-    final list = (res as Map<String, dynamic>)['tickets'] as List; // MAP: tickets
-    return list.map((e) => Ticket.fromJson(e as Map<String, dynamic>)).toList();
+    final list = (res as Map<String, dynamic>)['items'] as List; // MAP: items
+    return list
+        .map((e) => _ticketFromListItem(e as Map<String, dynamic>))
+        .toList();
   }
 
   @override
@@ -101,7 +167,7 @@ class ApiTicketRepository implements TicketRepository {
   Future<Ticket> ticketDetail(String ticketId) async {
     final res = await _api.call('tickets.detail', pathParams: {'ticketId': ticketId});
     _logResponse('tickets.detail', res);
-    return Ticket.fromJson(res as Map<String, dynamic>);
+    return _ticketFromListItem(res as Map<String, dynamic>);
   }
 
   @override
@@ -207,8 +273,10 @@ class ApiTicketRepository implements TicketRepository {
       'radiusKm': '$radiusKm',
     },);
     _logResponse('tickets.nearbyUnassigned', res);
-    final list = (res as Map<String, dynamic>)['tickets'] as List; // MAP: tickets
-    return list.map((e) => Ticket.fromJson(e as Map<String, dynamic>)).toList();
+    final list = (res as Map<String, dynamic>)['items'] as List; // MAP: items
+    return list
+        .map((e) => _ticketFromListItem(e as Map<String, dynamic>))
+        .toList();
   }
 
   @override
@@ -216,6 +284,6 @@ class ApiTicketRepository implements TicketRepository {
     final res = await _api.call('tickets.pickup',
         pathParams: {'ticketId': ticketId}, body: {'agentId': agentId},);
     _logResponse('tickets.pickup', res);
-    return Ticket.fromJson(res as Map<String, dynamic>);
+    return _ticketFromListItem(res as Map<String, dynamic>);
   }
 }

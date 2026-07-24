@@ -15,6 +15,7 @@ class EnvironmentConfig {
     required this.enableNetworkLogging,
     required this.gupshup,
     required this.authToken,
+    required this.blobStorage,
     this.deterministicSeed,
   });
 
@@ -33,6 +34,9 @@ class EnvironmentConfig {
   /// OAuth2 client-credentials for the backend access token, minted right after
   /// a successful login OTP (see [TicketRepository.generateAuthToken]).
   final AuthTokenConfig authToken;
+
+  /// Azure Blob Storage credentials for uploading captured proof images.
+  final BlobStorageConfig blobStorage;
 
   /// When set (test env only) the mock backend seeds with a fixed RNG so
   /// widget/integration tests are reproducible.
@@ -53,6 +57,9 @@ class EnvironmentConfig {
       ),
       authToken: AuthTokenConfig.fromJson(
         (json['authToken'] as Map<String, dynamic>?) ?? const {},
+      ),
+      blobStorage: BlobStorageConfig.fromJson(
+        (json['blobStorage'] as Map<String, dynamic>?) ?? const {},
       ),
       deterministicSeed: (json['deterministicSeed'] as num?)?.toInt(),
     );
@@ -158,5 +165,38 @@ class AuthTokenConfig {
         resource: json['resource'] as String? ?? '',
         clientSecret: json['clientSecret'] as String? ?? '',
         grantType: json['grantType'] as String? ?? 'client_credentials',
+      );
+}
+
+/// Azure Blob Storage configuration for uploading captured proof images
+/// (see `BlobUploadService`).
+///
+/// The [connectionString] embeds the storage account key, so it is a SECRET:
+/// keep the real value ONLY in the git-ignored `prod.json`, never in
+/// `prod.sample.json`. Longer term this should be replaced by a backend-issued
+/// short-lived SAS so the account key never ships in the client.
+class BlobStorageConfig {
+  const BlobStorageConfig({
+    required this.connectionString,
+    required this.containerName,
+  });
+
+  /// Full account connection string, e.g.
+  /// `DefaultEndpointsProtocol=https;AccountName=...;AccountKey=...;EndpointSuffix=core.windows.net`.
+  final String connectionString;
+
+  /// Target blob container the proof images are written to (e.g.
+  /// `asset-recovery`).
+  final String containerName;
+
+  /// True once both a connection string and a container are present. When
+  /// false, uploads are skipped (mock/test envs, or before the key is filled).
+  bool get isConfigured =>
+      connectionString.isNotEmpty && containerName.isNotEmpty;
+
+  factory BlobStorageConfig.fromJson(Map<String, dynamic> json) =>
+      BlobStorageConfig(
+        connectionString: json['connectionString'] as String? ?? '',
+        containerName: json['containerName'] as String? ?? '',
       );
 }

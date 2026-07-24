@@ -1,5 +1,6 @@
 import 'package:asset_recovery_app/core/config/config_service.dart';
 import 'package:asset_recovery_app/core/services/audit_log_service.dart';
+import 'package:asset_recovery_app/core/services/blob_upload_service.dart';
 import 'package:asset_recovery_app/core/services/location_service.dart';
 import 'package:asset_recovery_app/core/services/proof_service.dart';
 import 'package:asset_recovery_app/core/services/route_tracking_service.dart';
@@ -16,6 +17,7 @@ class AppServices {
     required this.config,
     required this.location,
     required this.proof,
+    required this.blobUpload,
     required this.attemptFlow,
     required this.auditLog,
     required this.syncQueue,
@@ -25,6 +27,7 @@ class AppServices {
   final ConfigService config;
   final LocationService location;
   final ProofService proof;
+  final BlobUploadService blobUpload;
   final AttemptFlowConfig attemptFlow;
   final AuditLogService auditLog;
   final SyncQueueService syncQueue;

@@ -1,8 +1,11 @@
 import 'dart:async';
+import 'dart:developer' as developer;
+import 'dart:io';
 
 import 'package:asset_recovery_app/core/config/config_service.dart';
 import 'package:asset_recovery_app/core/error/result.dart';
 import 'package:asset_recovery_app/core/services/audit_log_service.dart';
+import 'package:asset_recovery_app/core/services/blob_upload_service.dart';
 import 'package:asset_recovery_app/core/services/location_service.dart';
 import 'package:asset_recovery_app/core/services/proof_service.dart';
 import 'package:asset_recovery_app/core/services/sync_queue_service.dart';
@@ -49,6 +52,7 @@ class AttemptController extends ChangeNotifier {
     required ConfigService config,
     required LocationService location,
     required ProofService proof,
+    BlobUploadService? blobUpload,
     required GetDraftUseCase getDraft,
     required SaveDraftUseCase saveDraft,
     required UpdateCustomerUseCase updateCustomer,
@@ -60,6 +64,7 @@ class AttemptController extends ChangeNotifier {
   })  : _config = config,
         _location = location,
         _proof = proof,
+        _blobUpload = blobUpload ?? const NoopBlobUploadService(),
         _getDraft = getDraft,
         _saveDraft = saveDraft,
         _updateCustomer = updateCustomer,
@@ -76,6 +81,7 @@ class AttemptController extends ChangeNotifier {
   final ConfigService _config;
   final LocationService _location;
   final ProofService _proof;
+  final BlobUploadService _blobUpload;
   final GetDraftUseCase _getDraft;
   final SaveDraftUseCase _saveDraft;
   final UpdateCustomerUseCase _updateCustomer;
@@ -196,7 +202,48 @@ class AttemptController extends ChangeNotifier {
     final captured = await _proof.capture(kind);
     _proofs[f.id] = captured;
     notifyListeners();
+    // Push the image to blob storage in the background so the capture UX is
+    // never blocked on the network. The resulting URL is logged (and recorded
+    // on the Proof) when the upload lands; failures are logged and the local
+    // proof is kept. Drives the FIR-document upload (Outcome = FIR) today and
+    // works the same for every other proof kind.
+    unawaited(_uploadProof(f.id, captured));
     return captured;
+  }
+
+  /// Uploads [proof]'s image to blob storage and, on success, records the
+  /// returned URL on the stored [Proof]. Skips when storage isn't configured or
+  /// the proof has no real local file (e.g. the stub proof service). For now the
+  /// URL is only logged; once the submit payload carries it, `remoteUrl` is
+  /// already populated here.
+  Future<void> _uploadProof(String fieldId, Proof proof) async {
+    if (!_blobUpload.isConfigured) return;
+    final local = proof.localPath;
+    if (local.isEmpty || local.startsWith('mock://')) return;
+    try {
+      final url = await _blobUpload.upload(File(local), blobName: _blobName(proof));
+      developer.log('Proof uploaded [$fieldId]: $url', name: 'BlobUpload');
+      // A re-capture may have replaced this proof while the upload was in
+      // flight — only annotate if it's still the same one.
+      if (identical(_proofs[fieldId], proof)) {
+        _proofs[fieldId] = proof.copyWith(remoteUrl: url, uploaded: true);
+        notifyListeners();
+      }
+    } catch (e, st) {
+      developer.log('Proof upload failed [$fieldId]',
+          name: 'BlobUpload', error: e, stackTrace: st,);
+    }
+  }
+
+  /// Deterministic blob path for a captured proof:
+  /// `proofs/<ticket>/<bp>/<kind>_<timestamp>.<ext>`.
+  String _blobName(Proof proof) {
+    final ts = proof.capturedAt
+        .toUtc()
+        .toIso8601String()
+        .replaceAll(RegExp(r'[:.]'), '-');
+    final ext = proof.localPath.toLowerCase().endsWith('.png') ? 'png' : 'jpg';
+    return 'proofs/$ticketId/${battery.bpId}/${proof.kind.name}_$ts.$ext';
   }
 
   /// Geo-fence check for recovery proof (PRD §4.3). Returns true if compliant
