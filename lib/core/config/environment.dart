@@ -11,6 +11,7 @@ class EnvironmentConfig {
     required this.apiBaseUrl,
     required this.apiTimeoutSeconds,
     required this.mapsApiKey,
+    required this.batteryTrackingUrl,
     required this.callRecordingProvider,
     required this.enableNetworkLogging,
     required this.gupshup,
@@ -25,6 +26,14 @@ class EnvironmentConfig {
   final String apiBaseUrl;
   final int apiTimeoutSeconds;
   final String mapsApiKey;
+
+  /// Base URL of the backend live battery-tracking web page, opened in an
+  /// in-app WebView from the BP detail map icon. The page tracks a BP's live
+  /// position by id; the app appends `batteryId`, `lat` and `lng` query params
+  /// and attaches the Bearer token to the initial request. Empty disables the
+  /// feature (the map icon falls back to the internal map route).
+  final String batteryTrackingUrl;
+
   final String callRecordingProvider;
   final bool enableNetworkLogging;
 
@@ -50,6 +59,7 @@ class EnvironmentConfig {
       apiBaseUrl: json['apiBaseUrl'] as String? ?? '',
       apiTimeoutSeconds: (json['apiTimeoutSeconds'] as num?)?.toInt() ?? 30,
       mapsApiKey: json['mapsApiKey'] as String? ?? '',
+      batteryTrackingUrl: json['batteryTrackingUrl'] as String? ?? '',
       callRecordingProvider: json['callRecordingProvider'] as String? ?? 'none',
       enableNetworkLogging: json['enableNetworkLogging'] as bool? ?? true,
       gupshup: GupshupConfig.fromJson(

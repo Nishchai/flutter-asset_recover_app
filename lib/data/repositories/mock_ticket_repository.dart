@@ -3,7 +3,9 @@ import 'dart:math';
 
 import 'package:asset_recovery_app/domain/entities/agent.dart';
 import 'package:asset_recovery_app/domain/entities/attempt.dart';
+import 'package:asset_recovery_app/domain/entities/attempt_submission.dart';
 import 'package:asset_recovery_app/domain/entities/battery.dart';
+import 'package:asset_recovery_app/domain/entities/battery_detail.dart';
 import 'package:asset_recovery_app/domain/entities/call_recording.dart';
 import 'package:asset_recovery_app/domain/entities/customer.dart';
 import 'package:asset_recovery_app/domain/entities/draft_attempt.dart';
@@ -11,6 +13,7 @@ import 'package:asset_recovery_app/domain/entities/enums.dart';
 import 'package:asset_recovery_app/domain/entities/geo_point.dart';
 import 'package:asset_recovery_app/domain/entities/live_token_model.dart';
 import 'package:asset_recovery_app/domain/entities/ticket.dart';
+import 'package:asset_recovery_app/domain/entities/ticket_detail.dart';
 import 'package:asset_recovery_app/domain/repositories/ticket_repository.dart';
 
 /// In-memory backend seeded with data that mirrors the Asset Assurance Figma
@@ -396,6 +399,76 @@ class MockTicketRepository implements TicketRepository {
       _delayed(_tickets.firstWhere((t) => t.ticketId == ticketId));
 
   @override
+  Future<TicketDetail> ticketFullDetail(String uuid) {
+    // Match on the backend UUID ([Ticket.caseId]); fall back to the human
+    // ticket number so the mock resolves regardless of which id the caller has.
+    final t = _tickets.firstWhere(
+      (t) => t.caseId == uuid || t.ticketId == uuid,
+      orElse: () => _tickets.first,
+    );
+    final bp = t.primaryBp;
+    return _delayed(TicketDetail(
+      id: t.caseId.isEmpty ? t.ticketId : t.caseId,
+      ticketNumber: t.ticketId,
+      status: t.status.wire,
+      priority: t.priority,
+      source: t.caseSource,
+      slaDeadline: t.slaDeadline,
+      overdueDays: t.overdueDays,
+      clusterCode: t.cluster,
+      reassignCount: t.reassignmentCount,
+      assignedAt: t.createdAt,
+      closedAt: t.closedAt,
+      resolutionType: t.resolutionType,
+      customer: TicketDetailCustomer(
+        id: '',
+        fullName: bp.customer.name,
+        phonePrimary: bp.customer.mobile,
+        addressLine1: bp.customer.address,
+        geoLocation: bp.lastKnownLocation.display,
+        lastSwapDate: bp.lastSwap,
+        lastSwapStationCode: bp.lastStation,
+      ),
+      battery: TicketDetailBattery(
+        id: '',
+        bpId: bp.bpId,
+        vehicleType: bp.vehicleType,
+        vehicleRegNo: bp.vehicleRegNo,
+        soc: bp.soc,
+        attemptCount: bp.attemptCount,
+      ),
+      createdAt: t.createdAt,
+      updatedAt: t.createdAt,
+      riskTier: bp.caseType,
+      isEmergency: t.isEmergency,
+      routeCode: t.routeCode,
+      daysSinceLastAttempt: t.daysSinceLastAttempt,
+    ),);
+  }
+
+  @override
+  Future<BatteryDetail?> batteryDetail(String bpId) {
+    // No real Battery Master API in mock mode — synthesise telemetry from the
+    // seeded BP so "Last Seen"/"Last TIU" render end-to-end without a backend.
+    for (final t in _tickets) {
+      for (final bp in t.batteries) {
+        if (bp.bpId == bpId) {
+          final loc = bp.lastKnownLocation;
+          return _delayed(BatteryDetail(
+            batterySerialNumber: bp.bpId,
+            lastLatitude: loc.lat,
+            lastLongitude: loc.lng,
+            lastTiuTimestamp:
+                (bp.lastSwap ?? DateTime.now()).subtract(const Duration(hours: 3)),
+            lastSoc: bp.soc?.toDouble(),
+          ),);
+        }
+      }
+    }
+    return _delayed(null);
+  }
+
+  @override
   Future<Attempt> submitAttempt(
       String ticketId, String bpId, Attempt attempt,) async {
     final ticket = _tickets.firstWhere((t) => t.ticketId == ticketId);
@@ -444,6 +517,11 @@ class MockTicketRepository implements TicketRepository {
     _drafts.remove(bpId);
     return _delayed(stored);
   }
+
+  @override
+  Future<void> submitAttemptRecord(AttemptSubmission submission) =>
+      // Mock backend: accept and drop; nothing is persisted server-side.
+      _delayed(null);
 
   @override
   Future<bool> validateScan(

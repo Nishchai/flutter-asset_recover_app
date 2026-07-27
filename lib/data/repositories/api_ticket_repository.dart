@@ -4,7 +4,9 @@ import 'package:asset_recovery_app/core/services/api_client.dart';
 import 'package:asset_recovery_app/data/datasources/gupshup_otp_datasource.dart';
 import 'package:asset_recovery_app/domain/entities/agent.dart';
 import 'package:asset_recovery_app/domain/entities/attempt.dart';
+import 'package:asset_recovery_app/domain/entities/attempt_submission.dart';
 import 'package:asset_recovery_app/domain/entities/battery.dart';
+import 'package:asset_recovery_app/domain/entities/battery_detail.dart';
 import 'package:asset_recovery_app/domain/entities/call_recording.dart';
 import 'package:asset_recovery_app/domain/entities/customer.dart';
 import 'package:asset_recovery_app/domain/entities/draft_attempt.dart';
@@ -12,6 +14,7 @@ import 'package:asset_recovery_app/domain/entities/enums.dart';
 import 'package:asset_recovery_app/domain/entities/geo_point.dart';
 import 'package:asset_recovery_app/domain/entities/live_token_model.dart';
 import 'package:asset_recovery_app/domain/entities/ticket.dart';
+import 'package:asset_recovery_app/domain/entities/ticket_detail.dart';
 import 'package:asset_recovery_app/domain/repositories/ticket_repository.dart';
 
 /// Real backend implementation. Wired through [ApiClient] + `api_endpoints.json`.
@@ -63,6 +66,7 @@ class ApiTicketRepository implements TicketRepository {
       bpState: bpStateFromString(json['bpState'] as String?),
       vehicleType: json['vehicleType'] as String? ?? '', // MAP: vehicleType
       vehicleRegNo: json['vehicleRegNo'] as String? ?? '', // MAP: vehicleRegNo
+      bpType: json['bpType'] as String? ?? '', // MAP: bpType
       soc: (json['soc'] as num?)?.toInt(), // MAP: soc
       distanceKm: (json['distanceKm'] as num?)?.toDouble(), // MAP: distanceKm
       zone: json['zoneCode'] as String? ?? '', // MAP: zoneCode
@@ -80,9 +84,19 @@ class ApiTicketRepository implements TicketRepository {
       createdAt: _tryDate(json['createdAt']) ??
           DateTime.fromMillisecondsSinceEpoch(0),
       assignedAgentId: json['agentId'] as String? ?? '', // MAP: agentId
+      agentName: json['agentName'] as String? ?? '', // MAP: agentName
       cluster: json['clusterCode'] as String? ?? '', // MAP: clusterCode
       caseId: json['id'] as String? ?? '', // MAP: backend resource UUID
       caseSource: json['source'] as String? ?? '', // MAP: source
+      priority: (json['priority'] as num?)?.toInt() ?? 0, // MAP: priority
+      slaDeadline: _tryDate(json['slaDeadline']), // MAP: slaDeadline
+      overdueDays: (json['overdueDays'] as num?)?.toInt() ?? 0, // MAP: overdueDays
+      resolutionType: json['resolutionType'] as String? ?? '', // MAP: resolutionType
+      isEmergency: json['isEmergency'] as bool? ?? false, // MAP: isEmergency
+      routeCode: json['routeCode'] as String? ?? '', // MAP: routeCode
+      daysSinceLastAttempt:
+          (json['daysSinceLastAttempt'] as num?)?.toInt() ?? 0, // MAP: daysSinceLastAttempt
+      batteryCount: (json['batteryCount'] as num?)?.toInt() ?? 0, // MAP: batteryCount
       batteries: [battery],
     );
   }
@@ -171,6 +185,23 @@ class ApiTicketRepository implements TicketRepository {
   }
 
   @override
+  Future<TicketDetail> ticketFullDetail(String uuid) async {
+    final res =
+        await _api.call('tickets.fullDetail', pathParams: {'ticketId': uuid});
+    _logResponse('tickets.fullDetail', res);
+    return TicketDetail.fromJson(res as Map<String, dynamic>);
+  }
+
+  @override
+  Future<BatteryDetail?> batteryDetail(String bpId) async {
+    final res =
+        await _api.call('battery.getBatteryDetails', pathParams: {'bpId': bpId});
+    _logResponse('battery.getBatteryDetails', res);
+    if (res is! Map<String, dynamic>) return null;
+    return BatteryDetail.fromEnvelope(res); // MAP: envelope -> result[0]
+  }
+
+  @override
   Future<Attempt> submitAttempt(
       String ticketId, String bpId, Attempt attempt,) async {
     final res = await _api.call(
@@ -180,6 +211,14 @@ class ApiTicketRepository implements TicketRepository {
     );
     _logResponse('attempts.create', res);
     return Attempt.fromJson(res as Map<String, dynamic>);
+  }
+
+  @override
+  Future<void> submitAttemptRecord(AttemptSubmission submission) async {
+    // Absolute-URL endpoint: ApiClient sends the body verbatim with no
+    // apiBaseUrl prefix and no agentId query param (contract accepts none).
+    final res = await _api.call('attempts.submit', body: submission.toJson());
+    _logResponse('attempts.submit', res);
   }
 
   @override

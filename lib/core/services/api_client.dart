@@ -30,15 +30,19 @@ class ApiClient {
 
   final ConfigService _config;
   final http.Client _client;
-  String? _authToken;
+
+  /// The current Bearer access token (minted by `generateAuthToken`), or null
+  /// before login / in mock mode. Set here so it's visible to every API-backed
+  /// repo sharing this client, and readable by non-`call` consumers that must
+  /// send the same credential themselves — e.g. the in-app WebView hosting the
+  /// backend battery-tracking page.
+  String? authToken;
 
   /// Called on a 401 to re-mint the token; see [onUnauthorized].
   TokenRefresher? _onUnauthorized;
 
   /// In-flight refresh, shared so concurrent 401s trigger a single re-mint.
   Future<void>? _refreshing;
-
-  set authToken(String? token) => _authToken = token;
 
   /// When set, a 401 from [call] triggers a single token refresh followed by one
   /// automatic retry of the original request with the new Bearer header.
@@ -58,20 +62,34 @@ class ApiClient {
     var path = spec.$2;
     pathParams.forEach((k, v) => path = path.replaceAll('{$k}', v));
 
-    // Attach the agent id to every request. Existing query params win if a
-    // caller ever passes an explicit `agentId`.
-    final mergedQuery = <String, String>{
-      'agentId': _agentId,
-      ...?query,
-    };
+    final Uri uri;
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      // An endpoint may carry an ABSOLUTE URL when it targets an external
+      // service on its own host (a base URL different from apiBaseUrl — e.g.
+      // the Battery Master API). Use it verbatim: no apiBaseUrl prefix and no
+      // app-scoped `agentId` param (that host neither expects nor wants it).
+      // The Bearer token is still attached in [_dispatch].
+      final parsed = Uri.parse(path);
+      uri = (query == null || query.isEmpty)
+          ? parsed
+          : parsed.replace(
+              queryParameters: {...parsed.queryParameters, ...query},
+            );
+    } else {
+      // Attach the agent id to every request. Existing query params win if a
+      // caller ever passes an explicit `agentId`.
+      final mergedQuery = <String, String>{
+        'agentId': _agentId,
+        ...?query,
+      };
 
-    // Join base + path with exactly one slash: apiBaseUrl carries a trailing
-    // slash and every endpoint path a leading one, so a naive concat yields a
-    // `//` segment that routers reject (404). Normalize both sides.
-    final base = _config.env.apiBaseUrl.replaceAll(RegExp(r'/+$'), '');
-    final rel = path.startsWith('/') ? path : '/$path';
-    final uri = Uri.parse('$base$rel')
-        .replace(queryParameters: mergedQuery);
+      // Join base + path with exactly one slash: apiBaseUrl carries a trailing
+      // slash and every endpoint path a leading one, so a naive concat yields a
+      // `//` segment that routers reject (404). Normalize both sides.
+      final base = _config.env.apiBaseUrl.replaceAll(RegExp(r'/+$'), '');
+      final rel = path.startsWith('/') ? path : '/$path';
+      uri = Uri.parse('$base$rel').replace(queryParameters: mergedQuery);
+    }
 
     final timeout = Duration(seconds: _config.env.apiTimeoutSeconds);
 
@@ -107,7 +125,7 @@ class ApiClient {
   ) async {
     final headers = <String, String>{
       'Content-Type': 'application/json',
-      if (_authToken != null) 'Authorization': 'Bearer $_authToken',
+      if (authToken != null) 'Authorization': 'Bearer $authToken',
     };
     final Object? encoded = _encodeBody(body, headers);
 

@@ -12,6 +12,7 @@
     "assigned": "GET /tickets",
     "stats": "GET /agents/{agentId}/tickets/stats",
     "detail": "GET /tickets/{ticketId}",
+    "fullDetail": "GET /tickets/{ticketId}",
     "byBp": "GET /batteries/{bpId}/ticket",
     "nearbyUnassigned": "GET /tickets/nearby-unassigned",
     "pickup": "POST /tickets/{ticketId}/pickup"
@@ -23,7 +24,9 @@
   },
   "attempts": {
     "create": "POST /tickets/{ticketId}/batteries/{bpId}/attempts",
-    "history": "GET /batteries/{bpId}/attempts"
+    "history": "GET /batteries/{bpId}/attempts",
+    "_comment_submit": "Standalone attempts service on its own host. Carries an ABSOLUTE URL so ApiClient uses it verbatim — no apiBaseUrl prefix and no agentId query param (the contract accepts no query params). Called on Submit Attempt from the Update Status screen.",
+    "submit": "POST http://10.10.60.110:5088/api/v1/attempts"
   },
   "proof": {
     "upload": "POST /proof/upload"
@@ -50,6 +53,10 @@
   },
   "bp": {
     "liveLocation": "GET /batteries/{bpId}/live-location"
+  },
+  "battery": {
+    "_comment": "Battery Master API lives on its own host (different base URL than apiBaseUrl), so this endpoint carries an ABSOLUTE URL. ApiClient uses absolute endpoint URLs verbatim (no apiBaseUrl prefix, no agentId param) while still attaching the Bearer token. {bpId} is filled from the ticket's bpId.",
+    "getBatteryDetails": "GET https://smartnetwork.azure-api.net/battery-master-api-stage/api/v3/WheelerBattery/SearchBattery/{bpId}"
   },
   "calls": {
     "start": "POST /calls/ozonetel/click-to-call",

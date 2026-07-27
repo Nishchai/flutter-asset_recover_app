@@ -1,13 +1,21 @@
 import 'package:asset_recovery_app/core/di/app_services.dart';
+import 'package:asset_recovery_app/core/di/injector.dart';
+import 'package:asset_recovery_app/core/error/result.dart';
 import 'package:asset_recovery_app/core/localization/app_localizations.dart';
 import 'package:asset_recovery_app/core/theme/app_theme.dart';
 import 'package:asset_recovery_app/core/utils/formatters.dart';
 import 'package:asset_recovery_app/domain/entities/battery.dart';
+import 'package:asset_recovery_app/domain/entities/battery_detail.dart';
 import 'package:asset_recovery_app/domain/entities/enums.dart';
+import 'package:asset_recovery_app/domain/entities/geo_point.dart';
 import 'package:asset_recovery_app/domain/entities/ticket.dart';
+import 'package:asset_recovery_app/domain/entities/ticket_detail.dart';
+import 'package:asset_recovery_app/domain/usecases/get_battery_detail_usecase.dart';
+import 'package:asset_recovery_app/domain/usecases/get_ticket_full_detail_usecase.dart';
 import 'package:asset_recovery_app/presentation/features/attempt/ticket_actions_hub.dart';
 import 'package:asset_recovery_app/presentation/features/map/map_screen.dart';
 import 'package:asset_recovery_app/presentation/features/qr/qr_scan_screen.dart';
+import 'package:asset_recovery_app/presentation/features/tracking/battery_tracking_screen.dart';
 import 'package:asset_recovery_app/presentation/shared/widgets/info_chip.dart';
 import 'package:asset_recovery_app/presentation/shared/widgets/pill_button.dart';
 import 'package:asset_recovery_app/presentation/shared/widgets/status_badge.dart';
@@ -18,17 +26,65 @@ import 'package:provider/provider.dart';
 
 /// BP detail (Figma Navigation flow): dark header, SLA-critical banner,
 /// customer + battery attributes, attempt history, and the recovery CTAs.
-class TicketDetailScreen extends StatelessWidget {
+class TicketDetailScreen extends StatefulWidget {
   const TicketDetailScreen({super.key, required this.ticketId});
 
   final String ticketId;
+
+  @override
+  State<TicketDetailScreen> createState() => _TicketDetailScreenState();
+}
+
+class _TicketDetailScreenState extends State<TicketDetailScreen> {
+  /// Full nested detail from `GET /tickets/{UUID}`. Fetched once, lazily, using
+  /// the ticket's backend resource UUID. Null until it arrives (or if it fails)
+  /// — the screen renders from the already-loaded [Ticket] regardless, so this
+  /// is a non-critical enrichment.
+  TicketDetail? _detail;
+
+  /// Live battery telemetry from the Battery Master API
+  /// (`battery.getBatteryDetails`), keyed by the ticket's `bpId`. Supplies the
+  /// customer card's "Last Seen" (last lat/long) and "Last TIU" (last TIU
+  /// timestamp). Null until it arrives (or if it fails) — same non-critical
+  /// enrichment contract as [_detail].
+  BatteryDetail? _batteryDetail;
+  bool _fetchStarted = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_fetchStarted) return;
+    final ticket = context.read<TicketProvider>().byId(widget.ticketId);
+    if (ticket == null) return;
+    _fetchStarted = true;
+    // The detail endpoint is keyed by the backend UUID (`id` in the list
+    // response, kept as [Ticket.caseId]); fall back to the ticket number if the
+    // UUID isn't populated (e.g. mock data).
+    final uuid = ticket.caseId.isNotEmpty ? ticket.caseId : ticket.ticketId;
+    _loadDetail(uuid);
+    // The battery telemetry endpoint is keyed by the BP id from the ticket.
+    _loadBatteryDetail(ticket.primaryBp.bpId);
+  }
+
+  Future<void> _loadDetail(String uuid) async {
+    final result = await sl<GetTicketFullDetailUseCase>()(uuid);
+    if (!mounted || result.isErr) return;
+    setState(() => _detail = result.valueOrNull);
+  }
+
+  Future<void> _loadBatteryDetail(String bpId) async {
+    if (bpId.isEmpty) return;
+    final result = await sl<GetBatteryDetailUseCase>()(bpId);
+    if (!mounted || result.isErr) return;
+    setState(() => _batteryDetail = result.valueOrNull);
+  }
 
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final palette = context.read<AppPalette>();
     final tickets = context.watch<TicketProvider>();
-    final ticket = tickets.byId(ticketId);
+    final ticket = tickets.byId(widget.ticketId);
 
     if (ticket == null) {
       return Scaffold(appBar: AppBar(), body: Center(child: Text(l.t('common.error'))));
@@ -38,11 +94,15 @@ class TicketDetailScreen extends StatelessWidget {
     final isClosed = ticket.status == TicketStatus.closed ||
         ticket.status == TicketStatus.unrecoverable;
 
+    // Coordinates behind the customer card's "Last Seen" — passed to the live
+    // tracking page opened from the header map icon so both show the same spot.
+    final lastSeen = resolveLastSeenPoint(bp, _detail, _batteryDetail);
+
     return Scaffold(
       backgroundColor: palette.background,
       body: Column(
         children: [
-          _Header(ticket: ticket, bp: bp, palette: palette),
+          _Header(ticket: ticket, bp: bp, palette: palette, lastSeen: lastSeen),
           Expanded(
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
@@ -54,16 +114,24 @@ class TicketDetailScreen extends StatelessWidget {
                   _SlaBanner(ticket: ticket, palette: palette),
                   const SizedBox(height: 12),
                 ],
-                _CaseDetailsCard(ticket: ticket, bp: bp, palette: palette),
+                _CaseDetailsCard(
+                    ticket: ticket,
+                    bp: bp,
+                    palette: palette,
+                    batteryDetail: _batteryDetail,),
                 const SizedBox(height: 12),
-                _CustomerCard(bp: bp, palette: palette),
+                _CustomerCard(
+                    bp: bp,
+                    palette: palette,
+                    detail: _detail,
+                    batteryDetail: _batteryDetail,),
                 if (context.read<AppServices>().config.flag('features.riskVisibility') &&
                     bp.riskScore != null) ...[
                   const SizedBox(height: 12),
                   _RiskCard(bp: bp, palette: palette),
                 ],
                 const SizedBox(height: 12),
-                _AttemptHistory(ticket: ticket, palette: palette),
+                _AttemptHistory(detail: _detail, palette: palette),
               ],
             ),
           ),
@@ -74,11 +142,51 @@ class TicketDetailScreen extends StatelessWidget {
   }
 }
 
+/// Resolves the coordinates behind the customer card's "Last Seen" value,
+/// following the SAME source precedence as `_CustomerCard._lastSeen`: battery
+/// telemetry lat/lng → ticket-detail customer `geoLocation` (parsed from its
+/// normalised "lat, lng" string) → the base battery's last-known location. The
+/// live tracking page (`BatteryTrackingScreen`) is fed this so its map centres
+/// on exactly what the card shows.
+GeoPoint resolveLastSeenPoint(
+  Battery bp,
+  TicketDetail? detail,
+  BatteryDetail? batteryDetail,
+) {
+  final telemetry = batteryDetail?.location;
+  if (telemetry != null) return telemetry;
+  final parsed = _parseLatLng(detail?.customer?.geoLocation);
+  if (parsed != null) return parsed;
+  return bp.lastKnownLocation;
+}
+
+/// Parses a `"lat, lng"` string (the shape `TicketDetailCustomer.geoLocation`
+/// is normalised to) into a [GeoPoint]. Returns null for null/empty input or
+/// anything that isn't two parseable comma-separated doubles.
+GeoPoint? _parseLatLng(String? s) {
+  if (s == null || s.isEmpty) return null;
+  final parts = s.split(',');
+  if (parts.length != 2) return null;
+  final lat = double.tryParse(parts[0].trim());
+  final lng = double.tryParse(parts[1].trim());
+  if (lat == null || lng == null) return null;
+  return GeoPoint(lat: lat, lng: lng);
+}
+
 class _Header extends StatelessWidget {
-  const _Header({required this.ticket, required this.bp, required this.palette});
+  const _Header({
+    required this.ticket,
+    required this.bp,
+    required this.palette,
+    required this.lastSeen,
+  });
   final Ticket ticket;
   final Battery bp;
   final AppPalette palette;
+
+  /// "Last Seen" coordinates (see [resolveLastSeenPoint]) forwarded to the live
+  /// tracking page as its `lat`/`lng` params.
+  final GeoPoint lastSeen;
 
   @override
   Widget build(BuildContext context) {
@@ -111,9 +219,22 @@ class _Header extends StatelessWidget {
                   ),
                   const Spacer(),
                   InkWell(
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(builder: (_) => MapScreen(focusBp: bp)),
-                    ),
+                    onTap: () {
+                      // Live tracking page (backend WebView) when configured;
+                      // otherwise fall back to the internal route map.
+                      final trackingUrl = context
+                          .read<AppServices>()
+                          .config
+                          .env
+                          .batteryTrackingUrl;
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => trackingUrl.isNotEmpty
+                              ? BatteryTrackingScreen(bp: bp, location: lastSeen)
+                              : MapScreen(focusBp: bp),
+                        ),
+                      );
+                    },
                     child: Icon(Icons.map_outlined, color: palette.onDark),
                   ),
                 ],
@@ -261,12 +382,29 @@ class _SlaBanner extends StatelessWidget {
 /// console's "Case Details" panel — case/vehicle/assignment fields the field
 /// agent previously had no way to see together on the BP detail screen.
 class _CaseDetailsCard extends StatelessWidget {
-  const _CaseDetailsCard({required this.ticket, required this.bp, required this.palette});
+  const _CaseDetailsCard({
+    required this.ticket,
+    required this.bp,
+    required this.palette,
+    this.batteryDetail,
+  });
   final Ticket ticket;
   final Battery bp;
   final AppPalette palette;
 
+  /// Live battery telemetry from `battery.getBatteryDetails`, when it has
+  /// arrived. Takes precedence for "Last SOC" (`lastSoc`).
+  final BatteryDetail? batteryDetail;
+
   String _dash(String? v) => (v == null || v.isEmpty) ? '—' : v;
+
+  /// Last SOC — the battery telemetry's `lastSoc` wins; then the base
+  /// battery's `soc`; em-dash when neither is present. Rendered as a whole
+  /// percent to match the base `soc` display.
+  String _lastSoc() {
+    final soc = batteryDetail?.lastSoc ?? bp.soc?.toDouble();
+    return soc == null ? '—' : '${soc.toStringAsFixed(0)}%';
+  }
 
   String _statusLabel(AppLocalizations l) {
     switch (ticket.status) {
@@ -291,11 +429,11 @@ class _CaseDetailsCard extends StatelessWidget {
 
     final fields = <(String, String)>[
       (l.t('detail.batteryPack'), bp.bpId),
-      (l.t('caseDetails.caseId'), _dash(ticket.caseId.isEmpty ? null : ticket.caseId)),
+      (l.t('caseDetails.caseId'), _dash(ticket.ticketId.isEmpty ? null : ticket.ticketId)),
       (l.t('caseDetails.caseCreated'), Formatters.date(ticket.createdAt)),
       (l.t('caseDetails.caseSource'), _dash(ticket.caseSource.isEmpty ? null : ticket.caseSource)),
       (l.t('caseDetails.caseType'), bp.caseType),
-      (l.t('detail.vin'), _dash(bp.vin.isEmpty ? null : bp.vin)),
+      (l.t('detail.vin'), _dash(bp.vehicleRegNo.isEmpty ? null : bp.vehicleRegNo)),
       (l.t('caseDetails.vehicleType'), _dash(bp.vehicleType.isEmpty ? null : bp.vehicleType)),
       (l.t('caseDetails.vehicleId'), _dash(bp.vehicleId.isEmpty ? null : bp.vehicleId)),
       (l.t('caseDetails.customerName'), bp.customer.name),
@@ -303,7 +441,7 @@ class _CaseDetailsCard extends StatelessWidget {
       (l.t('caseDetails.zone'), _dash(bp.zone.isEmpty ? null : bp.zone)),
       (l.t('caseDetails.subzone'), _dash(bp.subzone.isEmpty ? null : bp.subzone)),
       (l.t('detail.lastSwap'), bp.lastSwap == null ? '—' : Formatters.date(bp.lastSwap!)),
-      (l.t('caseDetails.lastSoc'), bp.soc == null ? '—' : '${bp.soc}%'),
+      (l.t('caseDetails.lastSoc'), _lastSoc()),
       (l.t('detail.lastStation'), _dash(bp.lastStation.isEmpty ? null : bp.lastStation)),
       (l.t('caseDetails.assignedTo'), _dash(agent?.name)),
       (l.t('caseDetails.assignedOn'), Formatters.date(ticket.createdAt)),
@@ -358,9 +496,80 @@ class _CaseDetailsCard extends StatelessWidget {
 }
 
 class _CustomerCard extends StatelessWidget {
-  const _CustomerCard({required this.bp, required this.palette});
+  const _CustomerCard({
+    required this.bp,
+    required this.palette,
+    this.detail,
+    this.batteryDetail,
+  });
   final Battery bp;
   final AppPalette palette;
+
+  /// Full ticket detail from `GET /tickets/{UUID}`, when it has arrived. Its
+  /// customer sub-object supplies three fields the list summary lacks:
+  ///   • `geoLocation`         → Last Seen
+  ///   • `lastSwapDate`        → Last TIU
+  ///   • `lastSwapStationCode` → Last Swap
+  /// Each falls back to the base [Battery] value until the detail loads.
+  final TicketDetail? detail;
+
+  /// Live battery telemetry from `battery.getBatteryDetails`, when it has
+  /// arrived. Takes precedence for the two fields it carries:
+  ///   • `lastLatitude`/`lastLongitude` → Last Seen
+  ///   • `lastTiuTimestamp`             → Last TIU
+  final BatteryDetail? batteryDetail;
+
+  String _dash(String v) => v.isEmpty ? '—' : v;
+
+  /// Mobile → phonePrimary + phoneSecondary. Attaches whichever of the two is
+  /// non-empty (both, joined, when both are present; empty when neither is).
+  /// Falls back to the base customer's masked mobile until the detail loads.
+  String _mobile() {
+    final c = detail?.customer;
+    if (c == null) return bp.customer.maskedMobile();
+    final parts = [c.phonePrimary, c.phoneSecondary]
+        .where((p) => p.isNotEmpty)
+        .toList();
+    return _dash(parts.join(', '));
+  }
+
+  /// Address → all address components concatenated (line 1, city, state,
+  /// pincode), skipping empties. Falls back to the base customer address.
+  String _address() {
+    final c = detail?.customer;
+    if (c == null) return bp.customer.address;
+    final parts = [c.addressLine1, c.city, c.state, c.pincode]
+        .where((p) => p.isNotEmpty)
+        .toList();
+    return parts.isEmpty ? bp.customer.address : parts.join(', ');
+  }
+
+  /// Last Seen — the battery telemetry's last lat/long wins; then the ticket
+  /// detail's customer geoLocation; then the base battery's last known location.
+  String _lastSeen() {
+    final loc = batteryDetail?.location;
+    if (loc != null) return loc.display;
+    final geo = detail?.customer?.geoLocation;
+    if (geo != null && geo.isNotEmpty) return geo;
+    return bp.lastKnownLocation.display;
+  }
+
+  /// Last TIU — the battery telemetry's last TIU timestamp wins; then the ticket
+  /// detail's lastSwapDate; then the base battery's lastTiuTime string.
+  String _lastTiu() {
+    final tiu = batteryDetail?.lastTiuTimestamp;
+    if (tiu != null) return Formatters.dateTime(tiu);
+    final date = detail?.customer?.lastSwapDate;
+    if (date != null) return Formatters.date(date);
+    return _dash(bp.lastTiuTime);
+  }
+
+  /// lastSwapStationCode → Last Swap.
+  String _lastSwap() {
+    final code = detail?.customer?.lastSwapStationCode;
+    if (code != null && code.isNotEmpty) return code;
+    return bp.lastSwap != null ? Formatters.date(bp.lastSwap!) : '—';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -413,14 +622,15 @@ class _CustomerCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 14),
             child: Divider(height: 1, color: palette.border),
           ),
-          _row(l.t('detail.mobile'), bp.customer.maskedMobile(), palette),
-          _row(l.t('detail.address'), bp.customer.address, palette),
-          if (bp.lastSwap != null)
-            _row(l.t('detail.lastSwap'), Formatters.date(bp.lastSwap!), palette),
-          _row(l.t('detail.lastStation'), bp.lastStation, palette),
-          _row(l.t('detail.lastTiu'), bp.lastTiuTime, palette),
-          _row(l.t('detail.lastSeen'), bp.lastKnownLocation.display, palette,
-              last: true,),
+          _row(l.t('detail.mobile'), _mobile(), palette),
+          _row(l.t('detail.address'), _address(), palette),
+          // The next three are enriched from `GET /tickets/{UUID}` when it
+          // loads (customer geoLocation / lastSwapDate / lastSwapStationCode),
+          // falling back to the base battery values until then.
+          _row(l.t('detail.lastSwap'), _lastSwap(), palette),
+          _row(l.t('detail.lastStation'), _dash(bp.lastStation), palette),
+          _row(l.t('detail.lastTiu'), _lastTiu(), palette),
+          _row(l.t('detail.lastSeen'), _lastSeen(), palette, last: true),
         ],
       ),
     );
@@ -498,15 +708,19 @@ class _RiskCard extends StatelessWidget {
 }
 
 class _AttemptHistory extends StatelessWidget {
-  const _AttemptHistory({required this.ticket, required this.palette});
-  final Ticket ticket;
+  const _AttemptHistory({required this.detail, required this.palette});
+
+  /// Full ticket detail (source of the persisted [TicketDetailAttempt] records).
+  /// Null until the detail endpoint responds — the section renders an empty
+  /// state in the meantime.
+  final TicketDetail? detail;
   final AppPalette palette;
 
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final config = context.read<AppServices>().config;
-    final attempts = ticket.primaryBp.attempts;
+    final attempts = detail?.attempts ?? const <TicketDetailAttempt>[];
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -526,43 +740,215 @@ class _AttemptHistory extends StatelessWidget {
           if (attempts.isEmpty)
             Text('—', style: TextStyle(color: palette.muted))
           else
-            for (final a in attempts)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(Icons.check_circle, color: palette.info, size: 18),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            l.t('detail.attemptedOn',
-                                {'date': Formatters.date(a.createdAt)},),
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w600, fontSize: 13,),
-                          ),
-                          const SizedBox(height: 6),
-                          if (a.resolution.isNotEmpty)
-                            StatusBadge(
-                              label: a.resolution,
-                              color: palette.outcomeColor(a.resolution),
-                            )
-                          else
-                            InfoChip(label: l.t('detail.autoLogged'), palette: palette),
-                          if (a.remark.isNotEmpty) ...[
-                            const SizedBox(height: 6),
-                            Text(a.remark,
-                                style: TextStyle(color: palette.muted, fontSize: 12),),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ],
+            for (var i = 0; i < attempts.length; i++) ...[
+              if (i > 0) ...[
+                const SizedBox(height: 14),
+                Divider(height: 1, color: palette.border),
+                const SizedBox(height: 14),
+              ],
+              _AttemptTile(attempt: attempts[i], palette: palette),
+            ],
+        ],
+      ),
+    );
+  }
+}
+
+/// A single persisted attempt rendered per the BP-detail design: a header row
+/// (type · outcome · agent/duration), the free-text note, a meta row
+/// (completion · customer presence · geo), and any proof photos.
+class _AttemptTile extends StatelessWidget {
+  const _AttemptTile({required this.attempt, required this.palette});
+
+  final TicketDetailAttempt attempt;
+  final AppPalette palette;
+
+  /// Human duration between the two timestamps (e.g. "1 hour", "7 min").
+  String _duration() {
+    final from = attempt.attemptedAt;
+    final to = attempt.completedAt;
+    if (from == null || to == null) return '';
+    final d = to.difference(from);
+    if (d.isNegative) return '';
+    if (d.inHours >= 1) {
+      final h = d.inHours;
+      return '$h hour${h == 1 ? '' : 's'}';
+    }
+    if (d.inMinutes >= 1) return '${d.inMinutes} min';
+    return 'moments';
+  }
+
+  /// "field_visit" -> "field visit".
+  String get _typeLabel => attempt.attemptType.replaceAll('_', ' ');
+
+  /// "recovered" -> "Recovered".
+  String get _outcomeLabel {
+    final o = attempt.outcome;
+    if (o.isEmpty) return '';
+    return o[0].toUpperCase() + o.substring(1);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final duration = _duration();
+    final urls = attempt.proofUrls;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Row 1: type chip · outcome · (duration · agent).
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            if (_typeLabel.isNotEmpty) ...[
+              _OutlineTag(label: _typeLabel, palette: palette),
+              const SizedBox(width: 8),
+            ],
+            if (_outcomeLabel.isNotEmpty)
+              Flexible(
+                child: Text(
+                  _outcomeLabel,
+                  style: const TextStyle(
+                      fontSize: 15, fontWeight: FontWeight.w700,),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
+            const SizedBox(width: 8),
+            Text(
+              [
+                if (duration.isNotEmpty) 'in $duration',
+                if (attempt.agentName.isNotEmpty) attempt.agentName,
+              ].join(' · '),
+              style: TextStyle(color: palette.muted, fontSize: 12),
+            ),
+          ],
+        ),
+        // Row 2: the free-text note.
+        if (attempt.notes.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text(attempt.notes, style: const TextStyle(fontSize: 14)),
+        ],
+        // Row 3: completion · customer presence · geo.
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 16,
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            if (duration.isNotEmpty)
+              Text('Completed in $duration',
+                  style: TextStyle(color: palette.muted, fontSize: 12),),
+            Text(
+              attempt.customerPresent ? 'Customer present' : 'Customer absent',
+              style: TextStyle(color: palette.muted, fontSize: 12),
+            ),
+            if (attempt.latitude != null && attempt.longitude != null)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.place_outlined, size: 14, color: palette.muted),
+                  const SizedBox(width: 3),
+                  Text(
+                    '${attempt.latitude!.toStringAsFixed(4)}, '
+                    '${attempt.longitude!.toStringAsFixed(4)}',
+                    style: TextStyle(color: palette.muted, fontSize: 12),
+                  ),
+                ],
+              ),
+          ],
+        ),
+        // Proof photos.
+        if (urls.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final url in urls)
+                _ProofImage(url: url, palette: palette),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// Rounded outlined pill (e.g. the attempt type "field visit").
+class _OutlineTag extends StatelessWidget {
+  const _OutlineTag({required this.label, required this.palette});
+  final String label;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: palette.border),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+              fontSize: 12, fontWeight: FontWeight.w600, color: palette.muted,),
+        ),
+      );
+}
+
+/// A single proof photo with a "Photo" caption overlay, loaded from a network
+/// URL with graceful loading/error placeholders.
+class _ProofImage extends StatelessWidget {
+  const _ProofImage({required this.url, required this.palette});
+  final String url;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    const w = 240.0;
+    const h = 130.0;
+    Widget placeholder(IconData icon) => Container(
+          width: w,
+          height: h,
+          alignment: Alignment.center,
+          color: palette.chipBg,
+          child: Icon(icon, color: palette.muted),
+        );
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Stack(
+        children: [
+          Image.network(
+            url,
+            width: w,
+            height: h,
+            fit: BoxFit.cover,
+            loadingBuilder: (context, child, progress) =>
+                progress == null ? child : placeholder(Icons.image_outlined),
+            errorBuilder: (context, error, stack) =>
+                placeholder(Icons.broken_image_outlined),
+          ),
+          Positioned(
+            left: 8,
+            bottom: 8,
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.55),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.image_outlined, size: 13, color: Colors.white),
+                  SizedBox(width: 4),
+                  Text('Photo',
+                      style: TextStyle(color: Colors.white, fontSize: 11),),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );

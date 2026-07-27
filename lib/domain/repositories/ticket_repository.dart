@@ -1,11 +1,14 @@
 import 'package:asset_recovery_app/domain/entities/agent.dart';
 import 'package:asset_recovery_app/domain/entities/attempt.dart';
+import 'package:asset_recovery_app/domain/entities/attempt_submission.dart';
+import 'package:asset_recovery_app/domain/entities/battery_detail.dart';
 import 'package:asset_recovery_app/domain/entities/call_recording.dart';
 import 'package:asset_recovery_app/domain/entities/customer.dart';
 import 'package:asset_recovery_app/domain/entities/draft_attempt.dart';
 import 'package:asset_recovery_app/domain/entities/geo_point.dart';
 import 'package:asset_recovery_app/domain/entities/live_token_model.dart';
 import 'package:asset_recovery_app/domain/entities/ticket.dart';
+import 'package:asset_recovery_app/domain/entities/ticket_detail.dart';
 
 /// Backend-agnostic contract for all data access.
 ///
@@ -44,8 +47,25 @@ abstract class TicketRepository {
 
   Future<Ticket> ticketDetail(String ticketId);
 
+  /// Full, NESTED ticket detail (`GET /tickets/{UUID}`) fetched with the backend
+  /// resource UUID ([Ticket.caseId] / the response `id`). Carries fields the
+  /// flattened list summary omits — e.g. the customer's last-seen geo, last-swap
+  /// date and last-swap station — surfaced on the BP detail screen.
+  Future<TicketDetail> ticketFullDetail(String uuid);
+
+  /// Live battery telemetry from the Battery Master API
+  /// (`battery.getBatteryDetails`), keyed by the ticket's [bpId]. Supplies the
+  /// BP detail screen's "Last Seen" (last lat/long) and "Last TIU" (last TIU
+  /// timestamp). Null when the service returns no telemetry row for [bpId].
+  Future<BatteryDetail?> batteryDetail(String bpId);
+
   /// Persists a completed attempt and returns the stored record (with id).
   Future<Attempt> submitAttempt(String ticketId, String bpId, Attempt attempt);
+
+  /// Submits a completed attempt record to the standalone attempts service
+  /// (`attempts.submit` — `POST /api/v1/attempts`). Fire-and-confirm; throws
+  /// [ApiException] on a non-2xx response.
+  Future<void> submitAttemptRecord(AttemptSubmission submission);
 
   /// Validates a scanned BP serial against the assigned ticket (PRD §4.9 / QR).
   Future<bool> validateScan(String ticketId, String bpId, String scannedSerial);

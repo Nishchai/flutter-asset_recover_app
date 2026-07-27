@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:developer' as developer;
 import 'dart:io';
+import 'dart:math';
 
 import 'package:asset_recovery_app/core/config/config_service.dart';
 import 'package:asset_recovery_app/core/error/result.dart';
@@ -11,6 +12,7 @@ import 'package:asset_recovery_app/core/services/proof_service.dart';
 import 'package:asset_recovery_app/core/services/sync_queue_service.dart';
 import 'package:asset_recovery_app/core/utils/validators.dart';
 import 'package:asset_recovery_app/domain/entities/attempt.dart';
+import 'package:asset_recovery_app/domain/entities/attempt_submission.dart';
 import 'package:asset_recovery_app/domain/entities/battery.dart';
 import 'package:asset_recovery_app/domain/entities/call_recording.dart';
 import 'package:asset_recovery_app/domain/entities/customer.dart';
@@ -22,6 +24,7 @@ import 'package:asset_recovery_app/domain/entities/proof.dart';
 import 'package:asset_recovery_app/domain/usecases/call_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/draft_attempt_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/get_live_location_usecase.dart';
+import 'package:asset_recovery_app/domain/usecases/submit_attempt_record_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/update_customer_usecase.dart';
 import 'package:asset_recovery_app/presentation/state/ticket_provider.dart';
 import 'package:flutter/foundation.dart';
@@ -61,7 +64,10 @@ class AttemptController extends ChangeNotifier {
     required StartCallUseCase startCallUseCase,
     required GetCallRecordingsUseCase getCallRecordings,
     required SyncQueueService syncQueue,
-  })  : _config = config,
+    this.agentName = '',
+    SubmitAttemptRecordUseCase? submitAttemptRecord,
+  })  : _submitAttemptRecord = submitAttemptRecord,
+        _config = config,
         _location = location,
         _proof = proof,
         _blobUpload = blobUpload ?? const NoopBlobUploadService(),
@@ -78,6 +84,11 @@ class AttemptController extends ChangeNotifier {
   final String ticketId;
   final Battery battery;
   final String agentId;
+
+  /// Display name of the recovering agent (from the ticket detail screen's
+  /// "Assigned To"). Sent as `agentName` on the attempt submission.
+  final String agentName;
+  final SubmitAttemptRecordUseCase? _submitAttemptRecord;
   final ConfigService _config;
   final LocationService _location;
   final ProofService _proof;
@@ -95,6 +106,10 @@ class AttemptController extends ChangeNotifier {
   final Map<String, Proof> _proofs = {};
   bool _submitting = false;
   bool _loading = true;
+
+  /// When the agent opened the Update Status screen — captured on first entry
+  /// and sent as `attemptedAt` on the submission.
+  DateTime? _updateStatusOpenedAt;
   GeoPoint? _arrivalGps;
   GeoPoint? _liveLocation;
   bool _fetchingLiveLocation = false;
@@ -488,6 +503,71 @@ class AttemptController extends ChangeNotifier {
     );
   }
 
+  // --- Attempt submission (POST /api/v1/attempts) ------------------------------
+
+  /// Agent id sent on the attempt submission. Hard-coded for now, matching
+  /// [ApiClient]; sourced from the session once available.
+  static const _submissionAgentId = 'SUNMU00002340';
+
+  /// Attempt channel for the Update Status flow.
+  static const _submissionAttemptType = 'field_visit';
+
+  /// Records when the agent first entered the Update Status screen (idempotent
+  /// — later re-entries don't reset it). Drives `attemptedAt`.
+  void markUpdateStatusOpened() => _updateStatusOpenedAt ??= DateTime.now();
+
+  /// A random UUID v4 for the attempt `id` (no uuid package in this project).
+  String _generateAttemptId() {
+    final rng = Random();
+    final bytes = List<int>.generate(16, (_) => rng.nextInt(256));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
+    bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant 1
+    final hex =
+        bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-'
+        '${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
+  }
+
+  /// Blob URLs of proofs captured on this attempt that have finished uploading.
+  List<String> _proofUrls() =>
+      _proofs.values.map((p) => p.remoteUrl).whereType<String>().toList();
+
+  /// Every Update Status field value not mapped to a first-class column — sent
+  /// as `metadata` so nothing the agent entered is dropped.
+  Map<String, dynamic> _submissionMetadata() => {
+        for (final f in outcomeSection.fields)
+          if (f.id != 'outcome' && _values[f.id] != null) f.id: _values[f.id],
+      };
+
+  /// Builds the [AttemptSubmission] from the Update Status screen state.
+  /// [completedAt]/[gps] are captured at Submit time by the caller.
+  AttemptSubmission buildAttemptSubmission({
+    required DateTime completedAt,
+    required GeoPoint gps,
+  }) =>
+      AttemptSubmission(
+        id: _generateAttemptId(),
+        ticketId: ticketId,
+        batteryId: battery.bpId,
+        agentId: _submissionAgentId,
+        agentName: agentName,
+        attemptType: _submissionAttemptType,
+        // The app's snake_case outcome vocabulary (dropdowns.json `outcome`)
+        // already matches the attempts service's allowed enum values verbatim
+        // (recovered, fir, not_found_refused, customer_not_cooperating), so we
+        // send it raw. The service 422s "Invalid outcome" on anything else.
+        outcome: selectedOutcome,
+        attemptedAt: _updateStatusOpenedAt ?? DateTime.now(),
+        completedAt: completedAt,
+        latitude: gps.lat,
+        longitude: gps.lng,
+        // No customer-presence signal is captured on this screen; always false.
+        customerPresent: false,
+        notes: _buildRemark(),
+        proofUrls: _proofUrls(),
+        metadata: _submissionMetadata(),
+      );
+
   /// True when the last [submitOutcome] call queued the write for later sync
   /// (CC-04 — offline/unreachable) instead of confirming it immediately.
   bool lastOutcomeWasQueued = false;
@@ -503,6 +583,12 @@ class AttemptController extends ChangeNotifier {
     _submitting = true;
     notifyListeners();
     try {
+      // POST the attempt to the standalone attempts service. Timestamped at
+      // the moment of submit and geo-tagged with the agent's current location.
+      // A failure here is logged, not fatal — the local attempt flow below
+      // still records the outcome (and queues offline via [tickets]).
+      await _submitAttemptToService();
+
       await tickets.submitAttempt(ticketId, battery, buildAttempt());
       lastOutcomeWasQueued = tickets.lastSubmitWasQueued;
       await _saveDraft(SaveDraftParams(battery.bpId, const DraftAttempt()));
@@ -517,6 +603,25 @@ class AttemptController extends ChangeNotifier {
     } finally {
       _submitting = false;
       notifyListeners();
+    }
+  }
+
+  /// Builds and POSTs the [AttemptSubmission] to the attempts service. The
+  /// use case wraps errors in a [Result], so this never throws; a non-2xx or
+  /// network failure is logged and the outcome flow proceeds regardless.
+  Future<void> _submitAttemptToService() async {
+    final submit = _submitAttemptRecord;
+    if (submit == null) return; // not wired (e.g. unit tests) — skip.
+    final completedAt = DateTime.now();
+    final gps = await _location.currentLocation();
+    final submission =
+        buildAttemptSubmission(completedAt: completedAt, gps: gps);
+    final result = await submit(submission);
+    if (result.isErr) {
+      developer.log(
+        'attempt submission failed: ${result.failureOrNull?.message}',
+        name: 'AttemptController',
+      );
     }
   }
 }

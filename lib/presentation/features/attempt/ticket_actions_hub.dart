@@ -7,10 +7,12 @@ import 'package:asset_recovery_app/domain/entities/form_field_config.dart';
 import 'package:asset_recovery_app/domain/usecases/call_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/draft_attempt_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/get_live_location_usecase.dart';
+import 'package:asset_recovery_app/domain/usecases/submit_attempt_record_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/update_customer_usecase.dart';
 import 'package:asset_recovery_app/presentation/features/attempt/attempt_section_screen.dart';
 import 'package:asset_recovery_app/presentation/state/attempt_controller.dart';
 import 'package:asset_recovery_app/presentation/state/auth_provider.dart';
+import 'package:asset_recovery_app/presentation/state/ticket_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -35,14 +37,20 @@ class TicketActionsHub extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final services = context.read<AppServices>();
-    final agentId = context.read<AuthProvider>().agent!.id;
+    final agent = context.read<AuthProvider>().agent!;
+    // agentName comes from the tickets API (Ticket.agentName from the list /
+    // detail response), not the signed-in session.
+    final ticketAgentName =
+        context.read<TicketProvider>().byId(ticketId)?.agentName ?? '';
     return ChangeNotifierProvider<AttemptController>(
       create: (_) {
         final c = AttemptController(
           flow: services.attemptFlow,
           ticketId: ticketId,
           battery: battery,
-          agentId: agentId,
+          agentId: agent.id,
+          agentName: ticketAgentName,
+          submitAttemptRecord: sl<SubmitAttemptRecordUseCase>(),
           config: services.config,
           location: services.location,
           proof: services.proof,

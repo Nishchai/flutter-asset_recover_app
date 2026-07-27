@@ -38,6 +38,9 @@ class _AttemptSectionScreenState extends State<AttemptSectionScreen> {
     // (some synchronously, before their first await) and calling that
     // during initState — which runs mid-build — trips Flutter's
     // "setState during build" assertion.
+    // Stamp when the agent entered the Update Status screen — sent as
+    // `attemptedAt` on the attempt submission.
+    if (widget.isOutcome) controller.markUpdateStatusOpened();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (widget.section.id == 'call') controller.loadCallRecordings();

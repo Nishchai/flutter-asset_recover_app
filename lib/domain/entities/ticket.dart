@@ -16,6 +16,15 @@ class Ticket {
     this.reassignmentCount = 0,
     this.caseId = '',
     this.caseSource = '',
+    this.priority = 0,
+    this.slaDeadline,
+    this.overdueDays = 0,
+    this.agentName = '',
+    this.resolutionType = '',
+    this.isEmergency = false,
+    this.routeCode = '',
+    this.daysSinceLastAttempt = 0,
+    this.batteryCount = 0,
   });
 
   final String ticketId;
@@ -35,6 +44,40 @@ class Ticket {
 
   /// Where the case originated, e.g. "Theft Dashboard", "TIU Alert", "Manual".
   String caseSource;
+
+  /// Backend priority rank (higher = more urgent). Drives list ordering.
+  int priority;
+
+  /// Absolute SLA breach timestamp from the backend. Distinct from the
+  /// [slaDaysLeft] helper, which estimates a deadline off [createdAt] + a
+  /// configured window; when the backend supplies this, prefer it.
+  DateTime? slaDeadline;
+
+  /// Days the ticket is past its SLA deadline (0 when still within SLA).
+  int overdueDays;
+
+  /// Display name of the currently assigned agent (companion to
+  /// [assignedAgentId]).
+  String agentName;
+
+  /// How the case was resolved once closed (e.g. "swap", "fir"); empty while
+  /// the ticket is still open.
+  String resolutionType;
+
+  /// Backend-flagged emergency case, surfaced with priority treatment in the UI.
+  bool isEmergency;
+
+  /// Route the case belongs to within the [cluster]/zone (companion to
+  /// [Battery.zone]).
+  String routeCode;
+
+  /// Days since the last recovery attempt was logged against this ticket.
+  int daysSinceLastAttempt;
+
+  /// Battery count as reported by the backend summary. May differ from
+  /// [bpCount] (the number of [batteries] actually loaded into this model),
+  /// which in Phase 1 is always the single reconstructed BP.
+  int batteryCount;
 
   Battery get primaryBp => batteries.first;
   int get bpCount => batteries.length;
@@ -64,6 +107,18 @@ class Ticket {
         reassignmentCount: (json['reassignmentCount'] as num?)?.toInt() ?? 0,
         caseId: json['caseId'] as String? ?? '',
         caseSource: json['caseSource'] as String? ?? '',
+        priority: (json['priority'] as num?)?.toInt() ?? 0,
+        slaDeadline: json['slaDeadline'] == null
+            ? null
+            : DateTime.tryParse(json['slaDeadline'] as String),
+        overdueDays: (json['overdueDays'] as num?)?.toInt() ?? 0,
+        agentName: json['agentName'] as String? ?? '',
+        resolutionType: json['resolutionType'] as String? ?? '',
+        isEmergency: json['isEmergency'] as bool? ?? false,
+        routeCode: json['routeCode'] as String? ?? '',
+        daysSinceLastAttempt:
+            (json['daysSinceLastAttempt'] as num?)?.toInt() ?? 0,
+        batteryCount: (json['batteryCount'] as num?)?.toInt() ?? 0,
         batteries: (json['batteries'] as List)
             .map((e) => Battery.fromJson(e as Map<String, dynamic>))
             .toList(),
@@ -80,6 +135,15 @@ class Ticket {
         'reassignmentCount': reassignmentCount,
         'caseId': caseId,
         'caseSource': caseSource,
+        'priority': priority,
+        'slaDeadline': slaDeadline?.toIso8601String(),
+        'overdueDays': overdueDays,
+        'agentName': agentName,
+        'resolutionType': resolutionType,
+        'isEmergency': isEmergency,
+        'routeCode': routeCode,
+        'daysSinceLastAttempt': daysSinceLastAttempt,
+        'batteryCount': batteryCount,
         'batteries': batteries.map((b) => b.toJson()).toList(),
       };
 }

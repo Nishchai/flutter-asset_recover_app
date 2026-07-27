@@ -17,6 +17,7 @@ class Battery {
     this.dealerContact = '',
     this.vehicleType = '',
     this.vehicleRegNo = '',
+    this.bpType = '',
     this.vehicleId = '',
     this.tiuStatus = '',
     this.soc,
@@ -47,6 +48,10 @@ class Battery {
   String dealerContact;
   String vehicleType;
   String vehicleRegNo;
+
+  /// Battery pack type/model as classified by the backend (e.g. pack chemistry
+  /// or SKU). Empty when the backend hasn't populated it.
+  String bpType;
 
   /// Internal fleet vehicle identifier — distinct from [vehicleRegNo] (the
   /// number plate) and [vin]. Empty when this case's vehicle isn't part of
@@ -109,6 +114,7 @@ class Battery {
         dealerContact: json['dealerContact'] as String? ?? '',
         vehicleType: json['vehicleType'] as String? ?? '',
         vehicleRegNo: json['vehicleRegNo'] as String? ?? '',
+        bpType: json['bpType'] as String? ?? '',
         vehicleId: json['vehicleId'] as String? ?? '',
         tiuStatus: json['tiuStatus'] as String? ?? '',
         soc: (json['soc'] as num?)?.toInt(),
@@ -141,6 +147,7 @@ class Battery {
         'dealerContact': dealerContact,
         'vehicleType': vehicleType,
         'vehicleRegNo': vehicleRegNo,
+        'bpType': bpType,
         'vehicleId': vehicleId,
         'tiuStatus': tiuStatus,
         'soc': soc,

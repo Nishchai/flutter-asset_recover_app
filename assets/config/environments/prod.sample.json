@@ -5,6 +5,7 @@
   "apiBaseUrl": "https://asset-recovery.sunmobility.com/api/v1",
   "apiTimeoutSeconds": 30,
   "mapsApiKey": "REPLACE_WITH_PROD_MAPS_KEY",
+  "batteryTrackingUrl": "https://sm-battery-tracking.azurewebsites.net/",
   "callRecordingProvider": "exotel",
   "enableNetworkLogging": false,
   "gupshup": {
