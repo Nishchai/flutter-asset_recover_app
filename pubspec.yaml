@@ -47,8 +47,13 @@ dependencies:
   # app and returns the captured photo.
   image_picker: ^1.1.2
 
-  # Local persistence (session, language, cached tickets, offline sync queue)
+  # Local persistence (language, cached tickets, offline sync queue)
   shared_preferences: ^2.2.3
+
+  # Encrypted local persistence for the signed-in session (access token + agent)
+  # — Android EncryptedSharedPreferences / iOS Keychain. Lets the app skip the
+  # mobile+OTP screens on relaunch. See SessionStore.
+  flutter_secure_storage: ^9.2.2
 
   # Online/offline detection — drives the offline sync queue (CC-04).
   connectivity_plus: ^6.0.5

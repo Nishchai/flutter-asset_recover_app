@@ -11,11 +11,6 @@ import 'package:http/http.dart' as http;
 /// embedded proof images.
 const _gzipThresholdBytes = 2 * 1024;
 
-/// Every backend request is scoped to an agent. Hard-coded for now until the
-/// value is sourced from the authenticated session / agent profile.
-// TODO: replace with the real agent id once available from the session.
-const _agentId = 'SUNMU00002340';
-
 /// Re-mints the access token (OAuth2 client-credentials) and applies it via
 /// [ApiClient.authToken]. Invoked automatically on a 401 so an expired session
 /// recovers transparently. Returns once a fresh token has been set.
@@ -37,6 +32,14 @@ class ApiClient {
   /// send the same credential themselves — e.g. the in-app WebView hosting the
   /// backend battery-tracking page.
   String? authToken;
+
+  /// The id every relative request is scoped to, sent as the `agentId` query
+  /// param. Sourced from the signed-in session — the `partnerId` the
+  /// `commonLogin` response carried (see `PersistedSession.apiAgentId`) — and
+  /// kept in sync by [SessionStore], so it survives restarts with the session
+  /// and is cleared on logout. Null before the first sign-in, in which case the
+  /// param is omitted rather than sent empty.
+  String? agentId;
 
   /// Called on a 401 to re-mint the token; see [onUnauthorized].
   TokenRefresher? _onUnauthorized;
@@ -76,10 +79,12 @@ class ApiClient {
               queryParameters: {...parsed.queryParameters, ...query},
             );
     } else {
-      // Attach the agent id to every request. Existing query params win if a
-      // caller ever passes an explicit `agentId`.
+      // Attach the signed-in agent's id to every request. Omitted entirely when
+      // there is no session yet — an empty `agentId=` is worse than none.
+      // Existing query params win if a caller passes an explicit `agentId`.
+      final scoped = agentId;
       final mergedQuery = <String, String>{
-        'agentId': _agentId,
+        if (scoped != null && scoped.isNotEmpty) 'agentId': scoped,
         ...?query,
       };
 
@@ -88,7 +93,10 @@ class ApiClient {
       // `//` segment that routers reject (404). Normalize both sides.
       final base = _config.env.apiBaseUrl.replaceAll(RegExp(r'/+$'), '');
       final rel = path.startsWith('/') ? path : '/$path';
-      uri = Uri.parse('$base$rel').replace(queryParameters: mergedQuery);
+      final resolved = Uri.parse('$base$rel');
+      uri = mergedQuery.isEmpty
+          ? resolved
+          : resolved.replace(queryParameters: mergedQuery);
     }
 
     final timeout = Duration(seconds: _config.env.apiTimeoutSeconds);

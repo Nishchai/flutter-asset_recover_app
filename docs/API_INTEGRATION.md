@@ -57,6 +57,7 @@ here — keep one source of truth.
 
 | Capability | Config key | Used by |
 |---|---|---|
+| Partner directory lookup (login step 1) | `auth.commonLogin` | sign-in |
 | Mobile OTP request/verify (login) | `auth.requestOtp` / `auth.verifyOtp` | sign-in |
 | Assigned tickets (cluster-scoped) | `tickets.assigned` | task list |
 | Ticket detail | `tickets.detail` | detail screen |
@@ -84,11 +85,78 @@ These are device plugins, wired independently of the backend (see stubs in
 
 ## 6. Auth, RBAC & cluster scoping
 
+### The login flow (two steps)
+
+1. **`auth.commonLogin`** — the moment the agent submits their mobile number,
+   `GET https://sm-partners-api.azurewebsites.net/api/v1/commonLogin?appName=INDOFAST_PARTNER&userMobilenumber=<mobile>`
+   resolves it against the SM-Partners directory. The response envelope is
+   `{status, reason, data}`; `data` maps to `PartnerLoginData` and **is** the
+   real agent record (`userId`, `userName`, `partnerId`, `userRole`, …).
+   A non-200 `status`, a missing `data`, or `isActive: false` aborts the login
+   with the backend's own `reason` shown under the mobile field — **no OTP is
+   sent**.
+2. **OTP send → verify → token mint** — only on a step-1 success. The agent
+   identity persisted for the session is `PartnerLoginData.toAgent()`, whose
+   `Agent.id` is the **`partnerId`** (falling back to `userId`, then the mobile
+   number). `cluster` / `zone` / `recoveredCount` are not in the partner payload,
+   so they come from whatever the recovery backend supplied (`toAgent(base: …)`).
+
+`userRole` is mapped by `agentRoleFromString`, which falls back to
+`AgentRole.fieldAgent` for any value it doesn't recognise — Phase 1 is
+field-agent-only, so an unexpected role never locks an agent out.
+
+### Request scoping (`agentId`)
+
+`ApiClient` attaches `agentId=<partnerId>` to every **relative** endpoint —
+the `partnerId` from the `commonLogin` response, exposed as
+`PersistedSession.apiAgentId` and pushed into `ApiClient.agentId` by
+`SessionStore` on restore / login / logout. Nothing is hard-coded, and the value
+survives restarts with the session.
+
+Endpoints with an `{agentId}` **path** segment (e.g. `tickets.stats`) are filled
+by their callers from `Agent.id`, which is that same `partnerId` — one id
+everywhere, so the query param and the path segment can never disagree.
+
+- No session → the param is **omitted** (never sent empty).
+- No `partnerId` in the payload → falls back to `userId`, then the mobile number.
+- The 401 token swap deliberately leaves it untouched: same agent, new
+  credential, and the retried request still needs its scope.
+- Absolute endpoint URLs (Battery Master, `commonLogin`, the attempts service)
+  never receive it.
+
 - The bearer token from `auth.verifyOtp` is held by `ApiClient` and sent on
   every request.
 - Cluster-based data access (PRD §4.6) is expected to be enforced **server-side**
   on `tickets.assigned`; the app additionally only ever requests the signed-in
   agent's tickets.
+
+### Session persistence (login shown only once)
+
+`SessionStore` (`lib/core/services/session_store.dart`) persists the access
+token + signed-in `Agent` in encrypted storage — Android
+EncryptedSharedPreferences, iOS Keychain (`flutter_secure_storage`). The token
+never touches plain SharedPreferences. Nothing else writes
+`ApiClient.authToken`: every transition below flows through the store's
+`onAuthTokenChanged` sink, wired in `configureDependencies`.
+
+| Event | Store call | Effect |
+|---|---|---|
+| OTP verified | `save(token + agent + commonLogin profile)` | last time the login screens are shown |
+| App launch | `restore()` (in `configureDependencies`, before any UI) | `AuthProvider` is constructed already logged in → `_RootRouter` opens `HomeShell` |
+| **401** on any `ApiClient.call` | `clearAuthToken()` → re-mint → `replaceAuthToken(new)` | rejected token erased, fresh one saved, request retried once, agent stays signed in — no re-entry of mobile/OTP |
+| Logout / 12 h auto-logout | `clear()` | next launch starts at the login screen |
+
+Two consequences worth knowing:
+
+- A **restored token may already be expired** (client-credentials tokens are
+  ~1 h). That is fine and needs no startup network call: the first API request
+  401s, `ApiClient.onUnauthorized` re-mints silently and replays it.
+- If the re-mint itself fails, the token is already gone from disk, so the next
+  launch asks for the OTP again rather than restoring a credential the backend
+  refuses.
+
+The `test` environment uses `InMemorySessionStore` — `flutter_secure_storage`
+needs platform channels that `flutter_test` does not provide.
 
 ## 7. Offline & failures
 

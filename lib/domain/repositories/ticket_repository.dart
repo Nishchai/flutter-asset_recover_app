@@ -7,6 +7,7 @@ import 'package:asset_recovery_app/domain/entities/customer.dart';
 import 'package:asset_recovery_app/domain/entities/draft_attempt.dart';
 import 'package:asset_recovery_app/domain/entities/geo_point.dart';
 import 'package:asset_recovery_app/domain/entities/live_token_model.dart';
+import 'package:asset_recovery_app/domain/entities/partner_login_data.dart';
 import 'package:asset_recovery_app/domain/entities/ticket.dart';
 import 'package:asset_recovery_app/domain/entities/ticket_detail.dart';
 
@@ -19,6 +20,12 @@ import 'package:asset_recovery_app/domain/entities/ticket_detail.dart';
 /// Screens depend ONLY on this interface, so switching backends is a one-line
 /// change in the provider wiring. See docs/API_INTEGRATION.md.
 abstract class TicketRepository {
+  /// Looks [mobile] up in the SM-Partners directory (`commonLogin`) and returns
+  /// the agent record behind it. Step 1 of sign-in: it runs the moment the
+  /// mobile number is submitted and must succeed before any OTP is sent.
+  /// Throws when the number is unknown or the backend reports a failure.
+  Future<PartnerLoginData> commonLogin(String mobile);
+
   /// Validates [mobile] server-side and triggers an OTP send (mobile+OTP
   /// sign-in).
   Future<void> requestLoginOtp(String mobile);

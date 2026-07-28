@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:asset_recovery_app/core/di/app_services.dart';
 import 'package:asset_recovery_app/core/localization/app_localizations.dart';
 import 'package:asset_recovery_app/core/localization/locale_provider.dart';
@@ -73,7 +75,10 @@ class ProfileScreen extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: () => context.read<AuthProvider>().logout(),
+                // Clears the encrypted session too, so the next launch starts
+                // at the login screen again.
+                onPressed: () =>
+                    unawaited(context.read<AuthProvider>().logout()),
                 style: OutlinedButton.styleFrom(foregroundColor: palette.danger),
                 icon: const Icon(Icons.logout, size: 18),
                 label: Text(l.t('common.logout')),

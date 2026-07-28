@@ -56,9 +56,15 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
     setState(() => _mobileError = null);
-    // On success AuthProvider moves to AuthStatus.otpSent and this screen
-    // rebuilds into the OTP step below.
-    await context.read<AuthProvider>().requestOtp(value);
+    // Step 1 = commonLogin (directory lookup) + OTP send. On success
+    // AuthProvider moves to AuthStatus.otpSent and this screen rebuilds into
+    // the OTP step below; on failure no OTP was sent, so show WHY the number
+    // was rejected (the backend's `reason`) inline on the field.
+    final auth = context.read<AuthProvider>();
+    final ok = await auth.requestOtp(value);
+    if (!ok && mounted) {
+      setState(() => _mobileError = auth.error ?? l.t('common.error'));
+    }
   }
 
   Future<void> _submitOtp() async {
@@ -257,9 +263,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: TextStyle(fontSize: 12, color: palette.muted),
                   ),
                 ],
-                // On the OTP step the failure is shown inline on the field,
-                // so the generic banner is only for mobile-entry errors.
-                if (auth.error != null && !onOtpStep) ...[
+                // Failures are shown inline on the field they belong to (mobile
+                // or OTP); this banner is only a fallback for the rare error
+                // that isn't attached to either.
+                if (auth.error != null && !onOtpStep && _mobileError == null) ...[
                   const SizedBox(height: 12),
                   Text(
                     l.t('common.error'),

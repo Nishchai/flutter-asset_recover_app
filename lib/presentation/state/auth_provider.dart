@@ -2,37 +2,72 @@ import 'dart:async';
 
 import 'package:asset_recovery_app/core/error/result.dart';
 import 'package:asset_recovery_app/core/services/audit_log_service.dart';
+import 'package:asset_recovery_app/core/services/session_store.dart';
 import 'package:asset_recovery_app/domain/entities/agent.dart';
+import 'package:asset_recovery_app/domain/entities/partner_login_data.dart';
 import 'package:asset_recovery_app/domain/usecases/login_otp_usecase.dart';
 import 'package:flutter/foundation.dart';
 
 enum AuthStatus { loggedOut, sendingOtp, otpSent, verifyingOtp, loggedIn }
 
-/// Holds authentication state and the signed-in [Agent]. Mobile-number + OTP
-/// sign-in: [requestOtp] validates the mobile server-side and triggers the
-/// SMS send, [verifyOtp] exchanges the code for the authenticated agent.
+/// Holds authentication state and the signed-in [Agent]. Two-step
+/// mobile-number + OTP sign-in:
+///
+/// 1. [requestOtp] — looks the number up in the SM-Partners directory
+///    (`commonLogin`); only if it resolves to an agent is an OTP sent. The
+///    returned record is held in [profile] until the OTP is verified.
+/// 2. [verifyOtp] — verifies the code, mints the access token, and the agent
+///    from step 1 becomes the signed-in identity.
+///
 /// Depends on use cases (not the repository) — presentation talks to the
 /// domain through use cases only.
+///
+/// Session persistence: the login screens are shown only ONCE. On a successful
+/// [verifyOtp] the access token, agent and partner profile go to the
+/// [SessionStore] (encrypted); the DI container restores them at startup, so
+/// this provider is constructed already [AuthStatus.loggedIn] and the root
+/// router opens the home shell directly. [logout] wipes the stored session,
+/// sending the next launch back to the login screen.
 class AuthProvider extends ChangeNotifier {
-  AuthProvider(this._requestOtp, this._verifyOtp, this._auditLog);
+  AuthProvider(
+    this._requestOtp,
+    this._verifyOtp,
+    this._auditLog,
+    this._sessionStore,
+  )   : _agent = _sessionStore.current?.agent,
+        _status = _sessionStore.current == null
+            ? AuthStatus.loggedOut
+            : AuthStatus.loggedIn,
+        _mobile = _sessionStore.current?.agent.phone,
+        _profile = _sessionStore.current?.profile;
 
   final RequestLoginOtpUseCase _requestOtp;
   final VerifyLoginOtpUseCase _verifyOtp;
   final AuditLogService _auditLog;
+  final SessionStore _sessionStore;
 
-  AuthStatus _status = AuthStatus.loggedOut;
+  AuthStatus _status;
   Agent? _agent;
   String? _error;
   String? _mobile;
+  PartnerLoginData? _profile;
 
   AuthStatus get status => _status;
   Agent? get agent => _agent;
   String? get error => _error;
 
+  /// The full `commonLogin` record for the signed-in agent (partnerId, role,
+  /// email, app version…) — restored from encrypted storage on relaunch. Set
+  /// from [requestOtp] onwards; null in mock mode's pre-login state.
+  PartnerLoginData? get profile => _profile;
+
   /// The mobile number an OTP was last sent to, once [requestOtp] succeeds.
   String? get mobile => _mobile;
   bool get isLoggedIn => _status == AuthStatus.loggedIn;
 
+  /// Step 1: directory lookup, then OTP send. Returns false — with [error] set
+  /// to the backend's own reason — when the number isn't a known active agent,
+  /// in which case no OTP is sent.
   Future<bool> requestOtp(String mobile) async {
     _status = AuthStatus.sendingOtp;
     _error = null;
@@ -40,14 +75,16 @@ class AuthProvider extends ChangeNotifier {
 
     final result = await _requestOtp(mobile);
     return result.fold(
-      (_) {
+      (profile) {
         _mobile = mobile;
+        _profile = profile;
         _status = AuthStatus.otpSent;
         notifyListeners();
         return true;
       },
       (failure) {
         _error = failure.message;
+        _profile = null;
         _status = AuthStatus.loggedOut;
         notifyListeners();
         return false;
@@ -55,6 +92,8 @@ class AuthProvider extends ChangeNotifier {
     );
   }
 
+  /// Step 2: verifies the code, mints the token and signs the agent in using the
+  /// record [requestOtp] fetched.
   Future<bool> verifyOtp(String otp) async {
     final mobile = _mobile;
     if (mobile == null) return false;
@@ -62,13 +101,24 @@ class AuthProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
 
-    final result = await _verifyOtp(VerifyLoginOtpParams(mobile, otp));
+    final result = await _verifyOtp(
+      VerifyLoginOtpParams(mobile, otp, profile: _profile),
+    );
     return result.fold(
-      (agent) {
-        _agent = agent;
+      (login) {
+        _agent = login.agent;
+        _profile = login.profile ?? _profile;
         _status = AuthStatus.loggedIn;
         notifyListeners();
-        unawaited(_auditLog.log(agentId: agent.id, action: 'login'));
+        // Persist so this is the last time the login screens are shown. Not
+        // awaited: the UI must not wait on a keystore write, and a failure to
+        // save only costs an extra OTP on the next launch.
+        unawaited(_sessionStore.save(PersistedSession(
+          authToken: login.accessToken,
+          agent: login.agent,
+          profile: login.profile,
+        ),),);
+        unawaited(_auditLog.log(agentId: login.agent.id, action: 'login'));
         return true;
       },
       (failure) {
@@ -85,18 +135,24 @@ class AuthProvider extends ChangeNotifier {
   void resetToMobileEntry() {
     _status = AuthStatus.loggedOut;
     _mobile = null;
+    _profile = null;
     _error = null;
     notifyListeners();
   }
 
-  void logout() {
+  /// Signs out and erases the stored session, so the next launch shows the
+  /// login screen again. Awaiting it is optional — the UI flips to the login
+  /// screen as soon as the state changes.
+  Future<void> logout() async {
     final agentId = _agent?.id;
     _agent = null;
     _mobile = null;
+    _profile = null;
     _status = AuthStatus.loggedOut;
     notifyListeners();
     if (agentId != null) {
       unawaited(_auditLog.log(agentId: agentId, action: 'logout'));
     }
+    await _sessionStore.clear();
   }
 }

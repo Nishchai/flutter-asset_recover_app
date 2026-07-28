@@ -12,6 +12,7 @@ import 'package:asset_recovery_app/domain/entities/draft_attempt.dart';
 import 'package:asset_recovery_app/domain/entities/enums.dart';
 import 'package:asset_recovery_app/domain/entities/geo_point.dart';
 import 'package:asset_recovery_app/domain/entities/live_token_model.dart';
+import 'package:asset_recovery_app/domain/entities/partner_login_data.dart';
 import 'package:asset_recovery_app/domain/entities/ticket.dart';
 import 'package:asset_recovery_app/domain/entities/ticket_detail.dart';
 import 'package:asset_recovery_app/domain/repositories/ticket_repository.dart';
@@ -358,6 +359,29 @@ class MockTicketRepository implements TicketRepository {
   }
 
   // --- TicketRepository -------------------------------------------------------
+
+  /// Mirrors a successful `commonLogin` for the seeded agent, so demo/mock mode
+  /// walks the same two-step login as the real backend: any 10-digit number is
+  /// "found" in the directory.
+  ///
+  /// `partnerId` — which `toAgent()` turns into the session's agent id — is the
+  /// seeded agent's id, since every ticket in this mock is assigned to that one
+  /// id and would otherwise filter out to an empty list.
+  @override
+  Future<PartnerLoginData> commonLogin(String mobile) => _delayed(
+        PartnerLoginData(
+          usermobileNumber: mobile,
+          userId: _agent.id,
+          apppartneruserId: 1,
+          appId: 1,
+          partnerId: _agent.id,
+          isActive: true,
+          isLoggedIn: true,
+          userName: _agent.name,
+          userRole: _agent.role.name,
+          emailId: 'rohan.m@example.com',
+        ),
+      );
 
   @override
   Future<void> requestLoginOtp(String mobile) => _delayed(null);

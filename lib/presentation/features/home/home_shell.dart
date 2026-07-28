@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:asset_recovery_app/core/di/app_services.dart';
 import 'package:asset_recovery_app/core/localization/app_localizations.dart';
 import 'package:asset_recovery_app/core/services/session_manager.dart';
@@ -28,7 +30,9 @@ class _HomeShellState extends State<HomeShell> {
     _session = SessionManager(
       sessionDuration: Duration(hours: config.autoLogoutHours),
       onExpired: () {
-        if (mounted) context.read<AuthProvider>().logout();
+        // Auto-logout also wipes the stored session, so the next launch asks
+        // for the OTP again (PRD §4.9).
+        if (mounted) unawaited(context.read<AuthProvider>().logout());
       },
     )..start();
   }

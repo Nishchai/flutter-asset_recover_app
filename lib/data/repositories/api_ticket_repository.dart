@@ -13,6 +13,7 @@ import 'package:asset_recovery_app/domain/entities/draft_attempt.dart';
 import 'package:asset_recovery_app/domain/entities/enums.dart';
 import 'package:asset_recovery_app/domain/entities/geo_point.dart';
 import 'package:asset_recovery_app/domain/entities/live_token_model.dart';
+import 'package:asset_recovery_app/domain/entities/partner_login_data.dart';
 import 'package:asset_recovery_app/domain/entities/ticket.dart';
 import 'package:asset_recovery_app/domain/entities/ticket_detail.dart';
 import 'package:asset_recovery_app/domain/repositories/ticket_repository.dart';
@@ -106,6 +107,32 @@ class ApiTicketRepository implements TicketRepository {
       v is String ? DateTime.tryParse(v) : null;
 
   @override
+  Future<PartnerLoginData> commonLogin(String mobile) async {
+    // `appName` is baked into the configured absolute URL; only the mobile
+    // number is appended here — Uri percent-encodes it, matching the legacy
+    // Java string concatenation (`...commonLogin?userMobilenumber=<m>&appName=...`).
+    final res = await _api.call('auth.commonLogin', query: {
+      'userMobilenumber': mobile,
+    },);
+    _logResponse('auth.commonLogin', res);
+
+    // Envelope: {"status": 200, "reason": "...", "data": {...}}. Anything else
+    // (unknown number, backend failure) is surfaced with the server's `reason`
+    // so the login screen can show why the number was rejected.
+    final envelope = res as Map<String, dynamic>?;
+    final status = (envelope?['status'] as num?)?.toInt(); // MAP: status
+    final reason = envelope?['reason'] as String? ?? ''; // MAP: reason
+    final data = envelope?['data']; // MAP: data
+    if (data is! Map<String, dynamic> || (status != null && status != 200)) {
+      throw ApiException(
+        reason.isEmpty ? 'Login failed for $mobile' : reason,
+        statusCode: status,
+      );
+    }
+    return PartnerLoginData.fromJson(data);
+  }
+
+  @override
   Future<void> requestLoginOtp(String mobile) =>
       _gupshup.sendOtp(mobile);
 
@@ -116,11 +143,9 @@ class ApiTicketRepository implements TicketRepository {
     if (!matched) {
       throw ApiException('Invalid or expired OTP');
     }
-    // MAP: with direct-to-Gupshup verification there is no backend token/agent
-    // in this response. Fetch the agent profile for the verified [mobile] here
-    // once that endpoint exists (e.g. `_api.call('auth.me', ...)`), and set
-    // `_api.authToken`. For now a minimal agent keyed on the mobile number is
-    // returned so the existing session/UI flow works unchanged.
+    // Gupshup returns no profile, so this is only a fallback identity: the real
+    // agent record comes from [commonLogin] in step 1 of the login and is what
+    // VerifyLoginOtpUseCase actually keeps (see AuthenticatedSession.agent).
     return Agent(
       id: mobile,
       name: '',

@@ -2,6 +2,8 @@
   "_comment": "API endpoint paths (relative to apiBaseUrl in the active environment file). These are placeholders — confirm/replace once backend integration details are provided. ApiTicketRepository reads these so endpoint changes need no code edits.",
 
   "auth": {
+    "_comment_commonLogin": "SM-Partners directory lookup — step 1 of login, called the moment the agent submits their mobile number. Lives on its own host, so it carries an ABSOLUTE URL (used verbatim: no apiBaseUrl prefix, no agentId param). `appName` is fixed per app and travels in the URL; ApiTicketRepository appends `userMobilenumber`. A success (status 200 with a `data` block) gates the OTP send; the returned `data` is the real agent record.",
+    "commonLogin": "GET https://sm-partners-api-stage.azurewebsites.net/api/v1/commonLogin?appName=INDOFAST_PARTNER",
     "requestOtp": "POST /auth/otp/request",
     "verifyOtp": "POST /auth/otp/verify",
     "refresh": "POST /auth/refresh",
@@ -11,7 +13,7 @@
   "tickets": {
     "assigned": "GET /tickets",
     "stats": "GET /agents/{agentId}/tickets/stats",
-    "detail": "GET /tickets/{ticketId}",
+    "detail": "GET /tickets/{agentId}",
     "fullDetail": "GET /tickets/{ticketId}",
     "byBp": "GET /batteries/{bpId}/ticket",
     "nearbyUnassigned": "GET /tickets/nearby-unassigned",

@@ -10,6 +10,7 @@ import 'package:asset_recovery_app/core/services/connectivity_service.dart';
 import 'package:asset_recovery_app/core/services/location_service.dart';
 import 'package:asset_recovery_app/core/services/proof_service.dart';
 import 'package:asset_recovery_app/core/services/route_tracking_service.dart';
+import 'package:asset_recovery_app/core/services/session_store.dart';
 import 'package:asset_recovery_app/core/services/sync_queue_service.dart';
 import 'package:asset_recovery_app/data/datasources/gupshup_otp_datasource.dart';
 import 'package:asset_recovery_app/data/repositories/api_audit_repository.dart';
@@ -90,6 +91,28 @@ Future<void> configureDependencies({
   // ApiTicketRepository.login) is visible to every other API-backed repo.
   sl.registerLazySingleton<ApiClient>(() => ApiClient(cfg));
 
+  // Encrypted session storage. Every session transition (restore / login / 401
+  // swap / logout) pushes the live credential AND the request-scoping agent id
+  // into the shared ApiClient, so the store is the single owner of both — no
+  // hard-coded agent id anywhere. The `test` environment has no platform
+  // channels, hence the in-memory variant there.
+  final sessionStore = cfg.env.environment == 'test'
+      ? InMemorySessionStore(
+          onAuthTokenChanged: (token) => sl<ApiClient>().authToken = token,
+          onAgentIdChanged: (id) => sl<ApiClient>().agentId = id,
+        )
+      : SecureSessionStore(
+          onAuthTokenChanged: (token) => sl<ApiClient>().authToken = token,
+          onAgentIdChanged: (id) => sl<ApiClient>().agentId = id,
+        );
+  sl.registerSingleton<SessionStore>(sessionStore);
+
+  // Restore a previous sign-in BEFORE any presentation state is built: this is
+  // what lets the app skip the mobile+OTP screens on relaunch. AuthProvider
+  // reads `SessionStore.current` synchronously in its constructor, and the
+  // restored token + agentId are already on the ApiClient for the first call.
+  await sessionStore.restore();
+
   // Direct-to-Gupshup OTP client (login OTP send/verify). Credentials live in
   // the active environment file (cfg.env.gupshup).
   sl.registerLazySingleton<GupshupOtpDataSource>(() => GupshupOtpDataSource(cfg));
@@ -108,16 +131,26 @@ Future<void> configureDependencies({
   // On a real backend, teach the shared ApiClient to recover from a 401 by
   // re-minting the OAuth2 token (client-credentials) and retrying the request.
   // Resolved lazily so it reuses the same repository/ApiClient instances.
+  //
+  // The stored token is dropped FIRST: the backend has just told us it is no
+  // longer valid, so it must not survive to the next launch even if the re-mint
+  // below fails (in which case the agent lands on the login screen — correct,
+  // since we have no working credential). On success the freshly minted token
+  // replaces it against the same signed-in agent, and the agent stays logged in
+  // — no re-entry of the mobile number or OTP.
   if (!cfg.env.useMockData) {
     final auth = cfg.env.authToken;
-    sl<ApiClient>().onUnauthorized = () =>
-        sl<TicketRepository>().generateAuthToken(
-          url: auth.url,
-          clientId: auth.clientId,
-          resource: auth.resource,
-          clientSecret: auth.clientSecret,
-          grantType: auth.grantType,
-        );
+    sl<ApiClient>().onUnauthorized = () async {
+      await sessionStore.clearAuthToken();
+      final token = await sl<TicketRepository>().generateAuthToken(
+        url: auth.url,
+        clientId: auth.clientId,
+        resource: auth.resource,
+        clientSecret: auth.clientSecret,
+        grantType: auth.grantType,
+      );
+      await sessionStore.replaceAuthToken(token.accessToken);
+    };
   }
 
   sl.registerLazySingleton<AuditRepository>(
@@ -175,7 +208,7 @@ Future<void> configureDependencies({
   unawaited(syncQueue.init());
 
   // --- Presentation state (fresh instance per provider scope) ---------------
-  sl.registerFactory(() => AuthProvider(sl(), sl(), sl()));
+  sl.registerFactory(() => AuthProvider(sl(), sl(), sl(), sl()));
   sl.registerFactory(() => TicketProvider(
         getAssigned: sl(),
         getStats: sl(),
