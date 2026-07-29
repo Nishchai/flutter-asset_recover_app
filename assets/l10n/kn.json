@@ -73,6 +73,7 @@
   "attempt.draftSaved": "ಉಳಿಸಲಾಗಿದೆ — ನೀವು ಇದನ್ನು ನಂತರ ಮುಂದುವರಿಸಬಹುದು",
   "attempt.pendingApproval": "ಸಲ್ಲಿಸಲಾಗಿದೆ — ಸಂಯೋಜಕರ ಅನುಮೋದನೆ ಬಾಕಿಯಿದೆ",
   "attempt.success": "ಪ್ರಯತ್ನ ಯಶಸ್ವಿಯಾಗಿ ಸಲ್ಲಿಸಲಾಗಿದೆ",
+  "attempt.statusUpdated": "ಸ್ಥಿತಿ ಯಶಸ್ವಿಯಾಗಿ ನವೀಕರಿಸಲಾಗಿದೆ",
   "call.durationSeconds": "{seconds}ಸೆ",
   "call.endCall": "ಕರೆ ಅಂತ್ಯಗೊಳಿಸಿ",
   "call.historicalRecordings": "ಹಿಂದಿನ ಕರೆ ರೆಕಾರ್ಡಿಂಗ್‌ಗಳು",

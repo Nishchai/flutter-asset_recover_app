@@ -1,5 +1,7 @@
-import 'package:asset_recovery_app/core/di/injector.dart';
-import 'package:asset_recovery_app/core/error/result.dart';
+// Unused while scan validation is local (see [_QrScanScreenState._process]) —
+// restore together with the ValidateBatteryScanUseCase call there.
+// import 'package:asset_recovery_app/core/di/injector.dart';
+// import 'package:asset_recovery_app/core/error/result.dart';
 import 'package:asset_recovery_app/core/localization/app_localizations.dart';
 import 'package:asset_recovery_app/core/theme/app_theme.dart';
 import 'package:asset_recovery_app/domain/entities/battery.dart';
@@ -14,9 +16,12 @@ import 'package:provider/provider.dart';
 /// red on a wrong battery, and a manual-entry fallback.
 ///
 /// The camera decodes BP serial QR codes; the first successful decode is
-/// validated via [ValidateBatteryScanUseCase] and routed to [QrResultScreen].
-/// Further decodes are ignored while a result is being handled. On platforms
-/// without a usable camera (e.g. some emulators) the manual-entry path remains.
+/// validated LOCALLY against the ticket's assigned BP (no backend call — the
+/// [ValidateBatteryScanUseCase] path is commented out in `_process` until
+/// `qr.validate` is live) and routed to [QrResultScreen]. Further decodes are
+/// ignored while a result is being handled. On platforms without a usable camera
+/// (e.g. some emulators) the manual-entry path remains, and goes through the
+/// same comparison.
 enum _ScanState { idle, detected, wrong }
 
 class QrScanScreen extends StatefulWidget {
@@ -54,13 +59,22 @@ class _QrScanScreenState extends State<QrScanScreen> {
 
   Future<void> _process(String scannedSerial) async {
     setState(() => _busy = true);
-    final result = await sl<ValidateBatteryScanUseCase>()(ValidateScanParams(
-      ticketId: widget.ticketId,
-      bpId: widget.battery.bpId,
-      scannedSerial: scannedSerial,
-    ),);
-    final ok = result.valueOrNull ?? false;
-    if (!mounted) return;
+    // Validation is LOCAL for now — no backend call. The serial (camera-decoded
+    // or typed in via manual entry, both land here) is compared with the BP
+    // assigned to this ticket: a match routes to the success result screen,
+    // anything else to the mismatch screen.
+    //
+    // Restore this once `qr.validate` (POST /batteries/validate-scan) is live on
+    // the backend — until then it fails outright and reports every scan as a
+    // mismatch:
+    // final result = await sl<ValidateBatteryScanUseCase>()(ValidateScanParams(
+    //   ticketId: widget.ticketId,
+    //   bpId: widget.battery.bpId,
+    //   scannedSerial: scannedSerial,
+    // ),);
+    // final ok = result.valueOrNull ?? false;
+    final ok = scannedSerial.trim().toUpperCase() ==
+        widget.battery.bpId.trim().toUpperCase();
     setState(() => _state = ok ? _ScanState.detected : _ScanState.wrong);
     await Future<void>.delayed(const Duration(milliseconds: 450));
     if (!mounted) return;

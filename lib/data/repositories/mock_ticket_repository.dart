@@ -548,6 +548,20 @@ class MockTicketRepository implements TicketRepository {
       _delayed(null);
 
   @override
+  Future<void> updateTicketStatus(String ticketId, String status) async {
+    // The wire vocabulary is camelCase ("inProgress") while [TicketStatus]
+    // parses snake_case, so fold the case before mapping onto the local model.
+    final normalized = status.replaceAllMapped(
+        RegExp('[A-Z]'), (m) => '_${m[0]!.toLowerCase()}',);
+    for (final t in _tickets) {
+      if (t.ticketId == ticketId || t.caseId == ticketId) {
+        t.status = TicketStatus.fromString(normalized);
+      }
+    }
+    return _delayed(null);
+  }
+
+  @override
   Future<bool> validateScan(
       String ticketId, String bpId, String scannedSerial,) async {
     final normalized = scannedSerial.trim().toUpperCase();

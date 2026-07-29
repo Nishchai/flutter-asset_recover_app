@@ -73,6 +73,7 @@
   "attempt.draftSaved": "सेव्ह केले — तुम्ही हे नंतर सुरू ठेवू शकता",
   "attempt.pendingApproval": "सबमिट केले — समन्वयकाच्या मंजुरीच्या प्रतीक्षेत",
   "attempt.success": "प्रयत्न यशस्वीरित्या सबमिट झाला",
+  "attempt.statusUpdated": "स्थिती यशस्वीरित्या अपडेट झाली",
   "call.durationSeconds": "{seconds} से.",
   "call.endCall": "कॉल समाप्त करा",
   "call.historicalRecordings": "मागील कॉल रेकॉर्डिंग",

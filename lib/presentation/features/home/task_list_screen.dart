@@ -41,7 +41,14 @@ class _TaskListScreenState extends State<TaskListScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final tickets = context.read<TicketProvider>();
       final agent = context.read<AuthProvider>().agent;
-      if (agent != null && !tickets.hasLoaded && !tickets.loading) {
+      // Reload when the list has never been loaded OR belongs to a different
+      // agent — the provider survives a logout, so a fresh sign-in must not
+      // keep showing (and refreshing) the previous agent's tickets.
+      final staleForThisAgent =
+          tickets.hasLoaded && tickets.loadedAgentId != agent?.id;
+      if (agent != null &&
+          (!tickets.hasLoaded || staleForThisAgent) &&
+          !tickets.loading) {
         tickets.load(agent.id);
       }
     });
@@ -84,6 +91,25 @@ class _TaskListScreenState extends State<TaskListScreen> {
         ),
       ),
     );
+  }
+
+  /// Pull-to-refresh on the My Tickets list — re-runs the tickets API for the
+  /// signed-in agent. The provider swaps in whatever came back (list, header
+  /// counts and filter tabs all rebuild off it); a failed call keeps the
+  /// current list and is surfaced as a snack bar.
+  Future<void> _onRefreshTickets() async {
+    final tickets = context.read<TicketProvider>();
+    final agent = context.read<AuthProvider>().agent;
+    if (agent == null) return;
+    await tickets.refresh(agent.id);
+    if (!mounted) return;
+    final error = tickets.error;
+    if (error != null) {
+      final l = AppLocalizations.of(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.isEmpty ? l.t('common.error') : error)),
+      );
+    }
   }
 
   Future<void> _onToggleShift(bool turnOn) async {
@@ -161,9 +187,17 @@ class _TaskListScreenState extends State<TaskListScreen> {
                     onSelect: (f) => setState(() => _filter = f),
                   ),
                   Expanded(
+                    // Pull-to-refresh starts at the top of the My Tickets list
+                    // (just under the header + filter tabs) and re-calls the
+                    // tickets API.
                     child: tickets.loading
                         ? const Center(child: CircularProgressIndicator())
-                        : _buildList(context, tickets, palette, services),
+                        : RefreshIndicator(
+                            onRefresh: _onRefreshTickets,
+                            color: palette.primary,
+                            child:
+                                _buildList(context, tickets, palette, services),
+                          ),
                   ),
                 ],
               ),
@@ -179,11 +213,21 @@ class _TaskListScreenState extends State<TaskListScreen> {
     final l = AppLocalizations.of(context);
     final items = tickets.ticketsFor(_filter);
     if (items.isEmpty) {
-      return Center(
-        child: Text(l.t('home.empty'), style: TextStyle(color: palette.muted)),
+      // Scrollable even when empty, so the empty state can still be pulled
+      // down to refresh.
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(20, 64, 20, 24),
+        children: [
+          Center(
+            child:
+                Text(l.t('home.empty'), style: TextStyle(color: palette.muted)),
+          ),
+        ],
       );
     }
     return ListView.separated(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
       itemCount: items.length,
       separatorBuilder: (_, __) => const SizedBox(height: 12),

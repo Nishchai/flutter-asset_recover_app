@@ -74,6 +74,12 @@ abstract class TicketRepository {
   /// [ApiException] on a non-2xx response.
   Future<void> submitAttemptRecord(AttemptSubmission submission);
 
+  /// Moves [ticketId] to [status] on the backend (`tickets.status` —
+  /// `POST /tickets/status` with `{"ticketId": ..., "status": ...}`).
+  /// [ticketId] is the human ticket number shown as "Case ID" on the ticket
+  /// detail screen (e.g. `TKT-2026-00026`), NOT the resource UUID.
+  Future<void> updateTicketStatus(String ticketId, String status);
+
   /// Validates a scanned BP serial against the assigned ticket (PRD §4.9 / QR).
   Future<bool> validateScan(String ticketId, String bpId, String scannedSerial);
 

@@ -140,16 +140,39 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Signs out and erases the stored session, so the next launch shows the
-  /// login screen again. Awaiting it is optional — the UI flips to the login
-  /// screen as soon as the state changes.
+  /// Registers [callback] to run on every [logout], before the login screen is
+  /// shown. Used by the agent-scoped presentation state (e.g. `TicketProvider`)
+  /// to drop the signed-out agent's cached data and, with it, the agent id it
+  /// would otherwise reuse on the next refresh — those providers live for the
+  /// whole app lifetime, so nothing else resets them between two sign-ins.
+  /// Wired once in `AssetRecoveryApp`.
+  void addLogoutListener(VoidCallback callback) => _onLogout.add(callback);
+
+  void removeLogoutListener(VoidCallback callback) => _onLogout.remove(callback);
+
+  final List<VoidCallback> _onLogout = [];
+
+  /// Signs out and erases the stored session — access token AND the
+  /// request-scoping agent id, which [SessionStore.clear] pushes to the
+  /// `ApiClient` as null. Nothing of the signed-out agent survives: the next
+  /// sign-in scopes its calls to the id ITS `commonLogin` returned. Awaiting it
+  /// is optional — the UI flips to the login screen as soon as the state
+  /// changes.
   Future<void> logout() async {
     final agentId = _agent?.id;
     _agent = null;
     _mobile = null;
     _profile = null;
+    _error = null;
     _status = AuthStatus.loggedOut;
+    for (final callback in List<VoidCallback>.of(_onLogout)) {
+      callback();
+    }
     notifyListeners();
+    // Emitted BEFORE the session is cleared, and deliberately so: the request
+    // is built (token + agentId) synchronously inside this call, so the logout
+    // event still carries the credential of the agent it belongs to. Queued for
+    // retry by AuditLogService if it fails.
     if (agentId != null) {
       unawaited(_auditLog.log(agentId: agentId, action: 'logout'));
     }

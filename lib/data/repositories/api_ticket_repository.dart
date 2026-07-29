@@ -247,6 +247,18 @@ class ApiTicketRepository implements TicketRepository {
   }
 
   @override
+  Future<void> updateTicketStatus(String ticketId, String status) async {
+    // Flat body — the ticket number travels in the payload, not the path.
+    // `status` is sent verbatim in the backend's own camelCase vocabulary
+    // (e.g. "inProgress"), NOT the app's snake_case [TicketStatus.wire].
+    final res = await _api.call('tickets.status', body: {
+      'ticketId': ticketId, // MAP: ticketId
+      'status': status, // MAP: status
+    },);
+    _logResponse('tickets.status', res);
+  }
+
+  @override
   Future<bool> validateScan(
       String ticketId, String bpId, String scannedSerial,) async {
     final res = await _api.call('qr.validate', body: {

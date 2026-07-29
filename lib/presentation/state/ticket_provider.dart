@@ -16,9 +16,9 @@ import 'package:asset_recovery_app/domain/usecases/submit_attempt_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/ticket_pickup_usecase.dart';
 import 'package:flutter/foundation.dart';
 
-/// Home tabs (item 1): All Tasks (nothing attempted yet) / In Progress (at
-/// least one action taken, including outcomes still awaiting AC approval) /
-/// Completed (closed or unrecoverable).
+/// Home tabs (item 1): All Tasks (every ticket the API returned, any status) /
+/// In Progress (at least one action taken, including outcomes still awaiting AC
+/// approval) / Completed (closed or unrecoverable).
 enum TicketFilter { allTasks, inProgress, completed }
 
 /// Presentation state for the ticket list. Talks to the domain exclusively
@@ -56,6 +56,7 @@ class TicketProvider extends ChangeNotifier {
   final PickupTicketUseCase _pickupTicket;
 
   bool _loading = false;
+  bool _refreshing = false;
   bool _hasLoaded = false;
   String? _error;
   List<Ticket> _all = [];
@@ -67,6 +68,10 @@ class TicketProvider extends ChangeNotifier {
   bool _loadingNearby = false;
 
   bool get loading => _loading;
+
+  /// True while a pull-to-refresh is in flight. Unlike [loading] it never
+  /// blanks the list — the RefreshIndicator owns the progress affordance.
+  bool get refreshing => _refreshing;
   bool get hasLoaded => _hasLoaded;
   String? get error => _error;
   String get sort => _sort;
@@ -83,12 +88,58 @@ class TicketProvider extends ChangeNotifier {
   bool isPendingSync(String ticketId) => _pendingSyncTicketIds.contains(ticketId);
   int get pendingSyncCount => _syncQueue.pendingCount;
 
+  /// The agent id the current list was loaded for — the signed-in agent's id
+  /// (the `commonLogin` partnerId). Null before the first [load] and after
+  /// [reset]. The task list compares it against the signed-in agent so a new
+  /// sign-in never renders the previous agent's tickets.
+  String? get loadedAgentId => _lastAgentId;
+
   Future<void> load(String agentId) async {
+    // A different agent is signing in on this provider (it outlives the
+    // session): drop the previous agent's tickets/stats rather than showing
+    // them while the new list loads.
+    if (_lastAgentId != null && _lastAgentId != agentId) _clearAgentScopedState();
     _lastAgentId = agentId;
     _loading = true;
     _error = null;
     notifyListeners();
 
+    await _fetchAgentTickets(agentId);
+
+    _sort = _config.stringValue('taskList.defaultSort', fallback: 'distance');
+    _loading = false;
+    _hasLoaded = true;
+    notifyListeners();
+  }
+
+  /// Pull-to-refresh on the home list: re-runs the tickets (and stats) API for
+  /// [agentId] and replaces the list with what came back, without flipping
+  /// [loading] — the current tickets stay on screen under the RefreshIndicator
+  /// instead of being swapped for a full-screen spinner. The agent's chosen
+  /// [sort] is preserved (unlike [load], which resets it to the default).
+  Future<void> refresh(String agentId) async {
+    if (_loading || _refreshing) return;
+    // First load for this agent (or a different one signed in): that's a plain
+    // load, including the reset of agent-scoped state.
+    if (!_hasLoaded || _lastAgentId != agentId) {
+      await load(agentId);
+      return;
+    }
+    _refreshing = true;
+    _error = null;
+    notifyListeners();
+
+    await _fetchAgentTickets(agentId);
+
+    _refreshing = false;
+    notifyListeners();
+  }
+
+  /// Fetches the agent's tickets + shift stats and folds the response into
+  /// state. On a ticket failure the previous list is kept and [error] is set,
+  /// so a failed refresh degrades to "nothing changed" rather than an empty
+  /// list. Shared by [load] and [refresh]; neither notifies from here.
+  Future<void> _fetchAgentTickets(String agentId) async {
     final ticketsResult = await _getAssigned(agentId);
     if (ticketsResult.isOk) {
       _all = ticketsResult.valueOrNull ?? const [];
@@ -102,11 +153,28 @@ class TicketProvider extends ChangeNotifier {
     if (statsResult.isOk) {
       _stats = statsResult.valueOrNull ?? ShiftStats.empty;
     }
+  }
 
-    _sort = _config.stringValue('taskList.defaultSort', fallback: 'distance');
-    _loading = false;
-    _hasLoaded = true;
+  /// Drops everything that belonged to the signed-out agent — tickets, stats
+  /// and, crucially, [loadedAgentId], the id [registerAttemptSyncHandler]'s
+  /// replay refreshes against. Called on logout (see
+  /// `AuthProvider.addLogoutListener`): this provider is created once for the
+  /// app's lifetime, so without it the next agent would see the previous one's
+  /// list and a queued write would refresh under the previous one's id.
+  void reset() {
+    _clearAgentScopedState();
     notifyListeners();
+  }
+
+  void _clearAgentScopedState() {
+    _all = [];
+    _stats = ShiftStats.empty;
+    _error = null;
+    _hasLoaded = false;
+    _lastAgentId = null;
+    _nearbyUnassigned = [];
+    _pendingSyncTicketIds.clear();
+    lastSubmitWasQueued = false;
   }
 
   /// Rule 7 — a ticket with no action/outcome reached within the configured
@@ -132,7 +200,9 @@ class TicketProvider extends ChangeNotifier {
     final filtered = _all.where((t) {
       switch (filter) {
         case TicketFilter.allTasks:
-          return t.status == TicketStatus.assigned;
+          // Every ticket the tickets API returned for this agent, whatever its
+          // status — the In Progress / Completed tabs are the narrowed views.
+          return true;
         case TicketFilter.inProgress:
           // Any BP with at least one action taken but not yet closed —
           // includes outcomes (Recovered / FIR-Lost) still awaiting AC

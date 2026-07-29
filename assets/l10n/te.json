@@ -73,6 +73,7 @@
   "attempt.draftSaved": "సేవ్ చేయబడింది — మీరు దీన్ని తర్వాత కొనసాగించవచ్చు",
   "attempt.pendingApproval": "సమర్పించబడింది — కోఆర్డినేటర్ ఆమోదం పెండింగ్‌లో ఉంది",
   "attempt.success": "ప్రయత్నం విజయవంతంగా సమర్పించబడింది",
+  "attempt.statusUpdated": "స్థితి విజయవంతంగా నవీకరించబడింది",
   "call.durationSeconds": "{seconds}సె",
   "call.endCall": "కాల్ ముగించు",
   "call.historicalRecordings": "మునుపటి కాల్ రికార్డింగ్‌లు",

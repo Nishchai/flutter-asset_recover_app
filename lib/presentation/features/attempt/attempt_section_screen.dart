@@ -60,13 +60,18 @@ class _AttemptSectionScreenState extends State<AttemptSectionScreen> {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
         return;
       }
-      final msg = controller.lastOutcomeWasQueued
-          ? l.t('sync.queuedOffline')
-          : (controller.requiresApproval
-              ? l.t('attempt.pendingApproval')
-              : (controller.resolution.isNotEmpty && !controller.requiresApproval
-                  ? l.t('attempt.closed')
-                  : l.t('attempt.success')));
+      // The attempts service accepted the status — confirm it plainly. Any
+      // ticket-side write that had to be queued behind it syncs on its own and
+      // isn't the agent's problem, so no "you're offline" message here.
+      final msg = controller.lastOutcomeSubmittedToService
+          ? l.t('attempt.statusUpdated')
+          : (controller.lastOutcomeWasQueued
+              ? l.t('sync.queuedOffline')
+              : (controller.requiresApproval
+                  ? l.t('attempt.pendingApproval')
+                  : (controller.resolution.isNotEmpty && !controller.requiresApproval
+                      ? l.t('attempt.closed')
+                      : l.t('attempt.success'))));
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
       Navigator.of(context)
         ..pop()
@@ -361,7 +366,7 @@ class _LiveLocationBar extends StatelessWidget {
                     style: TextStyle(color: palette.muted, fontSize: 13),),
               ),
               Expanded(
-                child: Text(controller.battery.lastTiuTime,
+                child: Text(controller.lastTiuDisplay,
                     textAlign: TextAlign.right,
                     style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),),
               ),

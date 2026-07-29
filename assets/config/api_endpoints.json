@@ -17,7 +17,8 @@
     "fullDetail": "GET /tickets/{ticketId}",
     "byBp": "GET /batteries/{bpId}/ticket",
     "nearbyUnassigned": "GET /tickets/nearby-unassigned",
-    "pickup": "POST /tickets/{ticketId}/pickup"
+    "pickup": "POST /tickets/{ticketId}/pickup",
+    "status": "PATCH /tickets/status"
   },
   "shift": {
     "start": "POST /agents/{agentId}/shift/start",

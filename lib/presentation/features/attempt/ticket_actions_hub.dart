@@ -3,6 +3,7 @@ import 'package:asset_recovery_app/core/di/injector.dart';
 import 'package:asset_recovery_app/core/localization/app_localizations.dart';
 import 'package:asset_recovery_app/core/theme/app_theme.dart';
 import 'package:asset_recovery_app/domain/entities/battery.dart';
+import 'package:asset_recovery_app/domain/entities/battery_detail.dart';
 import 'package:asset_recovery_app/domain/entities/form_field_config.dart';
 import 'package:asset_recovery_app/domain/usecases/call_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/draft_attempt_usecase.dart';
@@ -22,10 +23,23 @@ import 'package:provider/provider.dart';
 /// any number of times — progress persists as a draft (item 13) until the
 /// Outcome action is submitted.
 class TicketActionsHub extends StatelessWidget {
-  const TicketActionsHub({super.key, required this.ticketId, required this.battery});
+  const TicketActionsHub({
+    super.key,
+    required this.ticketId,
+    required this.battery,
+    this.batteryDetail,
+  });
 
   final String ticketId;
   final Battery battery;
+
+  /// Live battery telemetry from `battery.getBatteryDetails`, already fetched by
+  /// the BP detail screen. Forwarded to [AttemptController] so the Visit BP
+  /// Location section can show the telemetry's last lat/long + last TIU and
+  /// navigate "View on Map" to those coordinates. Null when the call hasn't
+  /// landed (or returned no row) — the section then falls back to the cached
+  /// battery values.
+  final BatteryDetail? batteryDetail;
 
   static const _icons = {
     'phone': Icons.phone,
@@ -48,6 +62,7 @@ class TicketActionsHub extends StatelessWidget {
           flow: services.attemptFlow,
           ticketId: ticketId,
           battery: battery,
+          batteryDetail: batteryDetail,
           agentId: agent.id,
           agentName: ticketAgentName,
           submitAttemptRecord: sl<SubmitAttemptRecordUseCase>(),
@@ -169,14 +184,17 @@ class _ActionCard extends StatelessWidget {
           ),
         ),
         trailing: const Icon(Icons.chevron_right),
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => ChangeNotifierProvider.value(
-              value: controller,
-              child: AttemptSectionScreen(section: section, isOutcome: isOutcome),
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => ChangeNotifierProvider.value(
+                value: controller,
+                child:
+                    AttemptSectionScreen(section: section, isOutcome: isOutcome),
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }

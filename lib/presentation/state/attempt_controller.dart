@@ -10,10 +10,12 @@ import 'package:asset_recovery_app/core/services/blob_upload_service.dart';
 import 'package:asset_recovery_app/core/services/location_service.dart';
 import 'package:asset_recovery_app/core/services/proof_service.dart';
 import 'package:asset_recovery_app/core/services/sync_queue_service.dart';
+import 'package:asset_recovery_app/core/utils/formatters.dart';
 import 'package:asset_recovery_app/core/utils/validators.dart';
 import 'package:asset_recovery_app/domain/entities/attempt.dart';
 import 'package:asset_recovery_app/domain/entities/attempt_submission.dart';
 import 'package:asset_recovery_app/domain/entities/battery.dart';
+import 'package:asset_recovery_app/domain/entities/battery_detail.dart';
 import 'package:asset_recovery_app/domain/entities/call_recording.dart';
 import 'package:asset_recovery_app/domain/entities/customer.dart';
 import 'package:asset_recovery_app/domain/entities/draft_attempt.dart';
@@ -65,6 +67,7 @@ class AttemptController extends ChangeNotifier {
     required GetCallRecordingsUseCase getCallRecordings,
     required SyncQueueService syncQueue,
     this.agentName = '',
+    this.batteryDetail,
     SubmitAttemptRecordUseCase? submitAttemptRecord,
   })  : _submitAttemptRecord = submitAttemptRecord,
         _config = config,
@@ -88,6 +91,14 @@ class AttemptController extends ChangeNotifier {
   /// Display name of the recovering agent (from the ticket detail screen's
   /// "Assigned To"). Sent as `agentName` on the attempt submission.
   final String agentName;
+
+  /// Live battery telemetry from `battery.getBatteryDetails`, fetched once on
+  /// the BP detail screen and handed down through [TicketActionsHub]. Null
+  /// until/unless that call returns a telemetry row. Supplies the Visit BP
+  /// Location section's "Last Known Location" and "Last TIU" readouts and the
+  /// coordinates its "View on Map" button navigates to — see
+  /// [navigationTarget] and [lastTiuDisplay].
+  final BatteryDetail? batteryDetail;
   final SubmitAttemptRecordUseCase? _submitAttemptRecord;
   final ConfigService _config;
   final LocationService _location;
@@ -285,9 +296,22 @@ class AttemptController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// The point to navigate to / display — the freshly-fetched live location
-  /// once available, falling back to the last known one.
-  GeoPoint get navigationTarget => _liveLocation ?? battery.lastKnownLocation;
+  /// The point to navigate to / display — Battery Master telemetry's last
+  /// lat/long wins (same precedence the BP detail screen's "Last Seen" uses),
+  /// then a freshly-fetched live location, then the cached last known one.
+  /// Feeds the "Last Known Location" readonly field and the coordinates handed
+  /// to [MapScreen] by "View on Map".
+  GeoPoint get navigationTarget =>
+      batteryDetail?.location ?? _liveLocation ?? battery.lastKnownLocation;
+
+  /// "Last TIU" for the Visit BP Location section — the telemetry timestamp
+  /// from `battery.getBatteryDetails`, falling back to the base battery's
+  /// pre-formatted string.
+  String get lastTiuDisplay {
+    final tiu = batteryDetail?.lastTiuTimestamp;
+    if (tiu != null) return Formatters.dateTime(tiu);
+    return battery.lastTiuTime.isEmpty ? '—' : battery.lastTiuTime;
+  }
 
   // --- In-app calling (Ozonetel — Rule 8a) ------------------------------------
 
@@ -505,10 +529,6 @@ class AttemptController extends ChangeNotifier {
 
   // --- Attempt submission (POST /api/v1/attempts) ------------------------------
 
-  /// Agent id sent on the attempt submission. Hard-coded for now, matching
-  /// [ApiClient]; sourced from the session once available.
-  static const _submissionAgentId = 'SUNMU00002340';
-
   /// Attempt channel for the Update Status flow.
   static const _submissionAttemptType = 'field_visit';
 
@@ -549,7 +569,11 @@ class AttemptController extends ChangeNotifier {
         id: _generateAttemptId(),
         ticketId: ticketId,
         batteryId: battery.bpId,
-        agentId: _submissionAgentId,
+        // The signed-in agent's id — the `commonLogin` partnerId carried into
+        // the session on login (see `PersistedSession.apiAgentId`), passed down
+        // from the ticket screen. Never a hard-coded id: after a logout the next
+        // sign-in submits attempts under ITS own agent.
+        agentId: agentId,
         agentName: agentName,
         attemptType: _submissionAttemptType,
         // The app's snake_case outcome vocabulary (dropdowns.json `outcome`)
@@ -572,10 +596,16 @@ class AttemptController extends ChangeNotifier {
   /// (CC-04 — offline/unreachable) instead of confirming it immediately.
   bool lastOutcomeWasQueued = false;
 
+  /// True when the last [submitOutcome] call got a 2xx back from the attempts
+  /// service (POST /attempts). The status IS recorded server-side in that case,
+  /// so the UI confirms it outright — even if the ticket-side write behind
+  /// [lastOutcomeWasQueued] had to be queued.
+  bool lastOutcomeSubmittedToService = false;
+
   /// Validates + submits the Outcome action, finalizing the attempt and
   /// clearing the draft. Returns a localized error, or null on success (check
-  /// [requiresApproval]/[lastOutcomeWasQueued] afterwards to pick the right
-  /// success message).
+  /// [lastOutcomeSubmittedToService]/[requiresApproval]/[lastOutcomeWasQueued]
+  /// afterwards to pick the right success message).
   Future<String?> submitOutcome(TicketProvider tickets, Translate t) async {
     final error = validateSection(outcomeSection, t);
     if (error != null) return error;
@@ -587,7 +617,7 @@ class AttemptController extends ChangeNotifier {
       // the moment of submit and geo-tagged with the agent's current location.
       // A failure here is logged, not fatal — the local attempt flow below
       // still records the outcome (and queues offline via [tickets]).
-      await _submitAttemptToService();
+      lastOutcomeSubmittedToService = await _submitAttemptToService();
 
       await tickets.submitAttempt(ticketId, battery, buildAttempt());
       lastOutcomeWasQueued = tickets.lastSubmitWasQueued;
@@ -609,9 +639,10 @@ class AttemptController extends ChangeNotifier {
   /// Builds and POSTs the [AttemptSubmission] to the attempts service. The
   /// use case wraps errors in a [Result], so this never throws; a non-2xx or
   /// network failure is logged and the outcome flow proceeds regardless.
-  Future<void> _submitAttemptToService() async {
+  /// Returns true only when the service accepted the attempt.
+  Future<bool> _submitAttemptToService() async {
     final submit = _submitAttemptRecord;
-    if (submit == null) return; // not wired (e.g. unit tests) — skip.
+    if (submit == null) return false; // not wired (e.g. unit tests) — skip.
     final completedAt = DateTime.now();
     final gps = await _location.currentLocation();
     final submission =
@@ -622,6 +653,8 @@ class AttemptController extends ChangeNotifier {
         'attempt submission failed: ${result.failureOrNull?.message}',
         name: 'AttemptController',
       );
+      return false;
     }
+    return true;
   }
 }

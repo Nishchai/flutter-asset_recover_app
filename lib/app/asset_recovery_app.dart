@@ -33,7 +33,16 @@ class AssetRecoveryApp extends StatelessWidget {
         ChangeNotifierProvider<LocaleProvider>.value(value: localeProvider),
         ChangeNotifierProvider<AuthProvider>(create: (_) => sl<AuthProvider>()),
         ChangeNotifierProvider<TicketProvider>(
-            create: (_) => sl<TicketProvider>()..registerAttemptSyncHandler(),),
+          create: (context) {
+            final tickets = sl<TicketProvider>()..registerAttemptSyncHandler();
+            // This provider outlives the session, so logout has to empty it:
+            // otherwise the next agent to sign in sees the previous agent's
+            // tickets and refreshes them under the previous agent's id.
+            // AuthProvider is declared above, so it is already available here.
+            context.read<AuthProvider>().addLogoutListener(tickets.reset);
+            return tickets;
+          },
+        ),
         ChangeNotifierProvider<ShiftProvider>(create: (_) => sl<ShiftProvider>()),
       ],
       child: Consumer<LocaleProvider>(

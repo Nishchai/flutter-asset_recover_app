@@ -200,6 +200,54 @@ void main() {
           reason: 'set on login and restore, cleared on logout',);
     });
 
+    test('logout clears the agentId, and the next login scopes calls to the '
+        'agent ITS commonLogin returned', () async {
+      // Stands in for `ApiClient.agentId`, which is exactly what the DI
+      // container wires onAgentIdChanged to.
+      String? apiAgentId;
+      final disk = <String, String>{};
+      final store =
+          FakeDiskSessionStore(disk, onAgentIdChanged: (id) => apiAgentId = id);
+
+      // Agent A signs in.
+      await store.save(const PersistedSession(
+        authToken: 'token-a',
+        agent: agent,
+        profile: profile,
+      ),);
+      expect(apiAgentId, 'SUNMU0000234');
+
+      // …and signs out: no agent id is left on the client, and nothing of the
+      // session survives on disk to be restored.
+      await store.clear();
+      expect(apiAgentId, isNull);
+      expect(store.current, isNull);
+      expect(disk, isEmpty);
+
+      // Agent B signs in on the same device. Their own commonLogin partnerId —
+      // not A's — is what every request is scoped by from here on.
+      await store.save(const PersistedSession(
+        authToken: 'token-b',
+        agent: Agent(
+          id: 'SUNMU0000999',
+          name: 'Anita Rao',
+          cluster: 'Bengaluru North',
+          recoveredCount: 0,
+          phone: '9000000001',
+        ),
+        profile: PartnerLoginData(
+          usermobileNumber: '9000000001',
+          userId: 'SUNMU00009990',
+          partnerId: 'SUNMU0000999',
+          userName: 'Anita Rao',
+          isActive: true,
+        ),
+      ),);
+
+      expect(apiAgentId, 'SUNMU0000999');
+      expect(store.current!.apiAgentId, 'SUNMU0000999');
+    });
+
     test('the 401 token swap does NOT disturb the agentId', () async {
       final seen = <String?>[];
       final store = FakeDiskSessionStore({}, onAgentIdChanged: seen.add);

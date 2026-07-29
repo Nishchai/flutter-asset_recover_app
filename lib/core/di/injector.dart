@@ -36,6 +36,7 @@ import 'package:asset_recovery_app/domain/usecases/submit_attempt_record_usecase
 import 'package:asset_recovery_app/domain/usecases/submit_attempt_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/ticket_pickup_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/update_customer_usecase.dart';
+import 'package:asset_recovery_app/domain/usecases/update_ticket_status_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/validate_battery_scan_usecase.dart';
 import 'package:asset_recovery_app/presentation/state/auth_provider.dart';
 import 'package:asset_recovery_app/presentation/state/shift_provider.dart';
@@ -181,6 +182,7 @@ Future<void> configureDependencies({
   sl.registerLazySingleton(() => ValidateBatteryScanUseCase(sl()));
   sl.registerLazySingleton(() => GetRoadDistanceUseCase(sl()));
   sl.registerLazySingleton(() => UpdateCustomerUseCase(sl()));
+  sl.registerLazySingleton(() => UpdateTicketStatusUseCase(sl()));
   sl.registerLazySingleton(() => RequestHandoverOtpUseCase(sl()));
   sl.registerLazySingleton(() => VerifyHandoverOtpUseCase(sl()));
   sl.registerLazySingleton(() => GetDraftUseCase(sl()));

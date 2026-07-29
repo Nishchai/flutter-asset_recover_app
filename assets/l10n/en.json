@@ -290,6 +290,7 @@
   "profile.autoLogout": "Auto logout in {hours}h",
 
   "attempt.success": "Attempt submitted successfully",
+  "attempt.statusUpdated": "Status updated successfully",
   "attempt.pendingApproval": "Submitted — pending coordinator approval",
   "attempt.closed": "Ticket closed"
 }
