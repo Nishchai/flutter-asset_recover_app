@@ -9,6 +9,7 @@ import 'package:asset_recovery_app/core/services/audit_log_service.dart';
 import 'package:asset_recovery_app/core/services/blob_upload_service.dart';
 import 'package:asset_recovery_app/core/services/location_service.dart';
 import 'package:asset_recovery_app/core/services/proof_service.dart';
+import 'package:asset_recovery_app/core/services/sim_call_service.dart';
 import 'package:asset_recovery_app/core/services/sync_queue_service.dart';
 import 'package:asset_recovery_app/core/utils/formatters.dart';
 import 'package:asset_recovery_app/core/utils/validators.dart';
@@ -88,7 +89,9 @@ class AttemptController extends ChangeNotifier {
     this.agentName = '',
     this.batteryDetail,
     SubmitAttemptRecordUseCase? submitAttemptRecord,
-  })  : _submitAttemptRecord = submitAttemptRecord,
+    SimCallService? simCall,
+  })  : _simCall = simCall ?? const NoopSimCallService(),
+        _submitAttemptRecord = submitAttemptRecord,
         _config = config,
         _location = location,
         _proof = proof,
@@ -131,6 +134,7 @@ class AttemptController extends ChangeNotifier {
   final StartCallUseCase _startCallUseCase;
   final GetCallRecordingsUseCase _getCallRecordings;
   final SyncQueueService _syncQueue;
+  final SimCallService _simCall;
 
   final Map<String, dynamic> _values = {};
   final Map<String, Proof> _proofs = {};
@@ -158,12 +162,36 @@ class AttemptController extends ChangeNotifier {
   bool _callInProgress = false;
   List<CallRecording> _recordings = const [];
 
+  /// --- In-app SIM call (Android) ---
+  /// Live state of the call placed by [startSimCall], null when none is up.
+  SimCallState? _simCallState;
+  StreamSubscription<SimCallEvent>? _simCallSub;
+
+  /// When the current SIM call was placed — drives the on-screen elapsed timer.
+  DateTime? _simCallPlacedAt;
+
+  /// True when the platform is reporting this call's state, so its duration is
+  /// recorded automatically. False when READ_PHONE_STATE was refused and the
+  /// UI has to fall back to its own stopwatch.
+  bool _simCallTracked = false;
+
+  /// `callId` of the last SIM call already written to [_recordings], so an
+  /// `ended` event and a [reconcileSimCall] catch-up can't log it twice.
+  String? _recordedCallId;
+
+  /// Id of the call in flight, kept so [reconcileSimCall] knows which
+  /// `lastCallResult` belongs to it.
+  String? _activeCallId;
+
   bool get loading => _loading;
   bool get submitting => _submitting;
   GeoPoint? get liveLocation => _liveLocation;
   bool get fetchingLiveLocation => _fetchingLiveLocation;
   bool get callInProgress => _callInProgress;
   List<CallRecording> get recordings => _recordings;
+  SimCallState? get simCallState => _simCallState;
+  DateTime? get simCallPlacedAt => _simCallPlacedAt;
+  bool get simCallTracked => _simCallTracked;
 
   StepConfig get outcomeSection =>
       flow.steps.firstWhere((s) => s.id == 'outcome');
@@ -379,6 +407,149 @@ class AttemptController extends ChangeNotifier {
       _callInProgress = false;
       notifyListeners();
     }
+  }
+
+  // --- In-app SIM call (Rule 8a, Android) -------------------------------------
+
+  /// TEMPORARY: every in-app SIM call is placed to this test line instead of
+  /// the customer's own number, so the flow can be exercised against a phone
+  /// the team controls. Clear it to `''` to dial `battery.customer.mobile` —
+  /// the only change needed to go live.
+  static const String simCallOverrideNumber = '+917349577447';
+
+  /// The number [startSimCall] will actually dial. Displayed on the Start Call
+  /// button too, so the screen never claims to be calling a number it isn't.
+  String get simCallTargetNumber => simCallOverrideNumber.isEmpty
+      ? battery.customer.mobile
+      : simCallOverrideNumber;
+
+  /// True when this device can place the call on its own SIM from inside the
+  /// app. Resolved by [loadSimCallSupport] when the Call Customer screen opens;
+  /// false on iOS/desktop/emulators, where the UI times the call itself.
+  bool get simCallSupported => _simCallSupported;
+  bool _simCallSupported = false;
+
+  Future<void> loadSimCallSupport() async {
+    final supported = await _simCall.isSupported();
+    if (supported == _simCallSupported) return;
+    _simCallSupported = supported;
+    notifyListeners();
+  }
+
+  /// Dials the customer on the device SIM without leaving the app.
+  ///
+  /// Returns null on success, or a localization key describing why it could
+  /// not dial. On success the platform is watched for the call's real duration,
+  /// which is logged as a [CallRecording] the moment the agent hangs up — no
+  /// in-app stopwatch involved. When READ_PHONE_STATE is refused the call is
+  /// still placed but [simCallTracked] comes back false, and the caller is
+  /// expected to time the call itself and hand the seconds to
+  /// [saveCallRecording].
+  Future<String?> startSimCall() async {
+    final number = SimCallService.sanitize(simCallTargetNumber);
+    if (number.isEmpty) return 'call.noNumber';
+    if (_callInProgress) return null;
+
+    var perms = await _simCall.permissions();
+    if (!perms.canCall || !perms.canReadState) {
+      perms = await _simCall.requestPermissions();
+    }
+    // CALL_PHONE is the hard requirement; READ_PHONE_STATE only buys automatic
+    // duration capture, so a refusal there still lets the call go through.
+    if (!perms.canCall) return 'call.permissionDenied';
+
+    final SimCallStart start;
+    try {
+      start = await _simCall.placeCall(number);
+    } on SimCallException catch (e) {
+      return e.messageKey;
+    }
+
+    _activeCallId = start.callId;
+    _simCallTracked = start.stateTracked;
+    _simCallState = SimCallState.dialing;
+    _simCallPlacedAt = DateTime.now();
+    _callInProgress = true;
+    unawaited(_auditLog.log(
+      agentId: agentId,
+      action: 'call_started',
+      entityType: 'battery',
+      entityId: battery.bpId,
+      metadata: {'ticketId': ticketId, 'stateTracked': start.stateTracked},
+    ),);
+    if (start.stateTracked) _listenToSimCall();
+    notifyListeners();
+    return null;
+  }
+
+  void _listenToSimCall() {
+    _simCallSub?.cancel();
+    _simCallSub = _simCall.events.listen((event) {
+      // Events for a call we are no longer showing (a stale `ended` from a
+      // previous attempt) must not reopen the in-progress state.
+      if (_activeCallId != null &&
+          event.callId.isNotEmpty &&
+          event.callId != _activeCallId) {
+        return;
+      }
+      switch (event.state) {
+        case SimCallState.dialing:
+        case SimCallState.active:
+          _simCallState = event.state;
+          _callInProgress = true;
+          notifyListeners();
+        case SimCallState.ended:
+          _finishSimCall(event);
+      }
+    });
+  }
+
+  /// Closes out the tracked call: logs it as a recording (when it actually
+  /// connected) and clears the in-progress state.
+  void _finishSimCall(SimCallEvent event) {
+    _simCallSub?.cancel();
+    _simCallSub = null;
+    _simCallState = SimCallState.ended;
+    _callInProgress = false;
+    _simCallPlacedAt = null;
+    _activeCallId = null;
+    if (event.callId.isNotEmpty && event.callId == _recordedCallId) {
+      notifyListeners();
+      return;
+    }
+    _recordedCallId = event.callId;
+    if (event.durationSeconds > 0) {
+      // Logs the recording and notifies for us.
+      unawaited(saveCallRecording(event.durationSeconds));
+    } else {
+      // Dialed but never connected — nothing worth logging as a call record.
+      notifyListeners();
+    }
+  }
+
+  /// Picks up an `ended` event the app may have missed while backgrounded
+  /// behind the OS in-call screen. Called when the Call Customer screen
+  /// resumes; a no-op when there is nothing outstanding.
+  Future<void> reconcileSimCall() async {
+    if (!_callInProgress || !_simCallTracked) return;
+    final last = await _simCall.lastCallResult();
+    if (last == null) return;
+    if (last.callId.isNotEmpty && last.callId != _activeCallId) return;
+    _finishSimCall(last);
+  }
+
+  /// Abandons platform tracking of the call in flight — used when the UI timed
+  /// the call itself (untracked calls) or the agent dismissed the in-progress
+  /// banner.
+  Future<void> endSimCall() async {
+    await _simCallSub?.cancel();
+    _simCallSub = null;
+    _callInProgress = false;
+    _simCallState = null;
+    _simCallPlacedAt = null;
+    _activeCallId = null;
+    notifyListeners();
+    await _simCall.stopTracking();
   }
 
   /// Records a completed in-app call using the duration measured by the
@@ -676,6 +847,13 @@ class AttemptController extends ChangeNotifier {
   /// aren't told apart by `attemptType`; `metadata` carries the section's own
   /// fields (e.g. `homeVisitStatus` vs `visitStatus`) if they need separating.
   static const _sectionAttempts = <String, _SectionAttemptSpec>{
+    'call': _SectionAttemptSpec(
+      attemptType: 'call',
+      // "Call Status" (callStatus) — the dropdown's value goes out as `outcome`.
+      outcomeField: 'callStatus',
+      // "What did the customer say?" — the agent's free-text account of the call.
+      notesField: 'callingRemark',
+    ),
     'location_visit': _SectionAttemptSpec(
       attemptType: 'field_visit',
       // "What happened at the location" (bpLocationStatus).
@@ -711,6 +889,13 @@ class AttemptController extends ChangeNotifier {
   /// `bpLocationStatus` (`battery_found`, `battery_not_found`,
   /// `location_inaccessible`, `other`) is deliberately absent: the service is
   /// adding those members under the same names, so all four go out verbatim.
+  ///
+  /// `callStatus` (`connected`, `not_responding`, `call_disconnected`,
+  /// `switched_off`, `wrong_number`, `error`) is absent for the same reason —
+  /// the Call Customer dropdown value is sent exactly as configured. If the
+  /// service hasn't added these members yet it will 422 "Invalid outcome"; map
+  /// the app value to whatever it does accept here rather than editing
+  /// `dropdowns.json`, which is what the agent sees.
   static const Map<String, String> _visitOutcomeWireValues = {
     // homeVisitStatus — the service spells these two differently from the app.
     // "Yes, I saw a customer" and "Customer Not Available"; the third option,
@@ -873,5 +1058,14 @@ class AttemptController extends ChangeNotifier {
       return false;
     }
     return true;
+  }
+
+  @override
+  void dispose() {
+    // Leaving the Call Customer screen mid-call must not leave a platform
+    // listener attached to a dead controller.
+    _simCallSub?.cancel();
+    _simCallSub = null;
+    super.dispose();
   }
 }

@@ -81,6 +81,7 @@ class TicketActionsHub extends StatelessWidget {
           startCallUseCase: sl<StartCallUseCase>(),
           getCallRecordings: sl<GetCallRecordingsUseCase>(),
           syncQueue: services.syncQueue,
+          simCall: services.simCall,
         )..init();
         return c;
       },

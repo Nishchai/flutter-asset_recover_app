@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:asset_recovery_app/core/localization/app_localizations.dart';
+import 'package:asset_recovery_app/core/services/sim_call_service.dart';
 import 'package:asset_recovery_app/core/theme/app_theme.dart';
 import 'package:asset_recovery_app/domain/entities/form_field_config.dart';
 import 'package:asset_recovery_app/presentation/features/attempt/dynamic_field.dart';
@@ -29,7 +30,13 @@ class AttemptSectionScreen extends StatefulWidget {
   State<AttemptSectionScreen> createState() => _AttemptSectionScreenState();
 }
 
-class _AttemptSectionScreenState extends State<AttemptSectionScreen> {
+class _AttemptSectionScreenState extends State<AttemptSectionScreen>
+    with WidgetsBindingObserver {
+  /// Previous SIM-call state, so the transition into `ended` can be reported
+  /// once (the platform pushes the whole lifecycle, not just the end).
+  SimCallState? _lastSimCallState;
+  int _recordingsAtCallStart = 0;
+
   @override
   void initState() {
     super.initState();
@@ -48,11 +55,63 @@ class _AttemptSectionScreenState extends State<AttemptSectionScreen> {
     if (controller.recordsOwnAttempt(widget.section.id)) {
       controller.markSectionOpened(widget.section.id);
     }
+    if (widget.section.id == 'call') {
+      // The OS in-call screen backgrounds this one; on the way back we ask the
+      // platform whether the call finished while we weren't listening, and we
+      // watch the controller so a finished call is reported to the agent.
+      WidgetsBinding.instance.addObserver(this);
+      controller.addListener(_onSimCallStateChanged);
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      if (widget.section.id == 'call') controller.loadCallRecordings();
+      if (widget.section.id == 'call') {
+        controller.loadCallRecordings();
+        controller.loadSimCallSupport();
+      }
       if (widget.section.id == 'location_visit') controller.fetchLiveLocation();
     });
+  }
+
+  @override
+  void dispose() {
+    if (widget.section.id == 'call') {
+      WidgetsBinding.instance.removeObserver(this);
+      // read() is safe here: the provider outlives this screen (it lives on the
+      // hub), and dispose() runs before it is torn down.
+      context.read<AttemptController>().removeListener(_onSimCallStateChanged);
+    }
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      context.read<AttemptController>().reconcileSimCall();
+    }
+  }
+
+  /// Announces the end of a SIM call the platform tracked for us — the agent
+  /// hung up on the OS call screen, so nothing else would tell them whether the
+  /// call got logged.
+  void _onSimCallStateChanged() {
+    final controller = context.read<AttemptController>();
+    final state = controller.simCallState;
+    if (state == _lastSimCallState) return;
+    final previous = _lastSimCallState;
+    _lastSimCallState = state;
+    if (state == SimCallState.dialing) {
+      _recordingsAtCallStart = controller.recordings.length;
+      return;
+    }
+    if (state != SimCallState.ended || previous == null) return;
+    if (!mounted) return;
+    final l = AppLocalizations.of(context);
+    final logged = controller.recordings.length > _recordingsAtCallStart;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(l.t(logged ? 'call.recordingSaved' : 'call.notConnected')),
+      ),
+    );
   }
 
   Future<void> _onSave(BuildContext context) async {
@@ -92,13 +151,14 @@ class _AttemptSectionScreenState extends State<AttemptSectionScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
       return;
     }
-    // The visit sections also POST their attempt to the attempts service. The
-    // draft is saved either way, so say plainly which of the two happened
-    // instead of a blanket "Saved" that hides a rejected submission.
+    // The call and visit sections also POST their attempt to the attempts
+    // service. The draft is saved either way, so say plainly which of the two
+    // happened instead of a blanket "Saved" that hides a rejected submission.
+    final isCall = widget.section.id == 'call';
     final message = controller.recordsOwnAttempt(widget.section.id)
         ? (controller.lastSectionSubmittedToService
-            ? l.t('attempt.visitRecorded')
-            : l.t('attempt.visitNotSynced'))
+            ? l.t(isCall ? 'attempt.callRecorded' : 'attempt.visitRecorded')
+            : l.t(isCall ? 'attempt.callNotSynced' : 'attempt.visitNotSynced'))
         : l.t('attempt.draftSaved');
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
     Navigator.of(context).pop();
@@ -184,9 +244,11 @@ class _AttemptSectionScreenState extends State<AttemptSectionScreen> {
   }
 }
 
-/// In-app calling via Ozonetel (Rule 8a) — the call is proxied + recorded
-/// server-side by the provider; this UI starts the call and lists whatever
-/// recordings exist for this BP so far, replacing the old screenshot upload.
+/// In-app calling (Rule 8a) — on Android "Start Call" dials the customer on the
+/// device's own SIM without leaving the app, and the platform reports the call's
+/// duration so it is logged automatically when the agent hangs up. This UI
+/// starts the call and lists whatever recordings exist for this BP so far,
+/// replacing the old screenshot upload.
 class _CallRecordingPanel extends StatelessWidget {
   const _CallRecordingPanel({required this.palette});
   final AppPalette palette;
@@ -197,11 +259,59 @@ class _CallRecordingPanel extends StatelessWidget {
     return '${m}m ${s}s';
   }
 
+  /// Dials on the SIM (Android) or, where that isn't available, falls back to
+  /// timing the call in-app so the flow still works on emulators/iOS.
+  Future<void> _startCall(BuildContext context, AttemptController controller) async {
+    final l = AppLocalizations.of(context);
+    if (!controller.simCallSupported) {
+      await _timeCallInApp(context, controller);
+      return;
+    }
+    final errorKey = await controller.startSimCall();
+    if (!context.mounted) return;
+    if (errorKey != null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(l.t(errorKey))));
+      return;
+    }
+    // The call is up. With READ_PHONE_STATE granted the platform times it and
+    // the recording is logged on hang-up; without it, the agent has to.
+    if (!controller.simCallTracked) await _timeCallInApp(context, controller);
+  }
+
+  /// Stopwatch fallback: the agent taps End Call when the conversation is over
+  /// and those seconds become the [CallRecording].
+  Future<void> _timeCallInApp(BuildContext context, AttemptController controller) async {
+    final l = AppLocalizations.of(context);
+    final seconds = await showDialog<int>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _OngoingCallDialog(
+        palette: palette,
+        mobile: controller.simCallTargetNumber,
+        // Only worth explaining when a real call is running behind this dialog.
+        hint: controller.callInProgress ? l.t('call.manualTimerHint') : null,
+      ),
+    );
+    if (seconds != null && seconds > 0) {
+      await controller.saveCallRecording(seconds);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(l.t('call.recordingSaved'))));
+      }
+    }
+    await controller.endSimCall();
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final controller = context.watch<AttemptController>();
-    final mobile = controller.battery.customer.mobile;
+    // The number the call will really go to — while the test line is hardcoded
+    // that is not the customer's own mobile, and the button must say so.
+    final mobile = controller.simCallTargetNumber;
+    // While a tracked call is live the button would only start a second one.
+    final busy = controller.callInProgress && controller.simCallTracked;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -211,21 +321,16 @@ class _CallRecordingPanel extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: PillButton.yellow(
-              '${l.t('call.startRecording')} · $mobile',
+              '${l.t('call.startCall')} · $mobile',
               palette: palette,
               icon: Icons.call,
-              onPressed: () async {
-                final seconds = await showDialog<int>(
-                  context: context,
-                  barrierDismissible: false,
-                  builder: (_) => _OngoingCallDialog(palette: palette, mobile: mobile),
-                );
-                if (seconds != null && seconds > 0) {
-                  await controller.saveCallRecording(seconds);
-                }
-              },
+              onPressed: busy ? null : () => _startCall(context, controller),
             ),
           ),
+          if (busy) ...[
+            const SizedBox(height: 10),
+            _SimCallBanner(palette: palette),
+          ],
           const SizedBox(height: 14),
           Text(l.t('call.historicalRecordings'),
               style: TextStyle(fontWeight: FontWeight.w600, color: palette.onSurface),),
@@ -265,13 +370,100 @@ class _CallRecordingPanel extends StatelessWidget {
   }
 }
 
+/// Inline "call is up" strip shown while the platform tracks a live SIM call.
+/// The conversation itself happens on the OS in-call screen; this is what the
+/// agent comes back to, and it disappears on its own once the hang-up is
+/// reported and the duration logged.
+class _SimCallBanner extends StatefulWidget {
+  const _SimCallBanner({required this.palette});
+  final AppPalette palette;
+
+  @override
+  State<_SimCallBanner> createState() => _SimCallBannerState();
+}
+
+class _SimCallBannerState extends State<_SimCallBanner> {
+  Timer? _ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    // The platform only pushes state transitions, so the elapsed readout ticks
+    // locally off the moment the call was placed.
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final palette = widget.palette;
+    final controller = context.watch<AttemptController>();
+    final placedAt = controller.simCallPlacedAt;
+    final elapsed = placedAt == null
+        ? Duration.zero
+        : DateTime.now().difference(placedAt);
+    final label = controller.simCallState == SimCallState.active
+        ? l.t('call.inProgress')
+        : l.t('call.dialing');
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: palette.primaryLight,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: palette.border),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.phone_in_talk, size: 18, color: palette.primaryDark),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                  fontWeight: FontWeight.w600, color: palette.onSurface, fontSize: 13,),
+            ),
+          ),
+          Text(
+            '${elapsed.inMinutes.toString().padLeft(2, '0')}:'
+            '${(elapsed.inSeconds % 60).toString().padLeft(2, '0')}',
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              fontFeatures: const [FontFeature.tabularFigures()],
+              color: palette.onSurface,
+              fontSize: 13,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Modal shown while an in-app call is "connected": displays the on-going
 /// status with a live stopwatch and an End Call button. Popping returns the
 /// elapsed seconds so the caller can persist it as a [CallRecording].
 class _OngoingCallDialog extends StatefulWidget {
-  const _OngoingCallDialog({required this.palette, required this.mobile});
+  const _OngoingCallDialog({
+    required this.palette,
+    required this.mobile,
+    this.hint,
+  });
   final AppPalette palette;
   final String mobile;
+
+  /// Explains why the agent is looking at a stopwatch while the real call runs
+  /// on the OS in-call screen. Null when this dialog *is* the whole call (no
+  /// SIM support).
+  final String? hint;
 
   @override
   State<_OngoingCallDialog> createState() => _OngoingCallDialogState();
@@ -333,6 +525,14 @@ class _OngoingCallDialogState extends State<_OngoingCallDialog> {
               color: palette.onSurface,
             ),
           ),
+          if (widget.hint != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              widget.hint!,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: palette.muted, fontSize: 12),
+            ),
+          ],
         ],
       ),
       actionsAlignment: MainAxisAlignment.center,

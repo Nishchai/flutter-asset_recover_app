@@ -11,6 +11,7 @@ import 'package:asset_recovery_app/core/services/location_service.dart';
 import 'package:asset_recovery_app/core/services/proof_service.dart';
 import 'package:asset_recovery_app/core/services/route_tracking_service.dart';
 import 'package:asset_recovery_app/core/services/session_store.dart';
+import 'package:asset_recovery_app/core/services/sim_call_service.dart';
 import 'package:asset_recovery_app/core/services/sync_queue_service.dart';
 import 'package:asset_recovery_app/data/datasources/gupshup_otp_datasource.dart';
 import 'package:asset_recovery_app/data/repositories/api_audit_repository.dart';
@@ -159,6 +160,10 @@ Future<void> configureDependencies({
   );
   sl.registerLazySingleton<AuditLogService>(() => AuditLogService(sl(), sl(), sl()));
 
+  // In-app SIM calling (Rule 8a). Resolves to the real platform-channel
+  // implementation on Android and a no-op everywhere else.
+  sl.registerLazySingleton<SimCallService>(createSimCallService);
+
   sl.registerLazySingleton<AppServices>(() => AppServices(
         config: sl(),
         location: sl(),
@@ -168,6 +173,7 @@ Future<void> configureDependencies({
         auditLog: sl(),
         syncQueue: sl(),
         routeTracking: sl(),
+        simCall: sl(),
       ),);
 
   // --- Domain use cases -----------------------------------------------------

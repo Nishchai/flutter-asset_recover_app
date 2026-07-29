@@ -16,8 +16,20 @@
          Agent SDK is wired in; the current stub doesn't use the mic. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
+    <!-- In-app SIM call from the Call Customer screen (Rule 8a). CALL_PHONE
+         lets "Start Call" dial the customer on the device SIM directly
+         (ACTION_CALL) instead of handing off to the dialer app; READ_PHONE_STATE
+         lets SimCallHandler watch the call and record its real duration. The
+         call still goes through if only CALL_PHONE is granted — the app just
+         times it with its own stopwatch instead. -->
+    <uses-permission android:name="android.permission.CALL_PHONE" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+    <!-- Not required: tablets/emulators without a SIM still install and run,
+         they just report in-app calling as unavailable. -->
+    <uses-feature android:name="android.hardware.telephony" android:required="false" />
 
     <application
         android:label="Asset Recovery"

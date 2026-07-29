@@ -4,6 +4,7 @@ import 'package:asset_recovery_app/core/services/blob_upload_service.dart';
 import 'package:asset_recovery_app/core/services/location_service.dart';
 import 'package:asset_recovery_app/core/services/proof_service.dart';
 import 'package:asset_recovery_app/core/services/route_tracking_service.dart';
+import 'package:asset_recovery_app/core/services/sim_call_service.dart';
 import 'package:asset_recovery_app/core/services/sync_queue_service.dart';
 import 'package:asset_recovery_app/domain/entities/form_field_config.dart';
 
@@ -22,7 +23,8 @@ class AppServices {
     required this.auditLog,
     required this.syncQueue,
     required this.routeTracking,
-  });
+    SimCallService? simCall,
+  }) : simCall = simCall ?? const NoopSimCallService();
 
   final ConfigService config;
   final LocationService location;
@@ -32,4 +34,8 @@ class AppServices {
   final AuditLogService auditLog;
   final SyncQueueService syncQueue;
   final RouteTrackingService routeTracking;
+
+  /// In-app SIM calling for the Call Customer action. Android-only — a
+  /// [NoopSimCallService] elsewhere, which the UI treats as "unsupported".
+  final SimCallService simCall;
 }
