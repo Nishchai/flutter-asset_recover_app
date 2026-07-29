@@ -292,5 +292,7 @@
   "attempt.success": "Attempt submitted successfully",
   "attempt.statusUpdated": "Status updated successfully",
   "attempt.pendingApproval": "Submitted — pending coordinator approval",
-  "attempt.closed": "Ticket closed"
+  "attempt.closed": "Ticket closed",
+  "attempt.visitRecorded": "Visit recorded",
+  "attempt.visitNotSynced": "Saved on this device — the visit couldn't be sent to the server"
 }

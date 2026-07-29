@@ -39,6 +39,25 @@ typedef Translate = String Function(String key, [Map<String, Object?> params]);
 /// status chip on each Ticket Actions hub card.
 enum SectionStatus { empty, partial, done }
 
+/// How one visit section maps onto an [AttemptSubmission]: which of its fields
+/// supplies the `outcome` and the `notes`, and what `attemptType` it reports.
+/// See `AttemptController._sectionAttempts`.
+class _SectionAttemptSpec {
+  const _SectionAttemptSpec({
+    required this.attemptType,
+    required this.outcomeField,
+    required this.notesField,
+  });
+
+  final String attemptType;
+
+  /// `_values` key of the dropdown sent as `outcome`.
+  final String outcomeField;
+
+  /// `_values` key of the remarks field sent as `notes`.
+  final String notesField;
+}
+
 /// Drives the free-choice recovery actions (PRD-derived, item 4): Call
 /// Customer / Visit BP Location / Visit Customer Address / Update Status are
 /// independent actions the Field Agent can complete in any order, any number
@@ -121,6 +140,18 @@ class AttemptController extends ChangeNotifier {
   /// When the agent opened the Update Status screen — captured on first entry
   /// and sent as `attemptedAt` on the submission.
   DateTime? _updateStatusOpenedAt;
+
+  /// When the agent opened each visit section's screen, keyed by section id —
+  /// captured on first entry and sent as `attemptedAt` on that section's
+  /// attempt submission (`completedAt` is stamped when they tap Save). Keyed
+  /// per section so Visit BP Location and Visit Customer Address time
+  /// themselves independently of each other and of [_updateStatusOpenedAt].
+  final Map<String, DateTime> _sectionOpenedAt = {};
+
+  /// In-flight blob uploads, keyed by the field id that captured the proof.
+  /// [_proofUrlsForSection] awaits the relevant ones so a Save that lands
+  /// seconds after a photo capture still carries its `proofUrls`.
+  final Map<String, Future<void>> _uploadTasks = {};
   GeoPoint? _arrivalGps;
   GeoPoint? _liveLocation;
   bool _fetchingLiveLocation = false;
@@ -233,7 +264,9 @@ class AttemptController extends ChangeNotifier {
     // on the Proof) when the upload lands; failures are logged and the local
     // proof is kept. Drives the FIR-document upload (Outcome = FIR) today and
     // works the same for every other proof kind.
-    unawaited(_uploadProof(f.id, captured));
+    // The future is retained (not just unawaited) so a Save that happens while
+    // the upload is still in flight can await it — see [_proofUrlsForSection].
+    _uploadTasks[f.id] = _uploadProof(f.id, captured);
     return captured;
   }
 
@@ -418,6 +451,24 @@ class AttemptController extends ChangeNotifier {
     if (section.id == 'call') await _maybeUpdateMobile();
     if (section.id == 'home_visit') await _maybeUpdateAddress();
 
+    // The visit sections record their own attempt against the attempts
+    // service. Same not-fatal contract as the Outcome submission: a rejection
+    // or an unreachable service is logged and the local draft still saves, so
+    // the agent never loses what they entered. Check
+    // [lastSectionSubmittedToService] afterwards to tell the agent whether it
+    // reached the server. Runs after the customer mobile/address writes above
+    // so an updated address is already reflected in the submission.
+    if (recordsOwnAttempt(section.id)) {
+      _submitting = true;
+      notifyListeners();
+      try {
+        lastSectionSubmittedToService = await _submitSectionAttempt(section);
+      } finally {
+        _submitting = false;
+        notifyListeners();
+      }
+    }
+
     await _persistDraft();
     unawaited(_auditLog.log(
       agentId: agentId,
@@ -552,6 +603,26 @@ class AttemptController extends ChangeNotifier {
   List<String> _proofUrls() =>
       _proofs.values.map((p) => p.remoteUrl).whereType<String>().toList();
 
+  /// Blob URLs of the proofs belonging to [section] only — used when a single
+  /// section POSTs its own attempt and must not carry another section's photos.
+  ///
+  /// Awaits that section's still-running uploads first: capture fires the
+  /// upload in the background, so without this a quick Save would send an empty
+  /// `proofUrls` even though the photo uploads fine a moment later. Failed
+  /// uploads leave `remoteUrl` null and are simply omitted (never block Save).
+  Future<List<String>> _proofUrlsForSection(StepConfig section) async {
+    final ids = section.fields
+        .where((f) => f.type == 'proof')
+        .map((f) => f.id)
+        .toList();
+    final pending = ids.map((id) => _uploadTasks[id]).whereType<Future<void>>();
+    if (pending.isNotEmpty) await Future.wait(pending);
+    return ids
+        .map((id) => _proofs[id]?.remoteUrl)
+        .whereType<String>()
+        .toList();
+  }
+
   /// Every Update Status field value not mapped to a first-class column — sent
   /// as `metadata` so nothing the agent entered is dropped.
   Map<String, dynamic> _submissionMetadata() => {
@@ -591,6 +662,152 @@ class AttemptController extends ChangeNotifier {
         proofUrls: _proofUrls(),
         metadata: _submissionMetadata(),
       );
+
+  // --- Visit sections: each records its own attempt POST ----------------------
+
+  /// Which `_values` keys a visit section maps onto the submission's `outcome`
+  /// and `notes`, and the `attemptType` it reports.
+  ///
+  /// NOTE on `attemptType`: the service enum-validates this and 422s
+  /// "Invalid attemptType — Must be one of: call, field_visit, home_visit,
+  /// recovery." on anything else, so these are wire values, NOT screen labels.
+  /// Both visit sections deliberately report `field_visit` — the service does
+  /// also accept `home_visit`, but keeping one value means the two sections
+  /// aren't told apart by `attemptType`; `metadata` carries the section's own
+  /// fields (e.g. `homeVisitStatus` vs `visitStatus`) if they need separating.
+  static const _sectionAttempts = <String, _SectionAttemptSpec>{
+    'location_visit': _SectionAttemptSpec(
+      attemptType: 'field_visit',
+      // "What happened at the location" (bpLocationStatus).
+      outcomeField: 'visitStatus',
+      notesField: 'locationRemark',
+    ),
+    'home_visit': _SectionAttemptSpec(
+      attemptType: 'field_visit',
+      // "Battery status at location" (homeVisitStatus).
+      outcomeField: 'homeVisitStatus',
+      notesField: 'customerVisitRemark',
+    ),
+  };
+
+  /// True when [sectionId] POSTs its own attempt record on Save.
+  bool recordsOwnAttempt(String sectionId) =>
+      _sectionAttempts.containsKey(sectionId);
+
+  /// Records when the agent first entered [sectionId]'s screen (idempotent —
+  /// re-entering doesn't reset it). Drives `attemptedAt`; `completedAt` is
+  /// stamped at Save.
+  void markSectionOpened(String sectionId) =>
+      _sectionOpenedAt.putIfAbsent(sectionId, DateTime.now);
+
+  /// App-value → service-value translation for a visit `outcome`.
+  ///
+  /// The visit dropdowns (`bpLocationStatus`, `homeVisitStatus`) are worded for
+  /// the agent, not for the wire, and the attempts service enum-validates
+  /// `outcome` — it 422s "Invalid outcome" on anything outside its list. Values
+  /// absent from this map are sent verbatim, so only the values whose app
+  /// spelling differs from the service member need an entry here.
+  ///
+  /// `bpLocationStatus` (`battery_found`, `battery_not_found`,
+  /// `location_inaccessible`, `other`) is deliberately absent: the service is
+  /// adding those members under the same names, so all four go out verbatim.
+  static const Map<String, String> _visitOutcomeWireValues = {
+    // homeVisitStatus — the service spells these two differently from the app.
+    // "Yes, I saw a customer" and "Customer Not Available"; the third option,
+    // `address_not_found`, already matches its member and passes through.
+    'visit_done': 'customer_seen',
+    'not_available': 'customer_not_available',
+  };
+
+  /// Everything the agent entered on [section], plus the customer's name, sent
+  /// as `metadata` so nothing is dropped. Picks up the section's own text
+  /// fields automatically — e.g. Visit Customer Address's "Updated Customer
+  /// Address" (`newCustomerAddress`).
+  Map<String, dynamic> _sectionMetadata(StepConfig section) => {
+        'customerName': battery.customer.name,
+        for (final f in section.fields)
+          if (f.type != 'proof' && _values[f.id] != null) f.id: _values[f.id],
+      };
+
+  /// Builds the [AttemptSubmission] for a visit [section].
+  ///
+  /// [gps] is sent as top-level `latitude`/`longitude`; the service derives and
+  /// stores the `location` JSON string from them (see [AttemptSubmission] — a
+  /// `location` sent in the request body is ignored and persists null).
+  AttemptSubmission buildSectionAttemptSubmission({
+    required StepConfig section,
+    required DateTime completedAt,
+    required GeoPoint gps,
+    required List<String> proofUrls,
+  }) {
+    final spec = _sectionAttempts[section.id]!;
+    final selected = (_values[spec.outcomeField] as String?) ?? '';
+    return AttemptSubmission(
+      id: _generateAttemptId(),
+      // Human identifiers, as the service requires — the ticket number shown
+      // as "Case ID" on the ticket detail screen and the BP id, both handed
+      // down from that screen through TicketActionsHub.
+      ticketId: ticketId,
+      batteryId: battery.bpId,
+      agentId: agentId,
+      agentName: agentName,
+      attemptType: spec.attemptType,
+      outcome: _visitOutcomeWireValues[selected] ?? selected,
+      attemptedAt: _sectionOpenedAt[section.id] ?? DateTime.now(),
+      completedAt: completedAt,
+      latitude: gps.lat,
+      longitude: gps.lng,
+      // Neither visit section captures an explicit customer-presence signal —
+      // "Battery status at location" is about the battery, not who answered.
+      customerPresent: false,
+      notes: (_values[spec.notesField] as String?)?.trim() ?? '',
+      proofUrls: proofUrls,
+      metadata: _sectionMetadata(section),
+    );
+  }
+
+  /// True when the last visit-section save got a 2xx from the attempts service.
+  /// False when it was rejected, unreachable, or not wired at all — the draft
+  /// is saved locally either way.
+  bool lastSectionSubmittedToService = false;
+
+  /// POSTs [section]'s attempt. Mirrors [_submitAttemptToService]: the use case
+  /// wraps errors in a [Result] so this never throws, and a failure is logged
+  /// rather than blocking the agent's local save.
+  Future<bool> _submitSectionAttempt(StepConfig section) async {
+    final submit = _submitAttemptRecord;
+    if (submit == null) return false; // not wired (e.g. unit tests) — skip.
+    // Await this section's photo uploads before stamping completedAt, so the
+    // timestamp reflects when the record was actually sent.
+    final proofUrls = await _proofUrlsForSection(section);
+    // The geo-tag on the section's proof is the evidence that the agent stood
+    // at the place they're reporting on; fall back to a fresh device fix when
+    // no photo was captured (the proof is optional unless its
+    // `proof.mandatoryFor*` flag is set).
+    final proofFieldId = section.fields
+        .where((f) => f.type == 'proof')
+        .map((f) => f.id)
+        .firstOrNull;
+    final proofGps =
+        proofFieldId == null ? null : _proofs[proofFieldId]?.location;
+    final gps = proofGps ?? await _location.currentLocation();
+    final submission = buildSectionAttemptSubmission(
+      section: section,
+      completedAt: DateTime.now(),
+      gps: gps,
+      proofUrls: proofUrls,
+    );
+    final result = await submit(submission);
+    if (result.isErr) {
+      developer.log(
+        '${section.id} attempt submission failed: '
+        '${result.failureOrNull?.message}',
+        name: 'AttemptController',
+      );
+      return false;
+    }
+    return true;
+  }
 
   /// True when the last [submitOutcome] call queued the write for later sync
   /// (CC-04 — offline/unreachable) instead of confirming it immediately.

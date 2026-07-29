@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:developer' as developer;
 
 import 'package:asset_recovery_app/core/di/app_services.dart';
 import 'package:asset_recovery_app/core/di/injector.dart';
@@ -15,11 +14,11 @@ import 'package:asset_recovery_app/domain/entities/ticket.dart';
 import 'package:asset_recovery_app/domain/entities/ticket_detail.dart';
 import 'package:asset_recovery_app/domain/usecases/get_battery_detail_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/get_ticket_full_detail_usecase.dart';
-import 'package:asset_recovery_app/domain/usecases/update_ticket_status_usecase.dart';
 import 'package:asset_recovery_app/presentation/features/attempt/ticket_actions_hub.dart';
 import 'package:asset_recovery_app/presentation/features/map/map_screen.dart';
 import 'package:asset_recovery_app/presentation/features/qr/qr_scan_screen.dart';
 import 'package:asset_recovery_app/presentation/features/tracking/battery_tracking_screen.dart';
+import 'package:asset_recovery_app/presentation/shared/mark_ticket_in_progress.dart';
 import 'package:asset_recovery_app/presentation/shared/widgets/info_chip.dart';
 import 'package:asset_recovery_app/presentation/shared/widgets/pill_button.dart';
 import 'package:asset_recovery_app/presentation/shared/widgets/status_badge.dart';
@@ -964,40 +963,6 @@ class _ProofImage extends StatelessWidget {
   }
 }
 
-/// Status the ticket moves to the moment the agent starts working the case.
-/// The backend's own camelCase vocabulary, sent verbatim — not
-/// [TicketStatus.wire]'s snake_case.
-const _inProgressStatus = 'inProgress';
-
-/// Ticket numbers with an in-flight `tickets.status` request — guards against a
-/// second PATCH when the agent taps Scan QR / Ticket Actions twice in a row.
-final _statusUpdatesInFlight = <String>{};
-
-/// Moves the ticket to `inProgress` on the backend (`tickets.status` —
-/// `PATCH /tickets/status`). Fired from both recovery CTAs on this screen (Scan
-/// QR and Ticket Actions), either of which means the agent has started working
-/// the case. [ticketId] is the ticket number shown as "Case ID" here.
-///
-/// Fire-and-forget: navigation must not wait on the network, so a failure is
-/// logged rather than surfaced — the attempt submission is what actually
-/// records the agent's work.
-Future<void> _markTicketInProgress(String ticketId) async {
-  if (ticketId.isEmpty || _statusUpdatesInFlight.contains(ticketId)) return;
-  _statusUpdatesInFlight.add(ticketId);
-  try {
-    final result = await sl<UpdateTicketStatusUseCase>()(
-        UpdateTicketStatusParams(ticketId, _inProgressStatus),);
-    if (result.isErr) {
-      developer.log(
-        'ticket status update failed: ${result.failureOrNull?.message}',
-        name: 'TicketDetailScreen',
-      );
-    }
-  } finally {
-    _statusUpdatesInFlight.remove(ticketId);
-  }
-}
-
 class _Actions extends StatelessWidget {
   const _Actions({
     required this.ticket,
@@ -1034,7 +999,7 @@ class _Actions extends StatelessWidget {
                   palette: palette,
                   icon: Icons.qr_code_scanner,
                   onPressed: () {
-                    unawaited(_markTicketInProgress(ticket.ticketId));
+                    unawaited(markTicketInProgress(ticket.ticketId));
                     Navigator.of(context).push(
                       MaterialPageRoute<void>(
                         builder: (_) =>
@@ -1052,7 +1017,7 @@ class _Actions extends StatelessWidget {
                   palette: palette,
                   trailingArrow: true,
                   onPressed: () {
-                    unawaited(_markTicketInProgress(ticket.ticketId));
+                    unawaited(markTicketInProgress(ticket.ticketId));
                     Navigator.of(context).push(
                       MaterialPageRoute<void>(
                         builder: (_) => TicketActionsHub(

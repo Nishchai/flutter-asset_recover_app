@@ -41,6 +41,13 @@ class _AttemptSectionScreenState extends State<AttemptSectionScreen> {
     // Stamp when the agent entered the Update Status screen — sent as
     // `attemptedAt` on the attempt submission.
     if (widget.isOutcome) controller.markUpdateStatusOpened();
+    // Same for the visit sections: entry time is `attemptedAt`, Save time is
+    // `completedAt` on the section's own attempt POST. Stamped here rather
+    // than in the post-frame callback so it reflects when the screen actually
+    // opened; neither marker notifies listeners, so this is safe in initState.
+    if (controller.recordsOwnAttempt(widget.section.id)) {
+      controller.markSectionOpened(widget.section.id);
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (widget.section.id == 'call') controller.loadCallRecordings();
@@ -85,8 +92,15 @@ class _AttemptSectionScreenState extends State<AttemptSectionScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
       return;
     }
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(l.t('attempt.draftSaved'))));
+    // The visit sections also POST their attempt to the attempts service. The
+    // draft is saved either way, so say plainly which of the two happened
+    // instead of a blanket "Saved" that hides a rejected submission.
+    final message = controller.recordsOwnAttempt(widget.section.id)
+        ? (controller.lastSectionSubmittedToService
+            ? l.t('attempt.visitRecorded')
+            : l.t('attempt.visitNotSynced'))
+        : l.t('attempt.draftSaved');
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
     Navigator.of(context).pop();
   }
 
