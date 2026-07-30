@@ -7,6 +7,7 @@ import 'package:asset_recovery_app/core/theme/app_theme.dart';
 import 'package:asset_recovery_app/domain/entities/battery.dart';
 import 'package:asset_recovery_app/domain/entities/battery_detail.dart';
 import 'package:asset_recovery_app/domain/entities/form_field_config.dart';
+import 'package:asset_recovery_app/domain/entities/ticket_detail.dart';
 import 'package:asset_recovery_app/domain/usecases/call_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/draft_attempt_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/get_live_location_usecase.dart';
@@ -31,6 +32,7 @@ class TicketActionsHub extends StatelessWidget {
     required this.ticketId,
     required this.battery,
     this.batteryDetail,
+    this.ticketDetail,
   });
 
   final String ticketId;
@@ -43,6 +45,13 @@ class TicketActionsHub extends StatelessWidget {
   /// landed (or returned no row) — the section then falls back to the cached
   /// battery values.
   final BatteryDetail? batteryDetail;
+
+  /// Full ticket detail from `GET /tickets/{UUID}`, already fetched by the BP
+  /// detail screen. Forwarded to [AttemptController] so the Visit Customer
+  /// Address section's "Customer Address" card shows the same parsed address
+  /// (line 1, city, state, pincode) as that screen's customer card. Null until
+  /// the call lands — the card then falls back to the cached customer address.
+  final TicketDetail? ticketDetail;
 
   static const _icons = {
     'phone': Icons.phone,
@@ -66,6 +75,7 @@ class TicketActionsHub extends StatelessWidget {
           ticketId: ticketId,
           battery: battery,
           batteryDetail: batteryDetail,
+          ticketDetail: ticketDetail,
           agentId: agent.id,
           agentName: ticketAgentName,
           submitAttemptRecord: sl<SubmitAttemptRecordUseCase>(),

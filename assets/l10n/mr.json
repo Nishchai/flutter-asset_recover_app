@@ -134,6 +134,7 @@
   "field.calling_remark": "ग्राहकाने काय सांगितले?",
   "field.calling_remark_hint": "ग्राहकाच्या प्रतिसादाचा तपशील…",
   "field.customer_details": "ग्राहक तपशील",
+  "field.customer_address": "ग्राहकाचा पत्ता",
   "field.customer_remark": "ग्राहक टिप्पणी",
   "field.customer_remark_note": "अतिरिक्त ग्राहक टीप",
   "field.customer_visit_remark": "ग्राहक भेट टिप्पण्या",

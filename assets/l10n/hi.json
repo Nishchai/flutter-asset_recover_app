@@ -112,6 +112,7 @@
   "field.visit_status": "विज़िट स्थिति",
   "field.latlong_visit_proof": "लैट/लॉन्ग विज़िट प्रमाण",
   "field.customer_details": "ग्राहक विवरण",
+  "field.customer_address": "ग्राहक का पता",
   "field.home_visit_status": "घर विज़िट स्थिति",
   "field.home_visit_proof": "घर विज़िट प्रमाण",
   "field.new_address": "अद्यतन ग्राहक पता",

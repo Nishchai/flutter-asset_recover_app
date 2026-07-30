@@ -209,6 +209,14 @@ class TicketDetailCustomer {
   /// → "Last Swap".
   final String lastSwapStationCode;
 
+  /// The address components concatenated in postal order (line 1, city, state,
+  /// pincode), skipping empties. Empty when the response carried none of them.
+  /// Single source of the "Address" readout on the BP detail customer card and
+  /// the "Customer Address" card in the Visit Customer Address section.
+  String get fullAddress => [addressLine1, city, state, pincode]
+      .where((p) => p.isNotEmpty)
+      .join(', ');
+
   factory TicketDetailCustomer.fromJson(Map<String, dynamic> json) =>
       TicketDetailCustomer(
         id: json['id'] as String? ?? '',
@@ -316,6 +324,8 @@ class TicketDetailAttempt {
     this.notes = '',
     this.proofUrls = const [],
     this.metadata,
+    this.batteryRemarkReason = '',
+    this.customerRemarkReason = '',
   });
 
   final String id;
@@ -340,10 +350,20 @@ class TicketDetailAttempt {
   final List<String> proofUrls;
   final Map<String, dynamic>? metadata;
 
+  /// Underscored wire values (`bp_not_with_customer`, `denies_payment`) of the
+  /// two remark dropdowns on Update Status. They are submitted inside
+  /// [metadata] (`AttemptController._submissionMetadata` sends every outcome
+  /// field except `outcome` there), so that is where they are read from —
+  /// a top-level column is honoured too, in case the service promotes them.
+  /// Empty when the attempt carried neither.
+  final String batteryRemarkReason;
+  final String customerRemarkReason;
+
   factory TicketDetailAttempt.fromJson(Map<String, dynamic> json) {
     // `location` arrives as a JSON-encoded object string
     // (e.g. `"{\"lat\": 26.83, \"lng\": 75.68}"`); decode to lat/lng.
     final (lat, lng) = _latLng(json['location']);
+    final metadata = _jsonMap(json['metadata']);
     return TicketDetailAttempt(
       id: json['id'] as String? ?? '',
       ticketId: json['ticketId'] as String? ?? '',
@@ -362,9 +382,15 @@ class TicketDetailAttempt {
       // `proofUrls` arrives as a JSON-encoded string (e.g. `"[\"...\"]"`) in
       // the current contract, but tolerate a real JSON array too.
       proofUrls: _stringList(json['proofUrls']),
-      metadata: json['metadata'] is Map<String, dynamic>
-          ? json['metadata'] as Map<String, dynamic>
-          : null,
+      metadata: metadata,
+      batteryRemarkReason: _firstNonEmpty(
+        json['batteryRemarkReason'],
+        metadata?['batteryRemarkReason'],
+      ),
+      customerRemarkReason: _firstNonEmpty(
+        json['customerRemarkReason'],
+        metadata?['customerRemarkReason'],
+      ),
     );
   }
 }
@@ -394,6 +420,35 @@ DateTime? _tryDate(Object? v) => v is String ? DateTime.tryParse(v) : null;
   final lat = (m['lat'] ?? m['latitude']) as num?;
   final lng = (m['lng'] ?? m['longitude']) as num?;
   return (lat?.toDouble(), lng?.toDouble());
+}
+
+/// Coerces a metadata value that may be a real JSON object, a JSON-encoded
+/// object *string* (the shape `location`/`proofUrls` already arrive in), or
+/// null into a `Map<String, dynamic>`. Returns null when there is nothing
+/// usable — a malformed value is treated as absent rather than throwing.
+Map<String, dynamic>? _jsonMap(Object? v) {
+  Map<dynamic, dynamic>? m;
+  if (v is Map) {
+    m = v;
+  } else if (v is String) {
+    final s = v.trim();
+    if (s.startsWith('{') && s.endsWith('}')) {
+      try {
+        final decoded = jsonDecode(s);
+        if (decoded is Map) m = decoded;
+      } catch (_) {
+        // Malformed metadata string — treat as absent.
+      }
+    }
+  }
+  return m?.map((k, value) => MapEntry(k.toString(), value));
+}
+
+/// The first of [a]/[b] that stringifies to something non-blank, else ''.
+String _firstNonEmpty(Object? a, Object? b) {
+  final first = a?.toString().trim() ?? '';
+  if (first.isNotEmpty) return first;
+  return b?.toString().trim() ?? '';
 }
 
 /// Normalises a geo value (JSON object `{lat,lng}`, a plain string, or null)

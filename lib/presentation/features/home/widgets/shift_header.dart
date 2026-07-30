@@ -61,20 +61,30 @@ class ShiftHeader extends StatelessWidget {
                       children: [
                         Text(l.t(_greetingKey()),
                             style: TextStyle(
-                                fontSize: 12, color: palette.mutedDark,),),
-                        Row(
-                          children: [
-                            Text('${l.t('home.hello')} ',
+                                fontSize: 12, color: palette.mutedDark,),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,),
+                        Text.rich(
+                          TextSpan(
+                            children: [
+                              TextSpan(
+                                text: '${l.t('home.hello')} ',
                                 style: TextStyle(
                                     fontSize: 17,
                                     fontWeight: FontWeight.w600,
-                                    color: palette.onDark,),),
-                            Text(agent.name,
+                                    color: palette.onDark,),
+                              ),
+                              TextSpan(
+                                text: agent.name,
                                 style: TextStyle(
                                     fontSize: 17,
                                     fontWeight: FontWeight.bold,
-                                    color: palette.primary,),),
-                          ],
+                                    color: palette.primary,),
+                              ),
+                            ],
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),

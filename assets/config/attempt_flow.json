@@ -83,6 +83,13 @@
           "iconKey": "home"
         },
         {
+          "id": "customerAddress",
+          "type": "readonly",
+          "labelKey": "field.customer_address",
+          "sourceField": "customerAddress",
+          "iconKey": "location"
+        },
+        {
           "id": "homeVisitStatus",
           "type": "dropdown",
           "labelKey": "field.home_visit_status",

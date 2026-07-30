@@ -143,7 +143,8 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                 ticket: ticket,
                 bp: bp,
                 palette: palette,
-                batteryDetail: _batteryDetail,),
+                batteryDetail: _batteryDetail,
+                detail: _detail,),
         ],
       ),
     );
@@ -544,12 +545,8 @@ class _CustomerCard extends StatelessWidget {
   /// Address → all address components concatenated (line 1, city, state,
   /// pincode), skipping empties. Falls back to the base customer address.
   String _address() {
-    final c = detail?.customer;
-    if (c == null) return bp.customer.address;
-    final parts = [c.addressLine1, c.city, c.state, c.pincode]
-        .where((p) => p.isNotEmpty)
-        .toList();
-    return parts.isEmpty ? bp.customer.address : parts.join(', ');
+    final parsed = detail?.customer?.fullAddress ?? '';
+    return parsed.isEmpty ? bp.customer.address : parsed;
   }
 
   /// Last Seen — the battery telemetry's last lat/long wins; then the ticket
@@ -762,94 +759,103 @@ class _AttemptHistory extends StatelessWidget {
   }
 }
 
-/// A single persisted attempt rendered per the BP-detail design: a header row
-/// (type · outcome · agent/duration), the free-text note, a meta row
-/// (completion · customer presence · geo), and any proof photos.
+/// A single persisted attempt: a highlighted header row (type · outcome), a
+/// label/value block (the two timestamps plus any remark reasons), a meta row
+/// (agent · geo), and proof photos.
+///
+/// No elapsed-time readout — the raw `attemptedAt`/`completedAt` stamps are
+/// shown as received instead of a derived "in 7 min" duration.
 class _AttemptTile extends StatelessWidget {
   const _AttemptTile({required this.attempt, required this.palette});
 
   final TicketDetailAttempt attempt;
   final AppPalette palette;
 
-  /// Human duration between the two timestamps (e.g. "1 hour", "7 min").
-  String _duration() {
-    final from = attempt.attemptedAt;
-    final to = attempt.completedAt;
-    if (from == null || to == null) return '';
-    final d = to.difference(from);
-    if (d.isNegative) return '';
-    if (d.inHours >= 1) {
-      final h = d.inHours;
-      return '$h hour${h == 1 ? '' : 's'}';
-    }
-    if (d.inMinutes >= 1) return '${d.inMinutes} min';
-    return 'moments';
-  }
+  /// Secondary text size shared by every readout in the tile.
+  static const double _bodySize = 12;
 
-  /// "field_visit" -> "field visit".
-  String get _typeLabel => attempt.attemptType.replaceAll('_', ' ');
-
-  /// "recovered" -> "Recovered".
-  String get _outcomeLabel {
-    final o = attempt.outcome;
-    if (o.isEmpty) return '';
-    return o[0].toUpperCase() + o.substring(1);
-  }
+  static String _stamp(DateTime? dt) =>
+      dt == null ? '—' : Formatters.dateTime(dt);
 
   @override
   Widget build(BuildContext context) {
-    final duration = _duration();
     final urls = attempt.proofUrls;
+    final type = _humanizeWireValue(attempt.attemptType);
+    final outcome = _humanizeWireValue(attempt.outcome);
+    final batteryRemark = _humanizeWireValue(attempt.batteryRemarkReason);
+    final customerRemark = _humanizeWireValue(attempt.customerRemarkReason);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Row 1: type chip · outcome · (duration · agent).
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
+        // Row 1: attempt type and outcome, both bold and highlighted. Wrapped
+        // rather than a Row so a long outcome drops to its own line instead of
+        // squeezing the type chip.
+        Wrap(
+          spacing: 8,
+          runSpacing: 6,
           children: [
-            if (_typeLabel.isNotEmpty) ...[
-              _OutlineTag(label: _typeLabel, palette: palette),
-              const SizedBox(width: 8),
-            ],
-            if (_outcomeLabel.isNotEmpty)
-              Flexible(
-                child: Text(
-                  _outcomeLabel,
-                  style: const TextStyle(
-                      fontSize: 15, fontWeight: FontWeight.w700,),
-                  overflow: TextOverflow.ellipsis,
-                ),
+            if (type.isNotEmpty)
+              _HighlightTag(
+                label: type,
+                background: palette.chipBg,
+                foreground: palette.onSurface,
+                fontSize: _bodySize,
               ),
-            const SizedBox(width: 8),
-            Text(
-              [
-                if (duration.isNotEmpty) 'in $duration',
-                if (attempt.agentName.isNotEmpty) attempt.agentName,
-              ].join(' · '),
-              style: TextStyle(color: palette.muted, fontSize: 12),
-            ),
+            if (outcome.isNotEmpty)
+              _HighlightTag(
+                label: outcome,
+                background: palette.primaryLight,
+                foreground: palette.onSurface,
+                fontSize: _bodySize,
+              ),
           ],
         ),
-        // Row 2: the free-text note.
-        if (attempt.notes.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Text(attempt.notes, style: const TextStyle(fontSize: 14)),
-        ],
-        // Row 3: completion · customer presence · geo.
-        const SizedBox(height: 8),
+        // Row 2: the attempt's own timestamps, plus the remark reasons when
+        // the attempt carried them.
+        //
+        // The response's `notes` is deliberately NOT shown: it's a composed
+        // string the app writes at submit time ("Battery: … | Customer: …"),
+        // so it only restates the remark reasons rendered below it.
+        const SizedBox(height: 10),
+        _AttemptField(
+          label: 'Attempted At',
+          value: _stamp(attempt.attemptedAt),
+          palette: palette,
+          fontSize: _bodySize,
+        ),
+        _AttemptField(
+          label: 'Completed At',
+          value: _stamp(attempt.completedAt),
+          palette: palette,
+          fontSize: _bodySize,
+        ),
+        if (batteryRemark.isNotEmpty)
+          _AttemptField(
+            label: 'Battery Remark',
+            value: batteryRemark,
+            palette: palette,
+            fontSize: _bodySize,
+          ),
+        if (customerRemark.isNotEmpty)
+          _AttemptField(
+            label: 'Customer Remark',
+            value: customerRemark,
+            palette: palette,
+            fontSize: _bodySize,
+          ),
+        // Row 4: agent · geo. No customer-presence readout — neither the
+        // outcome screen nor the visit sections capture that signal, so it
+        // always reported "Customer absent" regardless of what happened.
+        const SizedBox(height: 6),
         Wrap(
           spacing: 16,
           runSpacing: 4,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            if (duration.isNotEmpty)
-              Text('Completed in $duration',
-                  style: TextStyle(color: palette.muted, fontSize: 12),),
-            Text(
-              attempt.customerPresent ? 'Customer present' : 'Customer absent',
-              style: TextStyle(color: palette.muted, fontSize: 12),
-            ),
+            if (attempt.agentName.isNotEmpty)
+              Text(attempt.agentName,
+                  style: TextStyle(color: palette.muted, fontSize: _bodySize),),
             if (attempt.latitude != null && attempt.longitude != null)
               Row(
                 mainAxisSize: MainAxisSize.min,
@@ -859,7 +865,8 @@ class _AttemptTile extends StatelessWidget {
                   Text(
                     '${attempt.latitude!.toStringAsFixed(4)}, '
                     '${attempt.longitude!.toStringAsFixed(4)}',
-                    style: TextStyle(color: palette.muted, fontSize: 12),
+                    style:
+                        TextStyle(color: palette.muted, fontSize: _bodySize),
                   ),
                 ],
               ),
@@ -882,23 +889,87 @@ class _AttemptTile extends StatelessWidget {
   }
 }
 
-/// Rounded outlined pill (e.g. the attempt type "field visit").
-class _OutlineTag extends StatelessWidget {
-  const _OutlineTag({required this.label, required this.palette});
+/// Backend enums arrive underscored (`field_visit`, `not_found_refused`,
+/// `bp_not_with_customer`); render them as words — "Not Found Refused".
+/// Returns '' for an empty value so callers can omit the row entirely.
+String _humanizeWireValue(String raw) => raw
+    .split(RegExp(r'[_\s]+'))
+    .where((w) => w.isNotEmpty)
+    .map((w) => w[0].toUpperCase() + w.substring(1))
+    .join(' ');
+
+/// Filled, bold pill used for the attempt's type and outcome — the two values
+/// the history card leads with.
+class _HighlightTag extends StatelessWidget {
+  const _HighlightTag({
+    required this.label,
+    required this.background,
+    required this.foreground,
+    required this.fontSize,
+  });
+
   final String label;
-  final AppPalette palette;
+  final Color background;
+  final Color foreground;
+  final double fontSize;
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: palette.border),
+          color: background,
+          borderRadius: BorderRadius.circular(8),
         ),
         child: Text(
           label,
           style: TextStyle(
-              fontSize: 12, fontWeight: FontWeight.w600, color: palette.muted,),
+            fontSize: fontSize,
+            fontWeight: FontWeight.w700,
+            color: foreground,
+          ),
+        ),
+      );
+}
+
+/// One muted-label / bold-value line inside an attempt tile (e.g.
+/// "Attempted At   30 Jul 2026, 04:15 PM").
+class _AttemptField extends StatelessWidget {
+  const _AttemptField({
+    required this.label,
+    required this.value,
+    required this.palette,
+    required this.fontSize,
+  });
+
+  final String label;
+  final String value;
+  final AppPalette palette;
+  final double fontSize;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 110,
+              child: Text(
+                label,
+                style: TextStyle(color: palette.muted, fontSize: fontSize),
+              ),
+            ),
+            Expanded(
+              child: Text(
+                value,
+                style: TextStyle(
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.w600,
+                  color: palette.onSurface,
+                ),
+              ),
+            ),
+          ],
         ),
       );
 }
@@ -969,6 +1040,7 @@ class _Actions extends StatelessWidget {
     required this.bp,
     required this.palette,
     this.batteryDetail,
+    this.detail,
   });
   final Ticket ticket;
   final Battery bp;
@@ -978,6 +1050,11 @@ class _Actions extends StatelessWidget {
   /// so the Visit BP Location section reuses the same last lat/long + last TIU
   /// instead of re-fetching them.
   final BatteryDetail? batteryDetail;
+
+  /// Ticket detail fetched on this screen, handed to the hub so the Visit
+  /// Customer Address section shows the same parsed customer address as the
+  /// customer card above instead of re-fetching it.
+  final TicketDetail? detail;
 
   @override
   Widget build(BuildContext context) {
@@ -1024,6 +1101,7 @@ class _Actions extends StatelessWidget {
                               ticketId: ticket.ticketId,
                               battery: bp,
                               batteryDetail: batteryDetail,
+                              ticketDetail: detail,
                             ),
                       ),
                     );

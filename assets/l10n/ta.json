@@ -134,6 +134,7 @@
   "field.calling_remark": "வாடிக்கையாளர் என்ன கூறினார்?",
   "field.calling_remark_hint": "வாடிக்கையாளர் பதில் விவரங்கள்…",
   "field.customer_details": "வாடிக்கையாளர் விவரங்கள்",
+  "field.customer_address": "வாடிக்கையாளர் முகவரி",
   "field.customer_remark": "வாடிக்கையாளர் குறிப்பு",
   "field.customer_remark_note": "கூடுதல் வாடிக்கையாளர் குறிப்பு",
   "field.customer_visit_remark": "வாடிக்கையாளர் வருகை குறிப்புகள்",

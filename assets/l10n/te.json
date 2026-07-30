@@ -134,6 +134,7 @@
   "field.calling_remark": "కస్టమర్ ఏమి చెప్పారు?",
   "field.calling_remark_hint": "కస్టమర్ ప్రతిస్పందన వివరాలు…",
   "field.customer_details": "కస్టమర్ వివరాలు",
+  "field.customer_address": "కస్టమర్ చిరునామా",
   "field.customer_remark": "కస్టమర్ వ్యాఖ్య",
   "field.customer_remark_note": "అదనపు కస్టమర్ గమనిక",
   "field.customer_visit_remark": "కస్టమర్ సందర్శన వ్యాఖ్యలు",

@@ -24,6 +24,7 @@ import 'package:asset_recovery_app/domain/entities/enums.dart';
 import 'package:asset_recovery_app/domain/entities/form_field_config.dart';
 import 'package:asset_recovery_app/domain/entities/geo_point.dart';
 import 'package:asset_recovery_app/domain/entities/proof.dart';
+import 'package:asset_recovery_app/domain/entities/ticket_detail.dart';
 import 'package:asset_recovery_app/domain/usecases/call_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/draft_attempt_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/get_live_location_usecase.dart';
@@ -88,6 +89,7 @@ class AttemptController extends ChangeNotifier {
     required SyncQueueService syncQueue,
     this.agentName = '',
     this.batteryDetail,
+    this.ticketDetail,
     SubmitAttemptRecordUseCase? submitAttemptRecord,
     SimCallService? simCall,
   })  : _simCall = simCall ?? const NoopSimCallService(),
@@ -121,6 +123,12 @@ class AttemptController extends ChangeNotifier {
   /// coordinates its "View on Map" button navigates to — see
   /// [navigationTarget] and [lastTiuDisplay].
   final BatteryDetail? batteryDetail;
+
+  /// Full ticket detail from `GET /tickets/{UUID}`, fetched on the BP detail
+  /// screen and handed down through [TicketActionsHub]. Its customer sub-object
+  /// carries the split address components that make up the Visit Customer
+  /// Address section's "Customer Address" card — see [customerAddressDisplay].
+  final TicketDetail? ticketDetail;
   final SubmitAttemptRecordUseCase? _submitAttemptRecord;
   final ConfigService _config;
   final LocationService _location;
@@ -257,10 +265,23 @@ class AttemptController extends ChangeNotifier {
         return navigationTarget.display;
       case 'customerSummary':
         final c = battery.customer;
-        return '${c.name} · ${c.mobile}\n${c.address}';
+        return '${c.name} · ${c.mobile}';
+      case 'customerAddress':
+        return customerAddressDisplay;
       default:
         return '';
     }
+  }
+
+  /// The customer's address as the BP detail screen's customer card shows it:
+  /// the ticket detail's split components joined in postal order, falling back
+  /// to the cached list-summary address while `GET /tickets/{UUID}` hasn't
+  /// landed (or carried no address at all).
+  String get customerAddressDisplay {
+    final parsed = ticketDetail?.customer?.fullAddress ?? '';
+    if (parsed.isNotEmpty) return parsed;
+    final cached = battery.customer.address;
+    return cached.isEmpty ? '—' : cached;
   }
 
   /// Status chip shown on the hub card for [section].
@@ -716,20 +737,33 @@ class AttemptController extends ChangeNotifier {
     final batteryNote = (_values['batteryRemarkNote'] as String?)?.trim();
     final batteryReason = _values['batteryRemarkReason'] as String?;
     if (batteryReason != null || (batteryNote?.isNotEmpty ?? false)) {
-      final label = batteryReason == null
-          ? ''
-          : (_config.optionByValue('batteryRemarkReason', batteryReason)?.labelKey ?? batteryReason);
+      final label = _remarkLabel('batteryRemarkReason', batteryReason);
       parts.add('Battery: $label${batteryNote?.isNotEmpty ?? false ? ' — $batteryNote' : ''}');
     }
     final customerNote = (_values['customerRemarkNote'] as String?)?.trim();
     final customerReason = _values['customerRemarkReason'] as String?;
     if (customerReason != null || (customerNote?.isNotEmpty ?? false)) {
-      final label = customerReason == null
-          ? ''
-          : (_config.optionByValue('customerRemarkReason', customerReason)?.labelKey ?? customerReason);
+      final label = _remarkLabel('customerRemarkReason', customerReason);
       parts.add('Customer: $label${customerNote?.isNotEmpty ?? false ? ' — $customerNote' : ''}');
     }
     return parts.join(' | ');
+  }
+
+  /// Readable text for a remark reason. The remark is a plain string that ends
+  /// up on the server and in the attempt history, so an l10n key like
+  /// `opt.batteryRemark.not_with_customer` is useless there — keep only the
+  /// last dotted segment and turn its underscores into spaced, capitalised
+  /// words ("Not With Customer").
+  String _remarkLabel(String optionsRef, String? value) {
+    if (value == null) return '';
+    final labelKey = _config.optionByValue(optionsRef, value)?.labelKey ?? value;
+    return labelKey
+        .split('.')
+        .last
+        .split(RegExp(r'[_\s]+'))
+        .where((w) => w.isNotEmpty)
+        .map((w) => w[0].toUpperCase() + w.substring(1))
+        .join(' ');
   }
 
   Attempt buildAttempt() {
