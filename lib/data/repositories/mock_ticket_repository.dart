@@ -394,6 +394,21 @@ class MockTicketRepository implements TicketRepository {
     return _delayed(_agent);
   }
 
+  /// Digits the last end-shift OTP was requested with; [verifyShiftEndOtp]
+  /// accepts any code of exactly that length, so the mock stays in step with
+  /// whatever the end-shift sheet asks for.
+  int _shiftOtpLength = 6;
+
+  @override
+  Future<void> requestShiftEndOtp(String mobile, {required int codeLength}) {
+    _shiftOtpLength = codeLength;
+    return _delayed(null);
+  }
+
+  @override
+  Future<bool> verifyShiftEndOtp(String mobile, String otp) =>
+      _delayed(RegExp('^\\d{$_shiftOtpLength}\$').hasMatch(otp));
+
   @override
   Future<LiveTokenModel> generateAuthToken({
     required String url,

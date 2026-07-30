@@ -1,13 +1,21 @@
 import 'package:asset_recovery_app/core/localization/app_localizations.dart';
 import 'package:asset_recovery_app/core/theme/app_theme.dart';
 import 'package:asset_recovery_app/presentation/shared/widgets/pill_button.dart';
+import 'package:asset_recovery_app/presentation/state/auth_provider.dart';
 import 'package:asset_recovery_app/presentation/state/shift_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
-/// End-of-shift OTP sheet (Figma "Daily logout flow"). The agent enters the OTP
-/// sent to their registered mobile to end the shift. Demo accepts any 6 digits.
+/// End-of-shift OTP sheet (Figma "Daily logout flow"). Owns the whole OTP
+/// exchange: opening the sheet is what requests the code — the home toggle only
+/// shows it — and the code goes to the agent's registered mobile, the
+/// `usermobileNumber` of their `commonLogin` record.
+///
+/// [ShiftProvider.otpLength] digits, verified against the SMS gateway when
+/// "Confirm & End Shift" is pressed. Sends are debounced by
+/// [ShiftProvider.otpResendCooldown], so reopening the sheet or hammering
+/// "Resend" never spends a second SMS.
 class EndShiftSheet extends StatefulWidget {
   const EndShiftSheet({super.key});
 
@@ -18,7 +26,24 @@ class EndShiftSheet extends StatefulWidget {
 class _EndShiftSheetState extends State<EndShiftSheet> {
   final _otp = TextEditingController();
   bool _busy = false;
-  bool _error = false;
+
+  /// Problem line under the input: a wrong code, a failed send, or the "wait N
+  /// seconds" message when a send was debounced away.
+  String? _fieldError;
+
+  /// Positive confirmation that a code was just (re)sent.
+  String? _sentNotice;
+
+  @override
+  void initState() {
+    super.initState();
+    // The request happens HERE, not on the home toggle: a flip the agent backs
+    // straight out of must not cost an SMS. Post-frame so the first build (and
+    // the localizations/provider lookups it needs) has completed.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _send(announce: false);
+    });
+  }
 
   @override
   void dispose() {
@@ -26,27 +51,78 @@ class _EndShiftSheetState extends State<EndShiftSheet> {
     super.dispose();
   }
 
+  /// Requests the OTP. [announce] is true for the agent-initiated "Resend" —
+  /// only then is the outcome reported, since the automatic send on open has
+  /// nothing useful to say when it is debounced away (the code from the last
+  /// send, moments ago, is still valid).
+  Future<void> _send({required bool announce}) async {
+    final shift = context.read<ShiftProvider>();
+    final l = AppLocalizations.of(context);
+    setState(() {
+      _fieldError = null;
+      _sentNotice = null;
+    });
+    final result = await shift.requestEndOtp();
+    if (!mounted) return;
+    setState(() {
+      switch (result) {
+        case EndOtpSendResult.sent:
+          // Anything already typed can only be a superseded code.
+          _otp.clear();
+          if (announce) _sentNotice = l.t('endShift.otpSent');
+        case EndOtpSendResult.throttled:
+          if (announce) {
+            _fieldError = l.t('endShift.otpWait',
+                {'seconds': shift.otpCooldownRemaining},);
+          }
+        case EndOtpSendResult.failed:
+          // Always surfaced, even for the automatic send: no code is coming, so
+          // the agent has to know before they sit waiting for one.
+          final error = shift.otpError;
+          _fieldError =
+              error == null || error.isEmpty ? l.t('common.error') : error;
+      }
+    });
+  }
+
+  /// Verifies the code and, only on a match, closes the sheet and signs the
+  /// agent out. The shift is ended by [ShiftProvider.verifyEndOtp] and the
+  /// session by [AuthProvider.logout] — never by dismissing this sheet.
   Future<void> _submit() async {
+    final l = AppLocalizations.of(context);
     setState(() {
       _busy = true;
-      _error = false;
+      _fieldError = null;
+      _sentNotice = null;
     });
-    final ok = await context.read<ShiftProvider>().verifyEndOtp(_otp.text.trim());
+    // Read before the pop below: afterwards this element is defunct and
+    // `context.read` on it throws.
+    final auth = context.read<AuthProvider>();
+    final shift = context.read<ShiftProvider>();
+    final ok = await shift.verifyEndOtp(_otp.text.trim());
     if (!mounted) return;
-    if (ok) {
-      Navigator.of(context).pop();
-    } else {
+    if (!ok) {
       setState(() {
         _busy = false;
-        _error = true;
+        // A gateway failure keeps its own message; anything else reaching here
+        // is a wrong or too-short code.
+        _fieldError = shift.otpError ?? l.t('validation.invalidOtp');
       });
+      return;
     }
+    // Ending the shift is a full sign-out (daily logout flow): close the sheet
+    // FIRST so no route is left sitting over the login screen, then erase the
+    // session — access token, agent and the commonLogin profile — from
+    // encrypted storage. The next launch starts at mobile + OTP again.
+    Navigator.of(context).pop();
+    await auth.logout();
   }
 
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final palette = context.read<AppPalette>();
+    final shift = context.watch<ShiftProvider>();
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
     return Padding(
@@ -82,17 +158,28 @@ class _EndShiftSheetState extends State<EndShiftSheet> {
             TextField(
               controller: _otp,
               keyboardType: TextInputType.number,
-              maxLength: 6,
+              // Same length the gateway was asked to generate, so the field can
+              // never demand more (or fewer) digits than the SMS carries.
+              maxLength: ShiftProvider.otpLength,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               decoration: InputDecoration(
                 counterText: '',
-                hintText: '••••••',
-                errorText: _error ? l.t('validation.otpRequired') : null,
+                hintText: '•' * ShiftProvider.otpLength,
+                errorText: _fieldError,
               ),
             ),
+            if (_sentNotice != null) ...[
+              const SizedBox(height: 6),
+              Text(_sentNotice!,
+                  style: TextStyle(color: palette.info, fontSize: 12.5),),
+            ],
             const SizedBox(height: 8),
             TextButton(
-              onPressed: () => context.read<ShiftProvider>().requestEndOtp(),
+              // Disabled only while a send is actually in flight. A press inside
+              // the cooldown is allowed through and answered with the "wait N
+              // seconds" message — the provider blocks the gateway call, so the
+              // agent gets told why instead of tapping a dead button.
+              onPressed: shift.sendingOtp ? null : () => _send(announce: true),
               style: TextButton.styleFrom(padding: EdgeInsets.zero),
               child: Text(l.t('endShift.resend'),
                   style: TextStyle(color: palette.info),),

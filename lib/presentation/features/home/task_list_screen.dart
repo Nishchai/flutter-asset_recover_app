@@ -119,6 +119,9 @@ class _TaskListScreenState extends State<TaskListScreen> {
       return;
     }
     // Turning the shift OFF requires the end-of-shift OTP (daily logout flow).
+    // Flipping the toggle only OPENS the sheet — it never calls the SMS gateway.
+    // The sheet requests the code itself once it is on screen, so a flip the
+    // agent immediately backs out of costs nothing.
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,

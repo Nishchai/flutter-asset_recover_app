@@ -51,6 +51,8 @@
   "endShift.title": "End Shift",
   "endShift.body": "Enter the OTP sent to your registered mobile number to end your shift.",
   "endShift.resend": "Resend OTP",
+  "endShift.otpSent": "OTP sent to your registered mobile number.",
+  "endShift.otpWait": "Please wait {seconds}s before requesting another OTP.",
   "endShift.submit": "Confirm & End Shift",
   "endShift.trouble": "Trouble ending shift?",
   "endShift.contactSupport": "Contact Support",

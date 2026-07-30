@@ -33,6 +33,18 @@ abstract class TicketRepository {
   /// Verifies the OTP sent to [mobile] and returns the signed-in agent.
   Future<Agent> verifyLoginOtp(String mobile, String otp);
 
+  /// Sends the end-of-shift OTP to [mobile] — the signed-in agent's own
+  /// `commonLogin` `usermobileNumber`, not a ticket- or BP-scoped number.
+  ///
+  /// [codeLength] is how many digits the gateway must generate. It has to match
+  /// the length the end-shift sheet asks the agent to type, so it is required
+  /// rather than defaulted to the login flow's configured length.
+  Future<void> requestShiftEndOtp(String mobile, {required int codeLength});
+
+  /// Verifies the end-of-shift OTP sent to [mobile]. Returns false for a wrong
+  /// or expired code; throws only when the gateway itself fails.
+  Future<bool> verifyShiftEndOtp(String mobile, String otp);
+
   /// Exchanges client credentials for a live access token (OAuth2
   /// client-credentials flow). [url] is the ABSOLUTE token endpoint — it is not
   /// resolved against `apiBaseUrl`. Mirrors the Java `getLiveToken` Retrofit

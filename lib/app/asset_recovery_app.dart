@@ -43,7 +43,16 @@ class AssetRecoveryApp extends StatelessWidget {
             return tickets;
           },
         ),
-        ChangeNotifierProvider<ShiftProvider>(create: (_) => sl<ShiftProvider>()),
+        ChangeNotifierProvider<ShiftProvider>(
+          create: (context) {
+            final shift = sl<ShiftProvider>();
+            // Ending the shift signs the agent out, so this provider has to be
+            // rearmed for whoever signs in next — otherwise they inherit the
+            // previous agent's ended shift.
+            context.read<AuthProvider>().addLogoutListener(shift.reset);
+            return shift;
+          },
+        ),
       ],
       child: Consumer<LocaleProvider>(
         builder: (context, locale, _) {

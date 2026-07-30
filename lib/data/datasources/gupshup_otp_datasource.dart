@@ -38,12 +38,17 @@ class GupshupOtpDataSource {
 
   GupshupConfig get _cfg => _config.env.gupshup;
 
-  /// Sends a login OTP to [mobile]. Throws [ApiException] if the gateway
+  /// Sends an OTP to [mobile]. Throws [ApiException] if the gateway
   /// rejects the request (bad credentials, throttling, invalid number, …).
+  ///
+  /// [codeLength] overrides how many digits the gateway generates; it defaults
+  /// to [GupshupConfig.otpCodeLength] (the login flow's length). Callers whose
+  /// UI asks for a different number of digits MUST pass it, or the code that
+  /// arrives by SMS can never fill their input.
   ///
   /// Mirrors the Java `generateOTP()` param string exactly (order matters — the
   /// encrypted blob must decrypt to the same string the gateway expects).
-  Future<void> sendOtp(String mobile) async {
+  Future<void> sendOtp(String mobile, {int? codeLength}) async {
     final uri = _buildUri({
       'password': _cfg.password,
       'method': 'TWO_FACTOR_AUTH',
@@ -51,7 +56,7 @@ class GupshupOtpDataSource {
       'phone_no': mobile,
       'msg': _cfg.otpMessageTemplate, // must contain the literal %code%
       'format': 'text',
-      'otpCodeLength': '${_cfg.otpCodeLength}',
+      'otpCodeLength': '${codeLength ?? _cfg.otpCodeLength}',
       'otpCodeType': _cfg.otpCodeType,
     });
     await _get(uri, isSend: true);

@@ -155,6 +155,18 @@ class ApiTicketRepository implements TicketRepository {
     );
   }
 
+  // Shift end uses the same Gupshup TWO_FACTOR_AUTH service as login — the
+  // agent's registered mobile is the second factor either way. Only the code
+  // length differs (the end-shift sheet asks for more digits than the login
+  // screen's configured `gupshup.otpCodeLength`), hence the explicit override.
+  @override
+  Future<void> requestShiftEndOtp(String mobile, {required int codeLength}) =>
+      _gupshup.sendOtp(mobile, codeLength: codeLength);
+
+  @override
+  Future<bool> verifyShiftEndOtp(String mobile, String otp) =>
+      _gupshup.verifyOtp(mobile, otp);
+
   @override
   Future<LiveTokenModel> generateAuthToken({
     required String url,

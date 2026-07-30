@@ -33,6 +33,7 @@ import 'package:asset_recovery_app/domain/usecases/get_shift_stats_usecase.dart'
 import 'package:asset_recovery_app/domain/usecases/get_ticket_full_detail_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/handover_otp_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/login_otp_usecase.dart';
+import 'package:asset_recovery_app/domain/usecases/shift_otp_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/submit_attempt_record_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/submit_attempt_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/ticket_pickup_usecase.dart';
@@ -191,6 +192,8 @@ Future<void> configureDependencies({
   sl.registerLazySingleton(() => UpdateTicketStatusUseCase(sl()));
   sl.registerLazySingleton(() => RequestHandoverOtpUseCase(sl()));
   sl.registerLazySingleton(() => VerifyHandoverOtpUseCase(sl()));
+  sl.registerLazySingleton(() => RequestShiftEndOtpUseCase(sl()));
+  sl.registerLazySingleton(() => VerifyShiftEndOtpUseCase(sl()));
   sl.registerLazySingleton(() => GetDraftUseCase(sl()));
   sl.registerLazySingleton(() => SaveDraftUseCase(sl()));
   sl.registerLazySingleton(() => GetLiveLocationUseCase(sl()));
@@ -228,7 +231,13 @@ Future<void> configureDependencies({
         getNearbyUnassigned: sl(),
         pickupTicket: sl(),
       ),);
-  sl.registerFactory(() => ShiftProvider());
+  sl.registerFactory(() => ShiftProvider(
+        requestOtp: sl(),
+        verifyOtp: sl(),
+        // Reads `usermobileNumber` off the persisted commonLogin profile — the
+        // number the end-shift OTP is sent to.
+        session: sl(),
+      ),);
 }
 
 /// Clears all registrations (used between tests).
