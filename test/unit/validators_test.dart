@@ -15,6 +15,20 @@ void main() {
     });
   });
 
+  group('Validators.mobileDigits', () {
+    test('reduces a stored number to its dialable 10 digits', () {
+      expect(Validators.mobileDigits('9811100000'), '9811100000');
+      expect(Validators.mobileDigits('+91 98111-00000'), '9811100000');
+      expect(Validators.mobileDigits('09811100000'), '9811100000');
+    });
+    test('rejects anything that is not a 10-digit mobile', () {
+      expect(Validators.mobileDigits('98111'), isNull);
+      expect(Validators.mobileDigits('+1 415 555 0100 9'), isNull);
+      expect(Validators.mobileDigits(''), isNull);
+      expect(Validators.mobileDigits(null), isNull);
+    });
+  });
+
   group('Validators.isValidOtp', () {
     test('accepts exactly 6 digits', () {
       expect(Validators.isValidOtp('123456'), isTrue);

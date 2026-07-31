@@ -75,6 +75,10 @@ class RouteTrackingService {
   Future<void> _sample() async {
     if (_activeRouteId == null || _points.length >= maxPoints) return;
     final location = await _location.currentLocation();
+    // No fix this tick (permission denied, services off, indoors). Drop the
+    // sample rather than draw the agent's route through Null Island — the
+    // next tick picks up again if the fix comes back.
+    if (!location.hasFix) return;
     if (_points.isNotEmpty) {
       final movedMeters = _points.last.location.haversineMeters(location);
       if (movedMeters < minDistanceMeters) return;

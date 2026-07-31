@@ -5,7 +5,7 @@
     "_comment_commonLogin": "SM-Partners directory lookup — step 1 of login, called the moment the agent submits their mobile number. Lives on its own host, so it carries an ABSOLUTE URL (used verbatim: no apiBaseUrl prefix, no agentId param). `appName` is fixed per app and travels in the URL; ApiTicketRepository appends `userMobilenumber`. A success (status 200 with a `data` block) gates the OTP send; the returned `data` is the real agent record.",
     "commonLogin": "GET https://sm-partners-api-stage.azurewebsites.net/api/v1/commonLogin?appName=INDOFAST_PARTNER",
     "requestOtp": "POST /auth/otp/request",
-    "verifyOtp": "POST /auth/otp/verify",
+    "verifyOtp": "POST /auth/otp/verify", 
     "refresh": "POST /auth/refresh",
     "logout": "POST /auth/logout",
     "me": "GET /auth/me"
@@ -19,6 +19,10 @@
     "nearbyUnassigned": "GET /tickets/nearby-unassigned",
     "pickup": "POST /tickets/{ticketId}/pickup",
     "status": "PATCH /tickets/status"
+  },
+  "agent": {
+    "_comment_location": "Reports the agent's current device coordinates. Body: {agentId, lat, lng}. Fired every time the Field Agent lands on the home screen — first open, returning from a pushed screen, and switching back to the Tasks tab.",
+    "location": "PATCH /agents/location"
   },
   "shift": {
     "start": "POST /agents/{agentId}/shift/start",
@@ -35,7 +39,10 @@
     "upload": "POST /proof/upload"
   },
   "customer": {
-    "update": "PATCH /batteries/{bpId}/customer"
+    "update": "PATCH /batteries/{bpId}/customer",
+    "_comment_updateDetails": "Customers service on the same host as the attempts service, so these carry ABSOLUTE URLs — ApiClient sends them verbatim with no apiBaseUrl prefix and no agentId query param. Called on Save from the Visit Customer Address screen to patch the address components + alternate number the agent entered. Prefer `updateById` ({id} = the ticket detail's customer.id): phone numbers are NOT unique in this backend and `updateByPhone` answers 409 'Ambiguous phonePrimary' whenever several customers share one. `updateByPhone` is only the fallback for a ticket detail that carried no customer id.",
+    "updateById": "PATCH http://10.10.60.110:5088/api/v1/customers/{id}",
+    "updateByPhone": "PATCH http://10.10.60.110:5088/api/v1/customers/by-phone"
   },
   "qr": {
     "validate": "POST /batteries/validate-scan"

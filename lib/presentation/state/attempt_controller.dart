@@ -19,6 +19,7 @@ import 'package:asset_recovery_app/domain/entities/battery.dart';
 import 'package:asset_recovery_app/domain/entities/battery_detail.dart';
 import 'package:asset_recovery_app/domain/entities/call_recording.dart';
 import 'package:asset_recovery_app/domain/entities/customer.dart';
+import 'package:asset_recovery_app/domain/entities/customer_details_update.dart';
 import 'package:asset_recovery_app/domain/entities/draft_attempt.dart';
 import 'package:asset_recovery_app/domain/entities/enums.dart';
 import 'package:asset_recovery_app/domain/entities/form_field_config.dart';
@@ -29,6 +30,7 @@ import 'package:asset_recovery_app/domain/usecases/call_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/draft_attempt_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/get_live_location_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/submit_attempt_record_usecase.dart';
+import 'package:asset_recovery_app/domain/usecases/update_customer_details_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/update_customer_usecase.dart';
 import 'package:asset_recovery_app/presentation/state/ticket_provider.dart';
 import 'package:flutter/foundation.dart';
@@ -82,6 +84,7 @@ class AttemptController extends ChangeNotifier {
     required GetDraftUseCase getDraft,
     required SaveDraftUseCase saveDraft,
     required UpdateCustomerUseCase updateCustomer,
+    required UpdateCustomerDetailsUseCase updateCustomerDetails,
     required AuditLogService auditLog,
     required GetLiveLocationUseCase getLiveLocation,
     required StartCallUseCase startCallUseCase,
@@ -101,6 +104,7 @@ class AttemptController extends ChangeNotifier {
         _getDraft = getDraft,
         _saveDraft = saveDraft,
         _updateCustomer = updateCustomer,
+        _updateCustomerDetails = updateCustomerDetails,
         _auditLog = auditLog,
         _getLiveLocation = getLiveLocation,
         _startCallUseCase = startCallUseCase,
@@ -137,6 +141,7 @@ class AttemptController extends ChangeNotifier {
   final GetDraftUseCase _getDraft;
   final SaveDraftUseCase _saveDraft;
   final UpdateCustomerUseCase _updateCustomer;
+  final UpdateCustomerDetailsUseCase _updateCustomerDetails;
   final AuditLogService _auditLog;
   final GetLiveLocationUseCase _getLiveLocation;
   final StartCallUseCase _startCallUseCase;
@@ -146,6 +151,10 @@ class AttemptController extends ChangeNotifier {
 
   final Map<String, dynamic> _values = {};
   final Map<String, Proof> _proofs = {};
+
+  /// Per-field validation messages, keyed by field id — see [fieldError].
+  /// Filled on Save and cleared field-by-field as the agent edits.
+  final Map<String, String> _fieldErrors = {};
   bool _submitting = false;
   bool _loading = true;
 
@@ -211,12 +220,24 @@ class AttemptController extends ChangeNotifier {
 
   void setValue(String id, dynamic value) {
     _values[id] = value;
+    // Editing a field clears the validation error sitting on it, so the red
+    // outline disappears as the agent corrects the input rather than only on
+    // the next Save.
+    _fieldErrors.remove(id);
     notifyListeners();
   }
 
+  /// Validation message to render on [id]'s own input (red outline + helper
+  /// text), or null when it's clean. Populated by [validateSection] on Save.
+  String? fieldError(String id) => _fieldErrors[id];
+
   /// Capture arrival GPS + load any saved draft. Call once after construction.
   Future<void> init() async {
-    _arrivalGps = await _location.currentLocation();
+    // Only a real fix counts as "where the agent arrived" — leaving this null
+    // on a failed read lets every consumer fall through to its own fallback
+    // instead of recording Null Island as the arrival point.
+    final arrival = await _location.currentLocation();
+    _arrivalGps = arrival.hasFix ? arrival : null;
     final result = await _getDraft(battery.bpId);
     final draft = result.valueOrNull;
     if (draft != null) {
@@ -273,6 +294,12 @@ class AttemptController extends ChangeNotifier {
     }
   }
 
+  /// Extra line rendered under a readonly card's main value, or null when the
+  /// card has none. The Customer Address card carries the customer's phone so
+  /// the agent can dial from the same place they read the address.
+  String? readonlySecondary(FormFieldConfig f) =>
+      f.sourceField == 'customerAddress' ? customerPhoneDisplay : null;
+
   /// The customer's address as the BP detail screen's customer card shows it:
   /// the ticket detail's split components joined in postal order, falling back
   /// to the cached list-summary address while `GET /tickets/{UUID}` hasn't
@@ -282,6 +309,27 @@ class AttemptController extends ChangeNotifier {
     if (parsed.isNotEmpty) return parsed;
     final cached = battery.customer.address;
     return cached.isEmpty ? '—' : cached;
+  }
+
+  /// The customer's primary number exactly as `GET /tickets/{UUID}` gave it —
+  /// the key `customer.updateByPhone` identifies the record by, so it is sent
+  /// raw (never masked, never the agent-entered alternate). Falls back to the
+  /// cached list-summary mobile if the ticket detail hasn't landed.
+  String get customerPrimaryPhone {
+    final fromDetail = ticketDetail?.customer?.phonePrimary ?? '';
+    return fromDetail.isNotEmpty ? fromDetail : battery.customer.mobile;
+  }
+
+  /// The customer's phone as the BP detail screen's customer card shows it:
+  /// the ticket detail's primary and secondary numbers, joined when both are
+  /// present, falling back to the cached masked mobile while
+  /// `GET /tickets/{UUID}` hasn't landed.
+  String get customerPhoneDisplay {
+    final c = ticketDetail?.customer;
+    if (c == null) return battery.customer.maskedMobile();
+    final parts =
+        [c.phonePrimary, c.phoneSecondary].where((p) => p.isNotEmpty).toList();
+    return parts.isEmpty ? '—' : parts.join(', ');
   }
 
   /// Status chip shown on the hub card for [section].
@@ -356,6 +404,9 @@ class AttemptController extends ChangeNotifier {
 
   /// Geo-fence check for recovery proof (PRD §4.3). Returns true if compliant
   /// or enforcement disabled.
+  ///
+  /// Only meaningful once [isProofLocationUnknown] is false — an unlocatable
+  /// proof is thousands of km from any BP and would fail this as "too far".
   bool isProofWithinGeofence(Proof proof) {
     if (!_config.enforceGeofence) return true;
     return _location.isWithinGeofence(
@@ -364,6 +415,38 @@ class AttemptController extends ChangeNotifier {
       _config.geofenceRadiusMeters,
     );
   }
+
+  /// The most trustworthy coordinate available for an attempt record.
+  ///
+  /// [AttemptSubmission] needs real `latitude`/`longitude` numbers — it cannot
+  /// carry "unknown" — so this walks a fallback chain instead of ever handing
+  /// back [kNoLocationFix]: the caller's [preferred] point (a proof photo's
+  /// geo-tag, the strongest evidence the agent stood there) → a live device
+  /// fix → where the agent arrived → any other geo-tagged proof → the BP's own
+  /// last known location. Every rung is a real place; Null Island is not.
+  Future<GeoPoint> _bestKnownPosition({GeoPoint? preferred}) async {
+    if (preferred != null && preferred.hasFix) return preferred;
+    final live = await _location.currentLocation();
+    if (live.hasFix) return live;
+    final arrival = _arrivalGps;
+    if (arrival != null && arrival.hasFix) return arrival;
+    return _proofs.values
+            .map((p) => p.location)
+            .where((l) => l.hasFix)
+            .firstOrNull ??
+        battery.lastKnownLocation;
+  }
+
+  /// True when [proof] carries no usable fix, so the geo-fence cannot be
+  /// judged at all.
+  ///
+  /// Kept distinct from "outside the fence" because the two need opposite
+  /// actions from the agent: grant location access vs. walk closer to the BP.
+  /// Note this still blocks the submission — waving it through would turn
+  /// "deny the location permission" into a one-tap geo-fence bypass, which is
+  /// the exact control PRD §4.3 exists to enforce.
+  bool isProofLocationUnknown(Proof proof) =>
+      _config.enforceGeofence && !proof.location.hasFix;
 
   // --- BP live location (Rule 8b) ---------------------------------------------
 
@@ -411,7 +494,7 @@ class AttemptController extends ChangeNotifier {
     notifyListeners();
     try {
       final result = await _startCallUseCase(
-        StartCallParams(battery.bpId, battery.customer.mobile),
+        StartCallParams(battery.bpId, simCallTargetNumber),
       );
       final recording = result.valueOrNull;
       if (recording != null) {
@@ -432,17 +515,58 @@ class AttemptController extends ChangeNotifier {
 
   // --- In-app SIM call (Rule 8a, Android) -------------------------------------
 
-  /// TEMPORARY: every in-app SIM call is placed to this test line instead of
-  /// the customer's own number, so the flow can be exercised against a phone
-  /// the team controls. Clear it to `''` to dial `battery.customer.mobile` —
-  /// the only change needed to go live.
-  static const String simCallOverrideNumber = '+917349577447';
+  /// The customer numbers the Call Customer screen may dial, in the order it
+  /// offers them: the ticket detail's `phonePrimary` then `phoneSecondary` —
+  /// the same pair the BP detail customer card and [customerPhoneDisplay] show
+  /// — reduced to their plain 10-digit form and de-duplicated. A number that
+  /// isn't a valid 10-digit mobile can't be called, so it is left out rather
+  /// than offered and failed on. Falls back to the cached list-summary mobile
+  /// while `GET /tickets/{UUID}` hasn't landed, or when neither of its numbers
+  /// is usable.
+  List<String> get callableNumbers {
+    final numbers = <String>[];
+    void add(String? raw) {
+      final digits = Validators.mobileDigits(raw);
+      if (digits != null && !numbers.contains(digits)) numbers.add(digits);
+    }
 
-  /// The number [startSimCall] will actually dial. Displayed on the Start Call
-  /// button too, so the screen never claims to be calling a number it isn't.
-  String get simCallTargetNumber => simCallOverrideNumber.isEmpty
-      ? battery.customer.mobile
-      : simCallOverrideNumber;
+    final c = ticketDetail?.customer;
+    if (c != null) {
+      add(c.phonePrimary);
+      add(c.phoneSecondary);
+    }
+    if (numbers.isEmpty) add(battery.customer.mobile);
+    return numbers;
+  }
+
+  /// Which of [callableNumbers] the agent picked in the Start Call dropdown —
+  /// null until they pick one, and ignored if the ticket detail lands later
+  /// without it.
+  String? _selectedCallNumber;
+
+  /// The number [startSimCall] will actually dial: whichever of
+  /// [callableNumbers] the agent selected, else the customer's primary one.
+  /// Empty when the customer has no callable number on record — the screen
+  /// disables Start Call in that case. Displayed on the button too, so it never
+  /// claims to be calling a number it isn't.
+  String get simCallTargetNumber {
+    final numbers = callableNumbers;
+    if (numbers.isEmpty) return '';
+    final selected = _selectedCallNumber;
+    return selected != null && numbers.contains(selected)
+        ? selected
+        : numbers.first;
+  }
+
+  /// Picks the number the next Start Call dials. Ignores anything that isn't
+  /// one of the customer's callable numbers.
+  void selectCallNumber(String number) {
+    if (!callableNumbers.contains(number) || number == _selectedCallNumber) {
+      return;
+    }
+    _selectedCallNumber = number;
+    notifyListeners();
+  }
 
   /// True when this device can place the call on its own SIM from inside the
   /// app. Resolved by [loadSimCallSupport] when the Call Customer screen opens;
@@ -597,39 +721,64 @@ class AttemptController extends ChangeNotifier {
 
   // --- Validation -------------------------------------------------------------
 
-  /// Validates one section's visible fields; returns a localized error or
-  /// null when valid.
+  /// Validates one section's visible fields; returns the first localized error
+  /// or null when valid.
+  ///
+  /// Every failure it finds is also parked in [_fieldErrors] so the offending
+  /// input renders it inline (red outline + message) instead of the agent
+  /// having to guess which field a snackbar is about. Only the save paths call
+  /// this, so mutating state here is safe.
   String? validateSection(StepConfig section, Translate t) {
-    for (final f in visibleFields(section)) {
+    final fields = visibleFields(section);
+    for (final f in fields) {
+      _fieldErrors.remove(f.id);
+    }
+    String? first;
+    void fail(FormFieldConfig f, String message) {
+      _fieldErrors[f.id] = message;
+      first ??= message;
+    }
+
+    for (final f in fields) {
       if (f.type == 'proof') {
         final p = _proofs[f.id];
-        if (isRequired(f) && p == null) return t('validation.proofRequired');
-        if (p != null && f.proofKind == 'recovery' && !isProofWithinGeofence(p)) {
-          return t('validation.geofence');
+        if (isRequired(f) && p == null) {
+          fail(f, t('validation.proofRequired'));
+        } else if (p != null && f.proofKind == 'recovery') {
+          // Two different failures with two different remedies — tell the
+          // agent which one they're looking at.
+          if (isProofLocationUnknown(p)) {
+            fail(f, t('validation.locationUnavailable'));
+          } else if (!isProofWithinGeofence(p)) {
+            fail(f, t('validation.geofence'));
+          }
         }
         continue;
       }
       if (f.type == 'otp') {
         final v = _values[f.id] as String?;
         if (isRequired(f) && !Validators.isValidOtp(v)) {
-          return t('validation.otpRequired');
+          fail(f, t('validation.otpRequired'));
         }
         continue;
       }
       if (f.type == 'phone') {
         final v = _values[f.id] as String?;
+        // Optional numbers (e.g. the alternate phone) are only checked once
+        // the agent has typed something — blank means "no such number".
         if ((isRequired(f) || (v != null && v.isNotEmpty)) &&
             !Validators.isValidMobile(v)) {
-          return t('validation.invalidMobile');
+          fail(f, t('validation.invalidMobile'));
         }
         continue;
       }
       if (isRequired(f) && !Validators.isNotEmpty(_values[f.id])) {
-        if (f.id == 'outcome') return t('validation.outcomeRequired');
-        return t('validation.required');
+        fail(f,
+            f.id == 'outcome' ? t('validation.outcomeRequired') : t('validation.required'),);
       }
     }
-    return null;
+    notifyListeners();
+    return first;
   }
 
   // --- Save one action section (item 4/13) ------------------------------------
@@ -641,7 +790,7 @@ class AttemptController extends ChangeNotifier {
     if (error != null) return error;
 
     if (section.id == 'call') await _maybeUpdateMobile();
-    if (section.id == 'home_visit') await _maybeUpdateAddress();
+    if (section.id == 'home_visit') await _pushCustomerDetails();
 
     // The visit sections record their own attempt against the attempts
     // service. Same not-fatal contract as the Outcome submission: a rejection
@@ -678,10 +827,73 @@ class AttemptController extends ChangeNotifier {
     await _updateCustomerField(battery.customer.copyWith(mobile: mobile), 'mobile');
   }
 
-  Future<void> _maybeUpdateAddress() async {
-    final address = (_values['newCustomerAddress'] as String?)?.trim();
-    if (address == null || address.isEmpty || address == battery.customer.address) return;
-    await _updateCustomerField(battery.customer.copyWith(address: address), 'address');
+  /// Save on the Visit Customer Address screen: pushes the agent's
+  /// customer-detail edits to the customers service
+  /// (`PATCH /api/v1/customers/{id}`).
+  ///
+  /// The customer is addressed by the ticket detail's `customer.id`, not by
+  /// phone — several customers can share a number and the by-phone route 409s
+  /// on that. Address components go up individually, blanks as explicit nulls
+  /// per the contract, and the section's "Customer Visit Remarks" ride along
+  /// in `metadata`.
+  ///
+  /// No-ops when the agent filled nothing in: the contract's explicit nulls
+  /// would otherwise blank out server-side values on a save that only recorded
+  /// a visit status.
+  Future<void> _pushCustomerDetails() async {
+    final update = CustomerDetailsUpdate(
+      customerId: ticketDetail?.customer?.id ?? '',
+      phonePrimary: customerPrimaryPhone,
+      phoneSecondary: _entered('newCustomerAltMobile'),
+      addressLine1: _entered('newCustomerAddress'),
+      city: _entered('newCustomerCity'),
+      state: _entered('newCustomerState'),
+      pincode: _entered('newCustomerPincode'),
+      metadata: {
+        if (_entered('customerVisitRemark') != null)
+          'customerVisitRemark': _entered('customerVisitRemark'),
+      },
+    );
+    if (!update.hasEdits) return;
+
+    // Mirror the edits locally first (offline-first UX — the agent's input is
+    // never silently lost), then confirm against the server or queue for retry.
+    _applyCustomerEditsLocally(update);
+    final result = await _updateCustomerDetails(update);
+    if (result.isErr) {
+      await _syncQueue.enqueue(
+          'update_customer_details', update.toQueuePayload(),);
+    }
+    unawaited(_auditLog.log(
+      agentId: agentId,
+      action: 'customer_details_updated',
+      entityType: 'battery',
+      entityId: battery.bpId,
+      metadata: {'queued': result.isErr},
+    ),);
+  }
+
+  /// [Customer] carries one address string and one mobile, so fold the split
+  /// components back together for the local copy the rest of the flow reads.
+  /// Untouched parts fall back to what the ticket detail already had.
+  void _applyCustomerEditsLocally(CustomerDetailsUpdate update) {
+    final detail = ticketDetail?.customer;
+    final address = [
+      update.addressLine1 ?? detail?.addressLine1 ?? '',
+      update.city ?? detail?.city ?? '',
+      update.state ?? detail?.state ?? '',
+      update.pincode ?? detail?.pincode ?? '',
+    ].where((p) => p.isNotEmpty).join(', ');
+    battery.customer = battery.customer.copyWith(
+      address: address.isEmpty ? null : address,
+    );
+  }
+
+  /// The trimmed value of [id], or null when the agent left it blank — the
+  /// shape `customer.updateByPhone` expects for an unfilled field.
+  String? _entered(String id) {
+    final v = (_values[id] as String?)?.trim();
+    return (v == null || v.isEmpty) ? null : v;
   }
 
   /// Applies the edit locally right away (offline-first UX — the agent's
@@ -940,8 +1152,8 @@ class AttemptController extends ChangeNotifier {
 
   /// Everything the agent entered on [section], plus the customer's name, sent
   /// as `metadata` so nothing is dropped. Picks up the section's own text
-  /// fields automatically — e.g. Visit Customer Address's "Updated Customer
-  /// Address" (`newCustomerAddress`).
+  /// fields automatically — e.g. Visit Customer Address's "Address Line"
+  /// (`newCustomerAddress`) and its state/city/pincode companions.
   Map<String, dynamic> _sectionMetadata(StepConfig section) => {
         'customerName': battery.customer.name,
         for (final f in section.fields)
@@ -1009,7 +1221,7 @@ class AttemptController extends ChangeNotifier {
         .firstOrNull;
     final proofGps =
         proofFieldId == null ? null : _proofs[proofFieldId]?.location;
-    final gps = proofGps ?? await _location.currentLocation();
+    final gps = await _bestKnownPosition(preferred: proofGps);
     final submission = buildSectionAttemptSubmission(
       section: section,
       completedAt: DateTime.now(),
@@ -1080,7 +1292,7 @@ class AttemptController extends ChangeNotifier {
     final submit = _submitAttemptRecord;
     if (submit == null) return false; // not wired (e.g. unit tests) — skip.
     final completedAt = DateTime.now();
-    final gps = await _location.currentLocation();
+    final gps = await _bestKnownPosition();
     final submission =
         buildAttemptSubmission(completedAt: completedAt, gps: gps);
     final result = await submit(submission);

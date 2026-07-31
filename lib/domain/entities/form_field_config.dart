@@ -18,6 +18,8 @@ class FormFieldConfig {
     this.group,
     this.prefix,
     this.maxLines = 1,
+    this.maxLength,
+    this.digitsOnly = false,
     this.proofKind,
   });
 
@@ -43,6 +45,14 @@ class FormFieldConfig {
   final String? group;
   final String? prefix;
   final int maxLines;
+
+  /// Character cap for text-style fields (e.g. a 6-digit pincode). `null`
+  /// leaves the input unbounded — the type-specific default still applies.
+  final int? maxLength;
+
+  /// Restricts a `number` field to digits only (e.g. a pincode) — amounts stay
+  /// unrestricted so decimals remain typable.
+  final bool digitsOnly;
   final String? proofKind;
 
   factory FormFieldConfig.fromJson(Map<String, dynamic> json) =>
@@ -61,6 +71,8 @@ class FormFieldConfig {
         group: json['group'] as String?,
         prefix: json['prefix'] as String?,
         maxLines: (json['maxLines'] as num?)?.toInt() ?? 1,
+        maxLength: (json['maxLength'] as num?)?.toInt(),
+        digitsOnly: json['digitsOnly'] as bool? ?? false,
         proofKind: json['proofKind'] as String?,
       );
 }

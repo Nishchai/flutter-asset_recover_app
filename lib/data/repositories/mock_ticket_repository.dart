@@ -8,6 +8,7 @@ import 'package:asset_recovery_app/domain/entities/battery.dart';
 import 'package:asset_recovery_app/domain/entities/battery_detail.dart';
 import 'package:asset_recovery_app/domain/entities/call_recording.dart';
 import 'package:asset_recovery_app/domain/entities/customer.dart';
+import 'package:asset_recovery_app/domain/entities/customer_details_update.dart';
 import 'package:asset_recovery_app/domain/entities/draft_attempt.dart';
 import 'package:asset_recovery_app/domain/entities/enums.dart';
 import 'package:asset_recovery_app/domain/entities/geo_point.dart';
@@ -600,6 +601,17 @@ class MockTicketRepository implements TicketRepository {
     }
     return _delayed(null);
   }
+
+  @override
+  Future<void> updateCustomerByPhone(CustomerDetailsUpdate update) =>
+      // Mock backend: accept and drop. The caller has already mirrored the
+      // edits onto the in-memory battery, which is all the mock data needs.
+      _delayed(null);
+
+  @override
+  Future<void> updateAgentLocation(String agentId, GeoPoint position) =>
+      // Mock backend: accept and drop; nothing tracks agent positions here.
+      _delayed(null);
 
   @override
   Future<void> requestHandoverOtp(String bpId) => _delayed(null);

@@ -13,6 +13,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
+/// Root navigator observer. Lets a screen learn that a route pushed on top of
+/// it has popped and it is visible again — [HomeShell] uses this to re-report
+/// the agent's location every time the agent lands back on home.
+final RouteObserver<ModalRoute<void>> appRouteObserver =
+    RouteObserver<ModalRoute<void>>();
+
 /// Root widget. Resolves all dependencies from the DI container ([sl]) and
 /// wires Provider scopes, theme, localization and top-level auth routing.
 /// [configureDependencies] must be awaited before this is built.
@@ -68,6 +74,7 @@ class AssetRecoveryApp extends StatelessWidget {
               GlobalWidgetsLocalizations.delegate,
               GlobalCupertinoLocalizations.delegate,
             ],
+            navigatorObservers: [appRouteObserver],
             home: const _RootRouter(),
           );
         },

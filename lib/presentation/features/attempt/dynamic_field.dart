@@ -42,7 +42,11 @@ class DynamicField extends StatelessWidget {
             keyboard: TextInputType.number, maxLength: 6, digitsOnly: true,);
       case 'number':
         return _text(context, controller, label, required,
-            keyboard: TextInputType.number, prefix: field.prefix,);
+            keyboard: TextInputType.number,
+            maxLength: field.maxLength,
+            digitsOnly: field.digitsOnly,
+            prefix: field.prefix,
+            hint: field.hintKey == null ? null : l.t(field.hintKey!),);
       case 'phone':
         return _text(context, controller, label, required,
             keyboard: TextInputType.phone, maxLength: 10, digitsOnly: true,);
@@ -52,7 +56,9 @@ class DynamicField extends StatelessWidget {
             hint: field.hintKey == null ? null : l.t(field.hintKey!),);
       case 'text':
       default:
-        return _text(context, controller, label, required);
+        return _text(context, controller, label, required,
+            maxLength: field.maxLength,
+            hint: field.hintKey == null ? null : l.t(field.hintKey!),);
     }
   }
 
@@ -73,6 +79,7 @@ class DynamicField extends StatelessWidget {
   Widget _readonly(BuildContext context, AttemptController c,
       AppPalette palette, String label,) {
     final value = c.readonlyValue(field);
+    final secondary = c.readonlySecondary(field);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -104,6 +111,21 @@ class DynamicField extends StatelessWidget {
                     Text(value,
                         style:
                             const TextStyle(fontWeight: FontWeight.w600),),
+                    if (secondary != null && secondary.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Icon(Icons.phone_outlined,
+                              size: 14, color: palette.muted,),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(secondary,
+                                style: const TextStyle(
+                                    fontSize: 13, fontWeight: FontWeight.w600,),),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -128,6 +150,7 @@ class DynamicField extends StatelessWidget {
         DropdownButtonFormField<String>(
           initialValue: current,
           isExpanded: true,
+          decoration: InputDecoration(errorText: c.fieldError(field.id)),
           hint: Text(l.t('field.selectHint')),
           items: [
             for (final o in options)
@@ -165,7 +188,14 @@ class DynamicField extends StatelessWidget {
               digitsOnly ? [FilteringTextInputFormatter.digitsOnly] : null,
           decoration: InputDecoration(
             counterText: '',
+            // Set on Save by the controller's validation and cleared the
+            // moment the agent edits the field; Material turns the outline red
+            // and prints the message beneath it.
+            errorText: c.fieldError(field.id),
             hintText: hint,
+            // A notch below the field label (13) and in the same muted tone, so
+            // the placeholder reads as guidance rather than entered text.
+            hintStyle: TextStyle(fontSize: 12, color: palette.muted),
             prefixText: prefix,
           ),
           onChanged: (v) => c.setValue(field.id, v),

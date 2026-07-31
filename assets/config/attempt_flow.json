@@ -107,6 +107,37 @@
           "id": "newCustomerAddress",
           "type": "text",
           "labelKey": "field.new_address",
+          "hintKey": "field.new_address_hint",
+          "required": false,
+          "featureFlag": "features.customerDetailUpdate"
+        },
+        {
+          "id": "newCustomerState",
+          "type": "text",
+          "labelKey": "field.new_state",
+          "required": false,
+          "featureFlag": "features.customerDetailUpdate"
+        },
+        {
+          "id": "newCustomerCity",
+          "type": "text",
+          "labelKey": "field.new_city",
+          "required": false,
+          "featureFlag": "features.customerDetailUpdate"
+        },
+        {
+          "id": "newCustomerPincode",
+          "type": "number",
+          "labelKey": "field.new_pincode",
+          "maxLength": 6,
+          "digitsOnly": true,
+          "required": false,
+          "featureFlag": "features.customerDetailUpdate"
+        },
+        {
+          "id": "newCustomerAltMobile",
+          "type": "phone",
+          "labelKey": "field.alt_mobile",
           "required": false,
           "featureFlag": "features.customerDetailUpdate"
         },

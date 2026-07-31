@@ -20,6 +20,7 @@ import 'package:asset_recovery_app/data/repositories/mock_audit_repository.dart'
 import 'package:asset_recovery_app/data/repositories/mock_ticket_repository.dart';
 import 'package:asset_recovery_app/domain/entities/audit_event.dart';
 import 'package:asset_recovery_app/domain/entities/customer.dart';
+import 'package:asset_recovery_app/domain/entities/customer_details_update.dart';
 import 'package:asset_recovery_app/domain/entities/form_field_config.dart';
 import 'package:asset_recovery_app/domain/repositories/audit_repository.dart';
 import 'package:asset_recovery_app/domain/repositories/ticket_repository.dart';
@@ -37,6 +38,8 @@ import 'package:asset_recovery_app/domain/usecases/shift_otp_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/submit_attempt_record_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/submit_attempt_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/ticket_pickup_usecase.dart';
+import 'package:asset_recovery_app/domain/usecases/update_agent_location_usecase.dart';
+import 'package:asset_recovery_app/domain/usecases/update_customer_details_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/update_customer_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/update_ticket_status_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/validate_battery_scan_usecase.dart';
@@ -62,8 +65,14 @@ Future<void> configureDependencies({
 
   // --- Core -----------------------------------------------------------------
   sl.registerSingleton<ConfigService>(cfg);
+  // Real device GPS everywhere except `test`, which has no platform channels
+  // and needs the deterministic jittered stub instead (same split as
+  // ConnectivityService below).
   sl.registerLazySingleton<LocationService>(
-      () => location ?? StubLocationService(seed: cfg.env.deterministicSeed),);
+      () => location ??
+          (cfg.env.environment == 'test'
+              ? StubLocationService(seed: cfg.env.deterministicSeed)
+              : GeolocatorLocationService()),);
   sl.registerLazySingleton<ProofService>(
       () => proof ?? CameraProofService(sl<LocationService>(), cfg),);
   // Real Azure Blob uploader only when credentials are present (dev/prod with a
@@ -189,6 +198,8 @@ Future<void> configureDependencies({
   sl.registerLazySingleton(() => ValidateBatteryScanUseCase(sl()));
   sl.registerLazySingleton(() => GetRoadDistanceUseCase(sl()));
   sl.registerLazySingleton(() => UpdateCustomerUseCase(sl()));
+  sl.registerLazySingleton(() => UpdateCustomerDetailsUseCase(sl()));
+  sl.registerLazySingleton(() => UpdateAgentLocationUseCase(sl()));
   sl.registerLazySingleton(() => UpdateTicketStatusUseCase(sl()));
   sl.registerLazySingleton(() => RequestHandoverOtpUseCase(sl()));
   sl.registerLazySingleton(() => VerifyHandoverOtpUseCase(sl()));
@@ -214,6 +225,12 @@ Future<void> configureDependencies({
       payload['bpId'] as String,
       Customer.fromJson(Map<String, dynamic>.from(payload['customer'] as Map)),
     ),);
+    if (result.isErr) throw StateError(result.failureOrNull!.message);
+  });
+  syncQueue.registerHandler('update_customer_details', (payload) async {
+    final result = await sl<UpdateCustomerDetailsUseCase>()(
+      CustomerDetailsUpdate.fromJson(Map<String, dynamic>.from(payload)),
+    );
     if (result.isErr) throw StateError(result.failureOrNull!.message);
   });
   unawaited(syncQueue.init());

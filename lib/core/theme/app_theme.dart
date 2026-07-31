@@ -56,6 +56,18 @@ class AppTheme {
           borderRadius: BorderRadius.circular(inputRadius),
           borderSide: BorderSide(color: palette.primary, width: 1.6),
         ),
+        // A failed validation marks the whole outline red at the same radius
+        // as every other state — Material's fallback error borders ignore
+        // `inputRadius` and would square off the corners.
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(inputRadius),
+          borderSide: BorderSide(color: palette.danger),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(inputRadius),
+          borderSide: BorderSide(color: palette.danger, width: 1.6),
+        ),
+        errorStyle: TextStyle(fontSize: 12, color: palette.danger),
       ),
       // Primary CTA = dark pill with yellow text (Figma "Call Customer",
       // "Submit & Navigate", "Proceed to collect"). The yellow-filled variant

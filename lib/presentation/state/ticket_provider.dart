@@ -273,8 +273,13 @@ class TicketProvider extends ChangeNotifier {
       _all.where((t) => t.status == TicketStatus.pending).length;
 
   /// Recomputes road distance from the agent to every BP (PRD §4.8).
+  ///
+  /// A no-op without a usable device fix: distances measured from Null Island
+  /// would be thousands of km and would reorder the whole distance-sorted
+  /// list. Keeping the previous numbers is the lesser wrong.
   Future<void> refreshDistances(Agent agent) async {
     final from = agent.currentLocation ?? await _location.currentLocation();
+    if (!from.hasFix) return;
     for (final t in _all) {
       for (final bp in t.batteries) {
         final result = await _roadDistance(RoadDistanceParams(from, bp.lastKnownLocation));

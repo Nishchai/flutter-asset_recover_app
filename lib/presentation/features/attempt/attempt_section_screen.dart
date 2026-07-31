@@ -307,8 +307,11 @@ class _CallRecordingPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final controller = context.watch<AttemptController>();
-    // The number the call will really go to — while the test line is hardcoded
-    // that is not the customer's own mobile, and the button must say so.
+    // The customer's own numbers, from the ticket detail — primary first, the
+    // alternate second, and only the ones that are valid 10-digit mobiles.
+    final numbers = controller.callableNumbers;
+    // The number the call will really go to, so the button never claims to be
+    // calling one it isn't.
     final mobile = controller.simCallTargetNumber;
     // While a tracked call is live the button would only start a second one.
     final busy = controller.callInProgress && controller.simCallTracked;
@@ -318,15 +321,21 @@ class _CallRecordingPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: double.infinity,
-            child: PillButton.yellow(
-              '${l.t('call.startCall')} · $mobile',
-              palette: palette,
-              icon: Icons.call,
-              onPressed: busy ? null : () => _startCall(context, controller),
-            ),
+          _StartCallButton(
+            palette: palette,
+            numbers: numbers,
+            selected: mobile,
+            enabled: !busy && numbers.isNotEmpty,
+            onCall: (number) {
+              controller.selectCallNumber(number);
+              _startCall(context, controller);
+            },
           ),
+          if (numbers.isEmpty) ...[
+            const SizedBox(height: 6),
+            Text(l.t('call.noNumber'),
+                style: TextStyle(color: palette.danger, fontSize: 12),),
+          ],
           if (busy) ...[
             const SizedBox(height: 10),
             _SimCallBanner(palette: palette),
@@ -365,6 +374,139 @@ class _CallRecordingPanel extends StatelessWidget {
               ),
           const SizedBox(height: 4),
         ],
+      ),
+    );
+  }
+}
+
+/// The Start Call CTA. With a single number on record it is a plain pill that
+/// dials it. When the customer has a second valid number the pill grows a
+/// dropdown on its right: it lists both numbers (primary / alternate) and the
+/// one the agent picks becomes the number this call — and every later one on
+/// this screen — goes to.
+class _StartCallButton extends StatelessWidget {
+  const _StartCallButton({
+    required this.palette,
+    required this.numbers,
+    required this.selected,
+    required this.enabled,
+    required this.onCall,
+  });
+
+  final AppPalette palette;
+
+  /// The customer's callable numbers, primary first.
+  final List<String> numbers;
+
+  /// The one the button currently dials — empty when [numbers] is.
+  final String selected;
+  final bool enabled;
+
+  /// Called with the number to dial: the selected one from the button itself,
+  /// or whichever entry was picked from the dropdown.
+  final void Function(String number) onCall;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final label = numbers.isEmpty
+        ? l.t('call.startCall')
+        : '${l.t('call.startCall')} · $selected';
+
+    if (numbers.length < 2) {
+      return SizedBox(
+        width: double.infinity,
+        child: PillButton.yellow(
+          label,
+          palette: palette,
+          icon: Icons.call,
+          onPressed: enabled ? () => onCall(selected) : null,
+        ),
+      );
+    }
+
+    return Opacity(
+      opacity: enabled ? 1 : 0.5,
+      child: Material(
+        color: palette.primary,
+        shape: const StadiumBorder(),
+        child: Row(
+          children: [
+            Expanded(
+              child: InkWell(
+                customBorder: const StadiumBorder(),
+                onTap: enabled ? () => onCall(selected) : null,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 17, horizontal: 22),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.call, size: 18, color: palette.onPrimary),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: palette.onPrimary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Container(
+              width: 1,
+              height: 26,
+              color: palette.onPrimary.withValues(alpha: 0.25),
+            ),
+            PopupMenuButton<String>(
+              enabled: enabled,
+              tooltip: l.t('call.chooseNumber'),
+              position: PopupMenuPosition.under,
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              icon: Icon(Icons.arrow_drop_down, color: palette.onPrimary),
+              onSelected: onCall,
+              itemBuilder: (_) => [
+                for (var i = 0; i < numbers.length; i++)
+                  PopupMenuItem<String>(
+                    value: numbers[i],
+                    child: Row(
+                      children: [
+                        Icon(
+                          numbers[i] == selected
+                              ? Icons.radio_button_checked
+                              : Icons.radio_button_unchecked,
+                          size: 18,
+                          color: palette.primaryDark,
+                        ),
+                        const SizedBox(width: 10),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(numbers[i],
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w600, fontSize: 14,),),
+                            Text(
+                              l.t(i == 0
+                                  ? 'call.primaryNumber'
+                                  : 'call.altNumber',),
+                              style: TextStyle(color: palette.muted, fontSize: 11),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

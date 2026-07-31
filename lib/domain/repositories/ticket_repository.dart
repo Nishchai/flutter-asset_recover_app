@@ -4,6 +4,7 @@ import 'package:asset_recovery_app/domain/entities/attempt_submission.dart';
 import 'package:asset_recovery_app/domain/entities/battery_detail.dart';
 import 'package:asset_recovery_app/domain/entities/call_recording.dart';
 import 'package:asset_recovery_app/domain/entities/customer.dart';
+import 'package:asset_recovery_app/domain/entities/customer_details_update.dart';
 import 'package:asset_recovery_app/domain/entities/draft_attempt.dart';
 import 'package:asset_recovery_app/domain/entities/geo_point.dart';
 import 'package:asset_recovery_app/domain/entities/live_token_model.dart';
@@ -100,6 +101,17 @@ abstract class TicketRepository {
   Future<double> roadDistanceKm(GeoPoint from, GeoPoint to);
 
   Future<void> updateCustomer(String bpId, Customer customer);
+
+  /// Patches the customer's address components and alternate number against
+  /// the customers service. Targets `PATCH /api/v1/customers/{id}` when
+  /// [CustomerDetailsUpdate.customerId] is set, falling back to the by-phone
+  /// route otherwise. Throws [ApiException] on a non-2xx response.
+  Future<void> updateCustomerByPhone(CustomerDetailsUpdate update);
+
+  /// Reports the agent's current device position (`agent.location` —
+  /// `PATCH /agents/location` with `{agentId, lat, lng}`). Fired whenever the
+  /// agent lands on the home screen. Throws [ApiException] on a non-2xx.
+  Future<void> updateAgentLocation(String agentId, GeoPoint position);
 
   /// Requests an OTP for store/ESV physical handover (PRD §5.1.6).
   Future<void> requestHandoverOtp(String bpId);

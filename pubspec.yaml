@@ -72,7 +72,7 @@ dependencies:
   # The app ships with stub service implementations so it compiles and runs
   # WITHOUT these. See lib/core/services/* and docs/API_INTEGRATION.md.
   # ---------------------------------------------------------------------------
-  # geolocator: ^12.0.0          # GPS capture + geo-fence validation
+  geolocator: ^12.0.0            # GPS capture + geo-fence validation
   google_maps_flutter: ^2.6.1
   mobile_scanner: ^5.1.1         # QR code scanning of BP serials (live camera)
   # camera: ^0.11.0              # Custom geo-tagged camera overlay

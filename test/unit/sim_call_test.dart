@@ -3,9 +3,11 @@ import 'dart:async';
 import 'package:asset_recovery_app/core/di/injector.dart';
 import 'package:asset_recovery_app/core/services/sim_call_service.dart';
 import 'package:asset_recovery_app/domain/entities/battery.dart';
+import 'package:asset_recovery_app/domain/entities/ticket_detail.dart';
 import 'package:asset_recovery_app/domain/usecases/call_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/draft_attempt_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/get_live_location_usecase.dart';
+import 'package:asset_recovery_app/domain/usecases/update_customer_details_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/update_customer_usecase.dart';
 import 'package:asset_recovery_app/presentation/state/attempt_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -106,7 +108,22 @@ void main() {
 
   tearDown(() => sim.dispose());
 
-  AttemptController controller() => AttemptController(
+  /// A ticket detail carrying the customer's numbers exactly as
+  /// `GET /tickets/{UUID}` returns them — the source the Call Customer screen
+  /// dials from.
+  TicketDetail detailWith({String primary = '', String secondary = ''}) =>
+      TicketDetail(
+        id: 'uuid-48217',
+        ticketNumber: 'TKT-48217',
+        status: 'ASSIGNED',
+        customer: TicketDetailCustomer(
+          id: 'cust-1',
+          phonePrimary: primary,
+          phoneSecondary: secondary,
+        ),
+      );
+
+  AttemptController controller({TicketDetail? detail}) => AttemptController(
         flow: env.services.attemptFlow,
         ticketId: 'TKT-48217',
         battery: bp,
@@ -117,12 +134,14 @@ void main() {
         getDraft: sl<GetDraftUseCase>(),
         saveDraft: sl<SaveDraftUseCase>(),
         updateCustomer: sl<UpdateCustomerUseCase>(),
+        updateCustomerDetails: sl<UpdateCustomerDetailsUseCase>(),
         auditLog: env.services.auditLog,
         getLiveLocation: sl<GetLiveLocationUseCase>(),
         startCallUseCase: sl<StartCallUseCase>(),
         getCallRecordings: sl<GetCallRecordingsUseCase>(),
         syncQueue: env.services.syncQueue,
         simCall: sim,
+        ticketDetail: detail,
       );
 
   test('sanitize keeps only what a tel: number can carry', () {
@@ -144,19 +163,59 @@ void main() {
     expect(c.simCallState, SimCallState.active);
   });
 
-  test('while the test line is hardcoded it wins over the customer number',
-      () async {
-    // Delete this test together with AttemptController.simCallOverrideNumber.
-    expect(AttemptController.simCallOverrideNumber, isNotEmpty);
+  test("the customer's own numbers are what the screen offers", () async {
     bp.customer = bp.customer.copyWith(mobile: '9000000001');
-    final c = controller();
-
-    expect(c.simCallTargetNumber, AttemptController.simCallOverrideNumber);
-    expect(await c.startSimCall(), isNull);
-    expect(
-      sim.dialed.single,
-      SimCallService.sanitize(AttemptController.simCallOverrideNumber),
+    final c = controller(
+      detail: detailWith(primary: '+91 98765-43210', secondary: '9811100244'),
     );
+
+    // Ticket detail wins over the cached list-summary mobile, and both numbers
+    // come back as the plain 10 digits the dropdown shows and dials.
+    expect(c.callableNumbers, ['9876543210', '9811100244']);
+    expect(c.simCallTargetNumber, '9876543210');
+    expect(await c.startSimCall(), isNull);
+    expect(sim.dialed.single, '9876543210');
+  });
+
+  test('numbers that are not valid 10-digit mobiles are not offered', () {
+    bp.customer = bp.customer.copyWith(mobile: '9000000001');
+
+    // A partial alternate is dropped, leaving only the primary.
+    expect(
+      controller(detail: detailWith(primary: '9811100244', secondary: '98111'))
+          .callableNumbers,
+      ['9811100244'],
+    );
+    // The same number twice (one of them formatted) is offered once.
+    expect(
+      controller(
+        detail: detailWith(primary: '9811100244', secondary: '098111 00244'),
+      ).callableNumbers,
+      ['9811100244'],
+    );
+    // Neither number usable — fall back to the cached list-summary mobile.
+    expect(
+      controller(detail: detailWith(primary: '12345', secondary: ''))
+          .callableNumbers,
+      ['9000000001'],
+    );
+    // No ticket detail yet — same fallback.
+    expect(controller().callableNumbers, ['9000000001']);
+  });
+
+  test('the agent can pick which number the call goes to', () async {
+    final c = controller(
+      detail: detailWith(primary: '9811100244', secondary: '9811100097'),
+    );
+
+    c.selectCallNumber('9811100097');
+    expect(c.simCallTargetNumber, '9811100097');
+    expect(await c.startSimCall(), isNull);
+    expect(sim.dialed.single, '9811100097');
+
+    // A number the customer doesn't have can't be selected.
+    c.selectCallNumber('9999999999');
+    expect(c.simCallTargetNumber, '9811100097');
   });
 
   test('hanging up logs the recording with the platform-measured duration',
@@ -263,17 +322,12 @@ void main() {
   test('a customer with no number is reported before anything is dialed',
       () async {
     bp.customer = bp.customer.copyWith(mobile: '');
-    final c = controller();
+    final c = controller(detail: detailWith());
 
-    if (AttemptController.simCallOverrideNumber.isEmpty) {
-      expect(await c.startSimCall(), 'call.noNumber');
-      expect(sim.dialed, isEmpty);
-    } else {
-      // The hardcoded test line stands in for the customer's number for now,
-      // so there is nothing to refuse. This branch goes away with the override.
-      expect(await c.startSimCall(), isNull);
-      expect(sim.dialed, hasLength(1));
-    }
+    expect(c.callableNumbers, isEmpty);
+    expect(c.simCallTargetNumber, isEmpty);
+    expect(await c.startSimCall(), 'call.noNumber');
+    expect(sim.dialed, isEmpty);
   });
 
   test('support is resolved for the Call Customer screen', () async {

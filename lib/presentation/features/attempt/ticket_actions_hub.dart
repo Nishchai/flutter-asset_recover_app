@@ -12,6 +12,7 @@ import 'package:asset_recovery_app/domain/usecases/call_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/draft_attempt_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/get_live_location_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/submit_attempt_record_usecase.dart';
+import 'package:asset_recovery_app/domain/usecases/update_customer_details_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/update_customer_usecase.dart';
 import 'package:asset_recovery_app/presentation/features/attempt/attempt_section_screen.dart';
 import 'package:asset_recovery_app/presentation/shared/mark_ticket_in_progress.dart';
@@ -86,6 +87,7 @@ class TicketActionsHub extends StatelessWidget {
           getDraft: sl<GetDraftUseCase>(),
           saveDraft: sl<SaveDraftUseCase>(),
           updateCustomer: sl<UpdateCustomerUseCase>(),
+          updateCustomerDetails: sl<UpdateCustomerDetailsUseCase>(),
           auditLog: services.auditLog,
           getLiveLocation: sl<GetLiveLocationUseCase>(),
           startCallUseCase: sl<StartCallUseCase>(),

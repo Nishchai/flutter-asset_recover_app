@@ -9,6 +9,7 @@ import 'package:asset_recovery_app/domain/usecases/call_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/draft_attempt_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/get_live_location_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/submit_attempt_record_usecase.dart';
+import 'package:asset_recovery_app/domain/usecases/update_customer_details_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/update_customer_usecase.dart';
 import 'package:asset_recovery_app/presentation/state/attempt_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -65,6 +66,7 @@ void main() {
         getDraft: sl<GetDraftUseCase>(),
         saveDraft: sl<SaveDraftUseCase>(),
         updateCustomer: sl<UpdateCustomerUseCase>(),
+        updateCustomerDetails: sl<UpdateCustomerDetailsUseCase>(),
         auditLog: env.services.auditLog,
         getLiveLocation: sl<GetLiveLocationUseCase>(),
         startCallUseCase: sl<StartCallUseCase>(),

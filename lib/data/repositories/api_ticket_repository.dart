@@ -9,6 +9,7 @@ import 'package:asset_recovery_app/domain/entities/battery.dart';
 import 'package:asset_recovery_app/domain/entities/battery_detail.dart';
 import 'package:asset_recovery_app/domain/entities/call_recording.dart';
 import 'package:asset_recovery_app/domain/entities/customer.dart';
+import 'package:asset_recovery_app/domain/entities/customer_details_update.dart';
 import 'package:asset_recovery_app/domain/entities/draft_attempt.dart';
 import 'package:asset_recovery_app/domain/entities/enums.dart';
 import 'package:asset_recovery_app/domain/entities/geo_point.dart';
@@ -299,6 +300,34 @@ class ApiTicketRepository implements TicketRepository {
     final res = await _api.call('customer.update',
         pathParams: {'bpId': bpId}, body: customer.toJson(),);
     _logResponse('customer.update', res);
+  }
+
+  @override
+  Future<void> updateCustomerByPhone(CustomerDetailsUpdate update) async {
+    // Absolute-URL endpoints: ApiClient sends the body verbatim with no
+    // apiBaseUrl prefix and no agentId query param.
+    //
+    // Address the customer by id whenever the ticket detail gave us one — the
+    // by-phone route 409s ("Ambiguous phonePrimary") when several customers
+    // share a number, which is common in this backend.
+    final byId = update.customerId.isNotEmpty;
+    final endpoint = byId ? 'customer.updateById' : 'customer.updateByPhone';
+    final res = await _api.call(
+      endpoint,
+      pathParams: byId ? {'id': update.customerId} : const {},
+      body: update.toJson(),
+    );
+    _logResponse(endpoint, res);
+  }
+
+  @override
+  Future<void> updateAgentLocation(String agentId, GeoPoint position) async {
+    final res = await _api.call('agent.location', body: {
+      'agentId': agentId,
+      'lat': position.lat,
+      'lng': position.lng,
+    },);
+    _logResponse('agent.location', res);
   }
 
   @override
