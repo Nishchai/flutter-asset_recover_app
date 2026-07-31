@@ -45,8 +45,9 @@ void main() {
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     env = await TestEnv.create();
-    final tickets = await env.repository.assignedTickets('FA-RM-01');
-    bp = tickets
+    final tickets =
+        await env.repository.assignedTickets('FA-RM-01', pageSize: 100);
+    bp = tickets.items
         .firstWhere((t) => t.ticketId == 'TKT-48217')
         .batteries
         .firstWhere((b) => b.bpId == 'BP-IF-09823-A');

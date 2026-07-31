@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:asset_recovery_app/core/di/app_services.dart';
 import 'package:asset_recovery_app/core/localization/app_localizations.dart';
 import 'package:asset_recovery_app/core/theme/app_theme.dart';
@@ -23,6 +25,13 @@ class TaskListScreen extends StatefulWidget {
 class _TaskListScreenState extends State<TaskListScreen> {
   TicketFilter _filter = TicketFilter.allTasks;
 
+  /// Drives the scroll paging: the next page is requested once the agent is
+  /// within this many pixels of the end of the loaded tickets, so the following
+  /// batch is usually already in place by the time the last card is reached.
+  static const double _loadMoreThresholdPx = 320;
+
+  final ScrollController _scroll = ScrollController();
+
   static const _filterOrder = [
     TicketFilter.allTasks,
     TicketFilter.inProgress,
@@ -38,6 +47,7 @@ class _TaskListScreenState extends State<TaskListScreen> {
   @override
   void initState() {
     super.initState();
+    _scroll.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final tickets = context.read<TicketProvider>();
       final agent = context.read<AuthProvider>().agent;
@@ -52,6 +62,38 @@ class _TaskListScreenState extends State<TaskListScreen> {
         tickets.load(agent.id);
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _scroll
+      ..removeListener(_onScroll)
+      ..dispose();
+    super.dispose();
+  }
+
+  /// Requests the next page once the agent scrolls within
+  /// [_loadMoreThresholdPx] of the end of the loaded tickets. The provider
+  /// itself ignores the call when a page is already in flight or the server has
+  /// no more, so this can fire on every scroll notification safely.
+  void _onScroll() {
+    if (!_scroll.hasClients) return;
+    final position = _scroll.position;
+    if (position.pixels < position.maxScrollExtent - _loadMoreThresholdPx) {
+      return;
+    }
+    unawaited(context.read<TicketProvider>().loadMore());
+  }
+
+  /// A filtered tab can show only a handful of the tickets loaded so far (two
+  /// Completed out of a page of twenty, say), leaving the list too short to
+  /// scroll — and with nothing to scroll there is no gesture to trigger the
+  /// next page, so the tab would dead-end. Top it up until the list can scroll
+  /// or the server runs out of pages.
+  void _topUpIfNotScrollable() {
+    if (!_scroll.hasClients) return;
+    if (_scroll.position.maxScrollExtent > 0) return;
+    unawaited(context.read<TicketProvider>().loadMore());
   }
 
   static const _sortLabelKeys = {
@@ -215,26 +257,53 @@ class _TaskListScreenState extends State<TaskListScreen> {
       AppPalette palette, AppServices services,) {
     final l = AppLocalizations.of(context);
     final items = tickets.ticketsFor(_filter);
+
+    // Whatever this tab shows, the loaded window may not cover it — check after
+    // layout whether more pages are needed to make the list scrollable at all.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _topUpIfNotScrollable();
+    });
+
     if (items.isEmpty) {
       // Scrollable even when empty, so the empty state can still be pulled
-      // down to refresh.
+      // down to refresh. Keeps the controller attached so an empty filtered tab
+      // (its matches sitting on a page not fetched yet) can still page on.
       return ListView(
+        controller: _scroll,
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(20, 64, 20, 24),
         children: [
           Center(
-            child:
-                Text(l.t('home.empty'), style: TextStyle(color: palette.muted)),
+            child: tickets.loadingMore
+                ? CircularProgressIndicator(color: palette.primary)
+                : Text(l.t('home.empty'),
+                    style: TextStyle(color: palette.muted),),
           ),
         ],
       );
     }
+
+    // One trailing slot for the paging footer, whenever there is a page to
+    // fetch, one in flight, or a failed attempt to retry.
+    final showFooter = tickets.hasMorePages ||
+        tickets.loadingMore ||
+        tickets.loadMoreError != null;
+
     return ListView.separated(
+      controller: _scroll,
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-      itemCount: items.length,
+      itemCount: items.length + (showFooter ? 1 : 0),
       separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (context, i) {
+        if (i == items.length) {
+          return _PagingFooter(
+            loading: tickets.loadingMore,
+            error: tickets.loadMoreError,
+            palette: palette,
+            onRetry: () => unawaited(tickets.loadMore()),
+          );
+        }
         final t = items[i];
         return TicketCard(
           ticket: t,
@@ -248,6 +317,61 @@ class _TaskListScreenState extends State<TaskListScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+/// Trailing slot of the paged ticket list: a spinner while the next page loads,
+/// a retry row when the last attempt failed, and otherwise just enough height
+/// to signal that the list continues.
+class _PagingFooter extends StatelessWidget {
+  const _PagingFooter({
+    required this.loading,
+    required this.error,
+    required this.palette,
+    required this.onRetry,
+  });
+
+  final bool loading;
+  final String? error;
+  final AppPalette palette;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    if (error != null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Column(
+          children: [
+            Text(
+              error!.isEmpty ? l.t('home.loadMoreFailed') : error!,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: palette.muted, fontSize: 12),
+            ),
+            const SizedBox(height: 6),
+            TextButton(
+              onPressed: onRetry,
+              child: Text(l.t('common.retry'),
+                  style: TextStyle(color: palette.primary),),
+            ),
+          ],
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      child: Center(
+        child: SizedBox(
+          width: 22,
+          height: 22,
+          child: loading
+              ? CircularProgressIndicator(
+                  strokeWidth: 2.2, color: palette.primary,)
+              : null,
+        ),
+      ),
     );
   }
 }

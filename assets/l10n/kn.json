@@ -135,6 +135,7 @@
   "detail.slaCritical": "SLA ನಿರ್ಣಾಯಕ:",
   "detail.slaCriticalBody": "{attempts} ಪ್ರಯತ್ನಗಳು ಅಥವಾ {days} ದಿನಗಳ ನಂತರ, ಈ ಟಿಕೆಟ್ ಅನ್ನು ಮರುಪಡೆಯಲಾಗದು ಎಂದು ಗುರುತಿಸಲಾಗುತ್ತದೆ.",
   "detail.ticketActions": "ಟಿಕೆಟ್ ಕ್ರಿಯೆಗಳು",
+  "detail.maxAttemptsReached": "ಈ ಬ್ಯಾಟರಿಗೆ ಗರಿಷ್ಠ {max} ಪ್ರಯತ್ನಗಳನ್ನು ನೀವು ತಲುಪಿದ್ದೀರಿ",
   "detail.totalAttempts": "ಒಟ್ಟು ಪ್ರಯತ್ನಗಳು",
   "detail.vin": "VIN",
   "field.amount_demanded": "ಬೇಡಿಕೆಯ ಮೊತ್ತ",

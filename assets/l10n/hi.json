@@ -268,6 +268,7 @@
   "detail.slaCritical": "एसएलए महत्वपूर्ण:",
   "detail.slaCriticalBody": "{attempts} प्रयासों या {days} दिनों के बाद, इस टिकट को अप्राप्य के रूप में चिह्नित किया जाएगा।",
   "detail.ticketActions": "टिकट कार्रवाई",
+  "detail.maxAttemptsReached": "आप इस बैटरी के लिए अधिकतम {max} प्रयास कर चुके हैं",
   "detail.vin": "वीआईएन",
   "field.battery_remark": "बैटरी टिप्पणी",
   "field.battery_remark_note": "अतिरिक्त बैटरी टिप्पणी",

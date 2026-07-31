@@ -135,6 +135,7 @@
   "detail.slaCritical": "SLA गंभीर:",
   "detail.slaCriticalBody": "{attempts} प्रयत्नांनंतर किंवा {days} दिवसांनंतर, हे तिकीट अवसुलीयोग्य म्हणून चिन्हांकित केले जाते.",
   "detail.ticketActions": "तिकीट क्रिया",
+  "detail.maxAttemptsReached": "या बॅटरीसाठी तुम्ही कमाल {max} प्रयत्न पूर्ण केले आहेत",
   "detail.totalAttempts": "एकूण प्रयत्न",
   "detail.vin": "VIN",
   "field.amount_demanded": "मागितलेली रक्कम",

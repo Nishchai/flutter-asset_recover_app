@@ -38,11 +38,32 @@ void main() {
   });
 
   test('assignedTickets returns seeded tickets for the agent', () async {
-    final tickets = await repo.assignedTickets('FA-RM-01');
+    final page = await repo.assignedTickets('FA-RM-01');
+    final tickets = page.items;
     expect(tickets, isNotEmpty);
     expect(tickets.every((t) => t.assignedAgentId == 'FA-RM-01'), isTrue);
     expect(tickets.map((t) => t.ticketId), contains('TKT-48217'));
     expect(tickets.first.primaryBp.bpId, startsWith('BP-IF-'));
+  });
+
+  test('assignedTickets windows the seeded list and reports the total',
+      () async {
+    final all = (await repo.assignedTickets('FA-RM-01', pageSize: 100)).items;
+
+    final first = await repo.assignedTickets('FA-RM-01', pageSize: 2);
+    expect(first.items, hasLength(2));
+    expect(first.items.map((t) => t.ticketId),
+        all.take(2).map((t) => t.ticketId),);
+    expect(first.total, all.length);
+
+    final second = await repo.assignedTickets('FA-RM-01', page: 2, pageSize: 2);
+    expect(second.items.map((t) => t.ticketId),
+        all.skip(2).take(2).map((t) => t.ticketId),);
+
+    // A window entirely past the end is empty, and stops the paging.
+    final past = await repo.assignedTickets('FA-RM-01', page: 99, pageSize: 2);
+    expect(past.items, isEmpty);
+    expect(past.hasMore, isFalse);
   });
 
   test('shiftStats returns the home header counters', () async {

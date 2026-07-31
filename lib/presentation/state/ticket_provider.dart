@@ -9,6 +9,7 @@ import 'package:asset_recovery_app/domain/entities/enums.dart';
 import 'package:asset_recovery_app/domain/entities/geo_point.dart';
 import 'package:asset_recovery_app/domain/entities/shift_stats.dart';
 import 'package:asset_recovery_app/domain/entities/ticket.dart';
+import 'package:asset_recovery_app/domain/entities/ticket_page.dart';
 import 'package:asset_recovery_app/domain/usecases/get_assigned_tickets_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/get_road_distance_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/get_shift_stats_usecase.dart';
@@ -60,6 +61,16 @@ class TicketProvider extends ChangeNotifier {
   bool _hasLoaded = false;
   String? _error;
   List<Ticket> _all = [];
+
+  /// Highest page of the assigned-tickets list folded into [_all]; 0 before the
+  /// first load. [loadMore] asks for `_page + 1`.
+  int _page = 0;
+
+  /// Whether the server reported (or implied) another page after [_page].
+  /// Starts true so the first [loadMore] is allowed to try.
+  bool _hasMorePages = true;
+  bool _loadingMore = false;
+  String? _loadMoreError;
   ShiftStats _stats = ShiftStats.empty;
   String _sort = 'distance';
   String? _lastAgentId;
@@ -75,6 +86,22 @@ class TicketProvider extends ChangeNotifier {
   bool get hasLoaded => _hasLoaded;
   String? get error => _error;
   String get sort => _sort;
+
+  /// Tickets per request for the home list's scroll paging.
+  int get pageSize => _config.intValue('taskList.pageSize', fallback: 20);
+
+  /// True while the next page is in flight — the home list shows a footer
+  /// spinner rather than blanking anything already on screen.
+  bool get loadingMore => _loadingMore;
+
+  /// Whether [loadMore] has anything left to fetch. False once the server
+  /// returned a short page (or reported a total the list has reached).
+  bool get hasMorePages => _hasMorePages;
+
+  /// Message from the last failed [loadMore], cleared on the next attempt and
+  /// on any full load/refresh. Distinct from [error] so a failed page-append
+  /// never reads as "the whole list failed".
+  String? get loadMoreError => _loadMoreError;
   ShiftStats get stats => _stats;
   List<String> get availableSorts =>
       _config.stringList('taskList.availableSorts');
@@ -135,14 +162,21 @@ class TicketProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Fetches the agent's tickets + shift stats and folds the response into
-  /// state. On a ticket failure the previous list is kept and [error] is set,
-  /// so a failed refresh degrades to "nothing changed" rather than an empty
-  /// list. Shared by [load] and [refresh]; neither notifies from here.
+  /// Fetches the FIRST page of the agent's tickets + shift stats and folds the
+  /// response into state, resetting the scroll paging window. On a ticket
+  /// failure the previous list and window are kept and [error] is set, so a
+  /// failed refresh degrades to "nothing changed" rather than an empty list.
+  /// Shared by [load] and [refresh]; neither notifies from here.
   Future<void> _fetchAgentTickets(String agentId) async {
-    final ticketsResult = await _getAssigned(agentId);
+    final ticketsResult = await _getAssigned(
+      AssignedTicketsParams(agentId, page: 1, pageSize: pageSize),
+    );
     if (ticketsResult.isOk) {
-      _all = ticketsResult.valueOrNull ?? const [];
+      final page = ticketsResult.valueOrNull ?? TicketPage.empty;
+      _all = [...page.items];
+      _page = page.page;
+      _hasMorePages = page.hasMore;
+      _loadMoreError = null;
       _applyAutoExpiry();
     } else {
       _error = ticketsResult.failureOrNull?.message;
@@ -153,6 +187,55 @@ class TicketProvider extends ChangeNotifier {
     if (statsResult.isOk) {
       _stats = statsResult.valueOrNull ?? ShiftStats.empty;
     }
+  }
+
+  /// Appends the next page of the agent's tickets — what the home list calls
+  /// when the agent scrolls to the end of what is loaded.
+  ///
+  /// Silently does nothing when there is nothing to do: no agent loaded yet, a
+  /// full load/refresh already in flight (it would fight over the window), a
+  /// previous append still running, or the server out of pages. A failure
+  /// leaves the loaded tickets untouched and only sets [loadMoreError], so the
+  /// list keeps working and the footer can offer a retry.
+  Future<void> loadMore() async {
+    final agentId = _lastAgentId;
+    if (agentId == null) return;
+    if (_loading || _refreshing || _loadingMore || !_hasMorePages) return;
+
+    _loadingMore = true;
+    _loadMoreError = null;
+    notifyListeners();
+
+    final result = await _getAssigned(
+      AssignedTicketsParams(agentId, page: _page + 1, pageSize: pageSize),
+    );
+    // The agent signed out (or a different one signed in) while the page was in
+    // flight — dropping it keeps the previous agent's tickets off the list.
+    if (_lastAgentId != agentId) {
+      _loadingMore = false;
+      return;
+    }
+    if (result.isOk) {
+      final page = result.valueOrNull ?? TicketPage.empty;
+      _page = page.page;
+      _hasMorePages = page.hasMore;
+      _appendPage(page.items);
+    } else {
+      _loadMoreError = result.failureOrNull?.message ?? '';
+    }
+    _loadingMore = false;
+    notifyListeners();
+  }
+
+  /// Folds a freshly fetched page into [_all], skipping ticket ids already
+  /// held: the backend re-sorts the list as statuses change, so a ticket can
+  /// shift across the page boundary between two requests and arrive twice.
+  void _appendPage(List<Ticket> fetched) {
+    final known = _all.map((t) => t.ticketId).toSet();
+    final fresh = fetched.where((t) => !known.contains(t.ticketId)).toList();
+    if (fresh.isEmpty) return;
+    _all = [..._all, ...fresh];
+    _applyAutoExpiry();
   }
 
   /// Drops everything that belonged to the signed-out agent — tickets, stats
@@ -172,6 +255,12 @@ class TicketProvider extends ChangeNotifier {
     _error = null;
     _hasLoaded = false;
     _lastAgentId = null;
+    // Rewind the scroll-paging window too, so the next agent starts at page 1
+    // and is not told there is nothing more to load.
+    _page = 0;
+    _hasMorePages = true;
+    _loadingMore = false;
+    _loadMoreError = null;
     _nearbyUnassigned = [];
     _pendingSyncTicketIds.clear();
     lastSubmitWasQueued = false;

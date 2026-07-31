@@ -135,6 +135,7 @@
   "detail.slaCritical": "SLA முக்கியமானது:",
   "detail.slaCriticalBody": "{attempts} முயற்சிகள் அல்லது {days} நாட்களுக்குப் பிறகு, இந்த டிக்கெட் மீட்க முடியாதது என குறிக்கப்படும்.",
   "detail.ticketActions": "டிக்கெட் செயல்கள்",
+  "detail.maxAttemptsReached": "இந்த பேட்டரிக்கான அதிகபட்ச {max} முயற்சிகளை நீங்கள் எட்டிவிட்டீர்கள்",
   "detail.totalAttempts": "மொத்த முயற்சிகள்",
   "detail.vin": "VIN",
   "field.amount_demanded": "கோரப்பட்ட தொகை",

@@ -20,6 +20,7 @@ import 'package:asset_recovery_app/presentation/features/qr/qr_scan_screen.dart'
 import 'package:asset_recovery_app/presentation/features/tracking/battery_tracking_screen.dart';
 import 'package:asset_recovery_app/presentation/shared/mark_ticket_in_progress.dart';
 import 'package:asset_recovery_app/presentation/shared/widgets/info_chip.dart';
+import 'package:asset_recovery_app/presentation/shared/widgets/photo_gallery_viewer.dart';
 import 'package:asset_recovery_app/presentation/shared/widgets/pill_button.dart';
 import 'package:asset_recovery_app/presentation/shared/widgets/status_badge.dart';
 import 'package:asset_recovery_app/presentation/state/auth_provider.dart';
@@ -532,12 +533,17 @@ class _CustomerCard extends StatelessWidget {
 
   /// Mobile → phonePrimary + phoneSecondary. Attaches whichever of the two is
   /// non-empty (both, joined, when both are present; empty when neither is).
-  /// Falls back to the base customer's masked mobile until the detail loads.
+  /// Falls back to the base customer's mobile until the detail loads.
+  ///
+  /// Every number is masked to its first five digits for display. Masking is
+  /// applied per number, BEFORE the join, so a second number is not left
+  /// readable by a mask that only counts from the start of the joined string.
   String _mobile() {
     final c = detail?.customer;
-    if (c == null) return bp.customer.maskedMobile();
+    if (c == null) return Formatters.maskedPhone(bp.customer.mobile);
     final parts = [c.phonePrimary, c.phoneSecondary]
         .where((p) => p.isNotEmpty)
+        .map(Formatters.maskedPhone)
         .toList();
     return _dash(parts.join(', '));
   }
@@ -774,8 +780,9 @@ class _AttemptTile extends StatelessWidget {
   /// Secondary text size shared by every readout in the tile.
   static const double _bodySize = 12;
 
+  /// The service sends both stamps in UTC; the agent reads them in IST.
   static String _stamp(DateTime? dt) =>
-      dt == null ? '—' : Formatters.dateTime(dt);
+      dt == null ? '—' : Formatters.dateTimeIst(dt);
 
   @override
   Widget build(BuildContext context) {
@@ -879,8 +886,15 @@ class _AttemptTile extends StatelessWidget {
             spacing: 8,
             runSpacing: 8,
             children: [
-              for (final url in urls)
-                _ProofImage(url: url, palette: palette),
+              for (var i = 0; i < urls.length; i++)
+                _ProofImage(
+                  urls: urls,
+                  index: i,
+                  // The attempt id keeps hero tags unique when two attempts of
+                  // the same ticket carry the same proof URL.
+                  heroTagPrefix: attempt.id,
+                  palette: palette,
+                ),
             ],
           ),
         ],
@@ -974,11 +988,30 @@ class _AttemptField extends StatelessWidget {
       );
 }
 
-/// A single proof photo with a "Photo" caption overlay, loaded from a network
-/// URL with graceful loading/error placeholders.
+/// A single proof photo thumbnail with a "Photo" caption overlay, loaded from a
+/// network URL with graceful loading/error placeholders.
+///
+/// Tapping it opens [PhotoGalleryViewer] on this photo, from where the attempt's
+/// other proofs can be swiped through and each one zoomed — the same handling
+/// as the device gallery.
 class _ProofImage extends StatelessWidget {
-  const _ProofImage({required this.url, required this.palette});
-  final String url;
+  const _ProofImage({
+    required this.urls,
+    required this.index,
+    required this.heroTagPrefix,
+    required this.palette,
+  });
+
+  /// Every proof URL of the owning attempt — handed to the viewer so it can
+  /// page through the whole set, not just the tapped photo.
+  final List<String> urls;
+
+  /// Position of this thumbnail within [urls].
+  final int index;
+
+  /// Namespace for the hero tag shared with the viewer.
+  final String heroTagPrefix;
+
   final AppPalette palette;
 
   @override
@@ -993,42 +1026,55 @@ class _ProofImage extends StatelessWidget {
           child: Icon(icon, color: palette.muted),
         );
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: Stack(
-        children: [
-          Image.network(
-            url,
-            width: w,
-            height: h,
-            fit: BoxFit.cover,
-            loadingBuilder: (context, child, progress) =>
-                progress == null ? child : placeholder(Icons.image_outlined),
-            errorBuilder: (context, error, stack) =>
-                placeholder(Icons.broken_image_outlined),
-          ),
-          Positioned(
-            left: 8,
-            bottom: 8,
-            child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.55),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.image_outlined, size: 13, color: Colors.white),
-                  SizedBox(width: 4),
-                  Text('Photo',
-                      style: TextStyle(color: Colors.white, fontSize: 11),),
-                ],
+    return GestureDetector(
+      onTap: () => unawaited(
+        PhotoGalleryViewer.open(
+          context,
+          urls: urls,
+          initialIndex: index,
+          heroTagPrefix: heroTagPrefix,
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Stack(
+          children: [
+            Hero(
+              tag: PhotoGalleryViewer.heroTag(heroTagPrefix, index),
+              child: Image.network(
+                urls[index],
+                width: w,
+                height: h,
+                fit: BoxFit.cover,
+                loadingBuilder: (context, child, progress) =>
+                    progress == null ? child : placeholder(Icons.image_outlined),
+                errorBuilder: (context, error, stack) =>
+                    placeholder(Icons.broken_image_outlined),
               ),
             ),
-          ),
-        ],
+            Positioned(
+              left: 8,
+              bottom: 8,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.image_outlined, size: 13, color: Colors.white),
+                    SizedBox(width: 4),
+                    Text('Photo',
+                        style: TextStyle(color: Colors.white, fontSize: 11),),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1056,9 +1102,24 @@ class _Actions extends StatelessWidget {
   /// customer card above instead of re-fetching it.
   final TicketDetail? detail;
 
+  /// Blocks the Ticket Actions hub once the BP has used up its attempts.
+  ///
+  /// The persisted `attempts` on the ticket detail are the source of truth —
+  /// the same records the Attempt History card renders — rather than the list
+  /// summary's `attemptCount`, which the paged home response can leave stale.
+  ///
+  /// A null [detail] means the full-detail fetch has not landed (or failed):
+  /// the count is unknown, so the agent is let through rather than locked out
+  /// of a BP that may well have attempts left.
+  bool _attemptsExhausted(int maxAttempts) {
+    final attempts = detail?.attempts;
+    return attempts != null && attempts.length >= maxAttempts;
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    final maxAttempts = context.read<AppServices>().config.maxAttemptsPerBp;
     return Container(
       decoration: BoxDecoration(
         color: palette.surface,
@@ -1094,6 +1155,19 @@ class _Actions extends StatelessWidget {
                   palette: palette,
                   trailingArrow: true,
                   onPressed: () {
+                    // Attempt cap (Rule 7): a BP that has already used its
+                    // allowance never opens the hub — bounce with a toast
+                    // BEFORE the in-progress mark, so a blocked tap leaves the
+                    // ticket's status untouched.
+                    if (_attemptsExhausted(maxAttempts)) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(l.t('detail.maxAttemptsReached',
+                              {'max': maxAttempts},),),
+                        ),
+                      );
+                      return;
+                    }
                     unawaited(markTicketInProgress(ticket.ticketId));
                     Navigator.of(context).push(
                       MaterialPageRoute<void>(

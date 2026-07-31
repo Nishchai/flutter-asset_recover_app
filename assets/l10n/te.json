@@ -135,6 +135,7 @@
   "detail.slaCritical": "SLA క్రిటికల్:",
   "detail.slaCriticalBody": "{attempts} ప్రయత్నాల తర్వాత లేదా {days} రోజుల తర్వాత, ఈ టికెట్ రికవర్ చేయలేనిదిగా గుర్తించబడుతుంది.",
   "detail.ticketActions": "టికెట్ చర్యలు",
+  "detail.maxAttemptsReached": "ఈ బ్యాటరీ కోసం మీరు గరిష్టంగా {max} ప్రయత్నాలను చేరుకున్నారు",
   "detail.totalAttempts": "మొత్తం ప్రయత్నాలు",
   "detail.vin": "VIN",
   "field.amount_demanded": "డిమాండ్ చేసిన మొత్తం",

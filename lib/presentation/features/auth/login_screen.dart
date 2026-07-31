@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:asset_recovery_app/core/di/app_services.dart';
 import 'package:asset_recovery_app/core/localization/app_localizations.dart';
 import 'package:asset_recovery_app/core/theme/app_theme.dart';
@@ -18,10 +20,18 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  /// How long "Resend OTP" stays locked after a code is sent.
+  static const _resendCooldown = Duration(seconds: 30);
+
   final _mobile = TextEditingController(text: '');
   final _otp = TextEditingController();
   String? _mobileError;
   String? _otpError;
+
+  /// Seconds left before "Resend OTP" becomes actionable again; 0 = unlocked.
+  int _resendIn = 0;
+  Timer? _resendTimer;
+  bool _cooldownPrimed = false;
 
   @override
   void initState() {
@@ -29,6 +39,45 @@ class _LoginScreenState extends State<LoginScreen> {
     // Rebuild as the user types so the Send OTP button can enable/recolour
     // the moment a valid 10-digit number is present.
     _mobile.addListener(_onMobileChanged);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Normally the cooldown is started by whichever action sent the OTP, but
+    // this screen can also be built already on the OTP step (e.g. rebuilt by
+    // the root router while an OTP is outstanding) — start it once here so the
+    // resend button is never live the instant the step appears.
+    if (!_cooldownPrimed) {
+      _cooldownPrimed = true;
+      if (context.read<AuthProvider>().status == AuthStatus.otpSent) {
+        // Pre-build: assign directly, setState() during build would assert.
+        _startResendCooldown(notify: false);
+      }
+    }
+  }
+
+  void _startResendCooldown({bool notify = true}) {
+    _resendTimer?.cancel();
+    _resendIn = _resendCooldown.inSeconds;
+    if (notify) setState(() {});
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      setState(() => _resendIn--);
+      if (_resendIn <= 0) {
+        timer.cancel();
+        _resendTimer = null;
+      }
+    });
+  }
+
+  void _stopResendCooldown() {
+    _resendTimer?.cancel();
+    _resendTimer = null;
+    if (_resendIn != 0) setState(() => _resendIn = 0);
   }
 
   void _onMobileChanged() {
@@ -42,6 +91,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
+    _resendTimer?.cancel();
     _mobile.removeListener(_onMobileChanged);
     _mobile.dispose();
     _otp.dispose();
@@ -62,7 +112,29 @@ class _LoginScreenState extends State<LoginScreen> {
     // was rejected (the backend's `reason`) inline on the field.
     final auth = context.read<AuthProvider>();
     final ok = await auth.requestOtp(value);
+    if (!mounted) return;
+    if (ok) {
+      // OTP is out — lock resend for the cooldown window.
+      _startResendCooldown();
+    } else {
+      setState(() => _mobileError = auth.error ?? l.t('common.error'));
+    }
+  }
+
+  /// Re-sends the OTP to the same number and restarts the cooldown. Only
+  /// reachable once [_resendIn] has counted down to 0.
+  Future<void> _resendOtp() async {
+    final l = AppLocalizations.of(context);
+    final auth = context.read<AuthProvider>();
+    final mobile = auth.mobile;
+    if (mobile == null) return;
+    setState(() => _otpError = null);
+    // Lock the button up front so it can't be double-tapped while the send is
+    // in flight; a failed send unlocks it again below.
+    _startResendCooldown();
+    final ok = await auth.requestOtp(mobile);
     if (!ok && mounted) {
+      _stopResendCooldown();
       setState(() => _mobileError = auth.error ?? l.t('common.error'));
     }
   }
@@ -87,6 +159,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _changeNumber() {
     _otp.clear();
+    _stopResendCooldown();
     setState(() => _otpError = null);
     context.read<AuthProvider>().resetToMobileEntry();
   }
@@ -102,6 +175,9 @@ class _LoginScreenState extends State<LoginScreen> {
     final busy =
         auth.status == AuthStatus.sendingOtp || auth.status == AuthStatus.verifyingOtp;
     final mobileValid = Validators.isValidMobile(_mobile.text.trim());
+    // Resend is live only once the countdown has run out and no OTP call is
+    // already in flight.
+    final resendReady = _resendIn == 0 && !busy;
 
     return Scaffold(
       body: SafeArea(
@@ -227,12 +303,24 @@ class _LoginScreenState extends State<LoginScreen> {
                   ],
                   Align(
                     alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: auth.status == AuthStatus.sendingOtp
-                          ? null
-                          : () => context.read<AuthProvider>().requestOtp(auth.mobile!),
-                      style: TextButton.styleFrom(padding: EdgeInsets.zero),
-                      child: Text(l.t('login.resendOtp')),
+                    child: Semantics(
+                      button: true,
+                      enabled: resendReady,
+                      child: TextButton(
+                        // Greyed out and non-actionable until the 30s countdown
+                        // reaches 0, so the agent can't spam the OTP endpoint.
+                        onPressed: resendReady ? _resendOtp : null,
+                        style: TextButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          foregroundColor: palette.primary,
+                          disabledForegroundColor: palette.muted,
+                        ),
+                        child: Text(
+                          resendReady
+                              ? l.t('login.resendOtp')
+                              : l.t('login.resendOtpIn', {'seconds': '$_resendIn'}),
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 14),

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:asset_recovery_app/core/localization/app_localizations.dart';
 import 'package:asset_recovery_app/core/services/sim_call_service.dart';
 import 'package:asset_recovery_app/core/theme/app_theme.dart';
+import 'package:asset_recovery_app/core/utils/formatters.dart';
 import 'package:asset_recovery_app/domain/entities/form_field_config.dart';
 import 'package:asset_recovery_app/presentation/features/attempt/dynamic_field.dart';
 import 'package:asset_recovery_app/presentation/features/map/map_screen.dart';
@@ -409,9 +410,11 @@ class _StartCallButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    // Masked for display only — [onCall] and the dropdown's item values still
+    // carry the real number, so the dialer gets the full one.
     final label = numbers.isEmpty
         ? l.t('call.startCall')
-        : '${l.t('call.startCall')} · $selected';
+        : '${l.t('call.startCall')} · ${Formatters.maskedPhone(selected)}';
 
     if (numbers.length < 2) {
       return SizedBox(
@@ -489,7 +492,7 @@ class _StartCallButton extends StatelessWidget {
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(numbers[i],
+                            Text(Formatters.maskedPhone(numbers[i]),
                                 style: const TextStyle(
                                     fontWeight: FontWeight.w600, fontSize: 14,),),
                             Text(

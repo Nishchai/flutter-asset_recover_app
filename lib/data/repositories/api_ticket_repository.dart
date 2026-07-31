@@ -17,6 +17,7 @@ import 'package:asset_recovery_app/domain/entities/live_token_model.dart';
 import 'package:asset_recovery_app/domain/entities/partner_login_data.dart';
 import 'package:asset_recovery_app/domain/entities/ticket.dart';
 import 'package:asset_recovery_app/domain/entities/ticket_detail.dart';
+import 'package:asset_recovery_app/domain/entities/ticket_page.dart';
 import 'package:asset_recovery_app/domain/repositories/ticket_repository.dart';
 
 /// Real backend implementation. Wired through [ApiClient] + `api_endpoints.json`.
@@ -190,17 +191,31 @@ class ApiTicketRepository implements TicketRepository {
   }
 
   @override
-  Future<List<Ticket>> assignedTickets(String agentId) async {
+  Future<TicketPage> assignedTickets(
+    String agentId, {
+    int page = 1,
+    int pageSize = 20,
+  }) async {
     // agentId is attached globally by ApiClient; only paging is passed here.
     final res = await _api.call('tickets.assigned', query: {
-      'page': '1',
-      'pageSize': '20',
+      'page': '$page',
+      'pageSize': '$pageSize',
     },);
     _logResponse('tickets.assigned', res);
-    final list = (res as Map<String, dynamic>)['items'] as List; // MAP: items
-    return list
-        .map((e) => _ticketFromListItem(e as Map<String, dynamic>))
-        .toList();
+    final envelope = res as Map<String, dynamic>;
+    final list = envelope['items'] as List; // MAP: items
+    return TicketPage(
+      items: list
+          .map((e) => _ticketFromListItem(e as Map<String, dynamic>))
+          .toList(),
+      // The envelope echoes the window back; fall back to what was asked for
+      // if the backend omits either field.
+      page: (envelope['page'] as num?)?.toInt() ?? page, // MAP: page
+      pageSize: (envelope['pageSize'] as num?)?.toInt() ?? pageSize, // MAP: pageSize
+      // Left null when absent — TicketPage.hasMore then reads a full window as
+      // "there is probably more" rather than assuming this was the last one.
+      total: (envelope['total'] as num?)?.toInt(), // MAP: total
+    );
   }
 
   @override

@@ -9,8 +9,9 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   Future<Battery> seededBp(TestEnv env) async {
-    final tickets = await env.repository.assignedTickets('FA-RM-01');
-    return tickets
+    final tickets =
+        await env.repository.assignedTickets('FA-RM-01', pageSize: 100);
+    return tickets.items
         .firstWhere((t) => t.ticketId == 'TKT-48217')
         .batteries
         .firstWhere((b) => b.bpId == 'BP-IF-09823-A');

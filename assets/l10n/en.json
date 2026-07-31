@@ -34,6 +34,7 @@
   "login.otp": "Enter OTP",
   "login.otpSubtitle": "Enter the code sent to +91 {mobile}",
   "login.resendOtp": "Resend OTP",
+  "login.resendOtpIn": "Resend OTP in {seconds}s",
   "login.verifyOtp": "Verify OTP",
   "login.changeNumber": "Change mobile number",
   "login.demoHint": "Demo mode — any 10-digit mobile number and 6-digit OTP works.",
@@ -44,6 +45,7 @@
   "home.hello": "Hello,",
   "home.myTickets": "My Tickets",
   "home.empty": "No tickets in this view",
+  "home.loadMoreFailed": "Couldn't load more tickets",
 
   "shift.active": "SHIFT ACTIVE",
   "shift.inactive": "SHIFT INACTIVE",
@@ -100,6 +102,7 @@
   "detail.days": "days",
   "detail.firStage": "FIR Stage",
   "detail.ticketActions": "Ticket Actions",
+  "detail.maxAttemptsReached": "You have reached the maximum of {max} attempts for this battery",
 
   "caseDetails.title": "Case Details",
   "caseDetails.caseId": "Case ID",

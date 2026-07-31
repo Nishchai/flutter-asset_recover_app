@@ -25,8 +25,11 @@ void main() {
 
   setUp(() async {
     env = await TestEnv.create();
-    final tickets = await env.repository.assignedTickets('FA-RM-01');
-    bp = tickets
+    // Wide window: the fixture is looked up by id, so it must not depend on
+    // which page the seeded list happens to put it on.
+    final tickets =
+        await env.repository.assignedTickets('FA-RM-01', pageSize: 100);
+    bp = tickets.items
         .firstWhere((t) => t.ticketId == 'TKT-48217')
         .batteries
         .firstWhere((b) => b.bpId == 'BP-IF-09823-A');

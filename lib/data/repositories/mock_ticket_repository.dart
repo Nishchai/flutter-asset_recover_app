@@ -16,6 +16,7 @@ import 'package:asset_recovery_app/domain/entities/live_token_model.dart';
 import 'package:asset_recovery_app/domain/entities/partner_login_data.dart';
 import 'package:asset_recovery_app/domain/entities/ticket.dart';
 import 'package:asset_recovery_app/domain/entities/ticket_detail.dart';
+import 'package:asset_recovery_app/domain/entities/ticket_page.dart';
 import 'package:asset_recovery_app/domain/repositories/ticket_repository.dart';
 
 /// In-memory backend seeded with data that mirrors the Asset Assurance Figma
@@ -425,8 +426,24 @@ class MockTicketRepository implements TicketRepository {
       ),);
 
   @override
-  Future<List<Ticket>> assignedTickets(String agentId) =>
-      _delayed(_tickets.where((t) => t.assignedAgentId == agentId).toList());
+  Future<TicketPage> assignedTickets(
+    String agentId, {
+    int page = 1,
+    int pageSize = 20,
+  }) {
+    final mine = _tickets.where((t) => t.assignedAgentId == agentId).toList();
+    // Slice the seeded list the way the backend windows it, so scroll paging
+    // can be exercised against the mock too. A page past the end is empty
+    // rather than an error.
+    final start = (page - 1) * pageSize;
+    final end = (start + pageSize).clamp(0, mine.length);
+    return _delayed(TicketPage(
+      items: start >= mine.length ? <Ticket>[] : mine.sublist(start, end),
+      page: page,
+      pageSize: pageSize,
+      total: mine.length,
+    ),);
+  }
 
   @override
   Future<Map<String, int>> shiftStats(String agentId) =>

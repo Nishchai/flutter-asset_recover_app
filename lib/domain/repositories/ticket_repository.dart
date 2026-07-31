@@ -11,6 +11,7 @@ import 'package:asset_recovery_app/domain/entities/live_token_model.dart';
 import 'package:asset_recovery_app/domain/entities/partner_login_data.dart';
 import 'package:asset_recovery_app/domain/entities/ticket.dart';
 import 'package:asset_recovery_app/domain/entities/ticket_detail.dart';
+import 'package:asset_recovery_app/domain/entities/ticket_page.dart';
 
 /// Backend-agnostic contract for all data access.
 ///
@@ -58,8 +59,14 @@ abstract class TicketRepository {
     String grantType = 'client_credentials',
   });
 
-  /// Tickets assigned to [agentId], already scoped to the agent's cluster.
-  Future<List<Ticket>> assignedTickets(String agentId);
+  /// One page of the tickets assigned to [agentId], already scoped to the
+  /// agent's cluster. [page] is 1-based; the home list walks it upwards as the
+  /// agent scrolls, using [TicketPage.hasMore] to know when to stop.
+  Future<TicketPage> assignedTickets(
+    String agentId, {
+    int page,
+    int pageSize,
+  });
 
   /// Aggregate shift counters for the home header: keys `assigned`,
   /// `inProgress`, `pending`.
