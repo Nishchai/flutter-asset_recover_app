@@ -46,6 +46,33 @@ android {
     }
 }
 
+// ── 16 KB page-size alignment ────────────────────────────────────────────────
+// Android 15+ can run with 16 KB memory pages, and every bundled .so must have
+// its ELF LOAD segments aligned to 16 KB or the loader rejects it. Two prebuilt
+// libraries reached the APK aligned to 4 KB, both pulled in transitively by
+// `mobile_scanner` (5.2.3), which pins versions predating the fix:
+//
+//   libimage_processing_util_jni.so  ← androidx.camera:camera-core 1.3.3
+//                                      (aligned from CameraX 1.4.0)
+//   libbarhopper_v3.so               ← play-services-mlkit-barcode-scanning
+//                                      18.3.0 (aligned from 18.3.1)
+//
+// They ship as prebuilt binaries, so the only fix is newer versions. Forcing
+// them here upgrades the transitive dependency without a mobile_scanner major
+// bump (7.x rewrites the Dart API that QrScanScreen is built on). Drop this
+// block once mobile_scanner itself ships aligned dependencies.
+configurations.all {
+    resolutionStrategy {
+        force(
+            "androidx.camera:camera-core:1.4.2",
+            "androidx.camera:camera-camera2:1.4.2",
+            "androidx.camera:camera-lifecycle:1.4.2",
+            "com.google.android.gms:play-services-mlkit-barcode-scanning:18.3.1",
+            "com.google.mlkit:barcode-scanning:17.3.0",
+        )
+    }
+}
+
 flutter {
     source = "../.."
 }

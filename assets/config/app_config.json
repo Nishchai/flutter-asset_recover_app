@@ -6,7 +6,7 @@
   "business": {
     "slaDays": 90,
     "slaWarnDays": 7,
-    "maxAttemptsPerBp": 3,
+    "maxAttemptsPerBp": 6,
     "allowReattemptAfterMax": false,
     "ticketIdPrefix": "TKT",
     "bpIdPrefix": "BP",
@@ -71,6 +71,8 @@
   },
 
   "taskList": {
+    "_comment_pageSize": "Tickets fetched per request by the home list (GET /tickets?page=&pageSize=). The list appends the next page as the agent scrolls to the end of the loaded ones.",
+    "pageSize": 20,
     "defaultSort": "distance",
     "availableSorts": ["distance", "pendingDuration", "slaRemaining"],
     "segments": ["all_tasks", "in_progress", "completed"]
