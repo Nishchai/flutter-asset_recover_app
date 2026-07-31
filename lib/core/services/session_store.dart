@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:developer' as developer;
 
+import 'package:asset_recovery_app/core/utils/ist_time.dart';
 import 'package:asset_recovery_app/domain/entities/agent.dart';
 import 'package:asset_recovery_app/domain/entities/partner_login_data.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -19,11 +20,22 @@ class PersistedSession {
     required this.authToken,
     required this.agent,
     this.profile,
+    this.loginAt,
   });
 
   final String authToken;
   final Agent agent;
   final PartnerLoginData? profile;
+
+  /// The IST wall-clock moment the OTP was verified — the anchor of the fixed
+  /// auto-logout window (see [sessionRemaining]). Written once, at sign-in, and
+  /// deliberately never refreshed afterwards: neither activity nor the 401
+  /// token re-mint may extend the window.
+  ///
+  /// Null only for a session written by a build from before this existed, which
+  /// [sessionRemaining] reports as already elapsed — costing that agent one
+  /// extra OTP, once.
+  final DateTime? loginAt;
 
   /// The id every backend request is scoped to (`agentId` query param): the
   /// `commonLogin` [PartnerLoginData.partnerId].
@@ -37,15 +49,37 @@ class PersistedSession {
     return partnerId.isNotEmpty ? partnerId : agent.id;
   }
 
+  /// How much of the fixed post-login [window] is left, measured on the IST
+  /// clock: `window - (now - loginAt)`.
+  ///
+  /// The window is ABSOLUTE, not idle-based (PRD §4.9). An agent who signs in
+  /// at 08:00 IST with a 12-hour window has 8 hours left when they open the app
+  /// at 12:00, and a NEGATIVE duration at 20:30 — at which point the session is
+  /// already over and they are signed out on the spot.
+  ///
+  /// Zero when there is no [loginAt] to anchor to: an unanchored session cannot
+  /// be shown to be inside its window, so it is treated as outside it.
+  Duration sessionRemaining(Duration window) {
+    final start = loginAt;
+    if (start == null) return Duration.zero;
+    return window - nowIst().difference(start);
+  }
+
+  /// True once [sessionRemaining] has run out — the agent must sign in again.
+  bool isSessionExpired(Duration window) =>
+      sessionRemaining(window) <= Duration.zero;
+
   PersistedSession copyWith({
     String? authToken,
     Agent? agent,
     PartnerLoginData? profile,
+    DateTime? loginAt,
   }) =>
       PersistedSession(
         authToken: authToken ?? this.authToken,
         agent: agent ?? this.agent,
         profile: profile ?? this.profile,
+        loginAt: loginAt ?? this.loginAt,
       );
 }
 
@@ -57,7 +91,8 @@ class PersistedSession {
 /// [restore] (e.g. `AuthProvider`) can read the session synchronously.
 ///
 /// Lifecycle:
-/// * OTP verified → [save] (token + agent)
+/// * OTP verified → [save] (token + agent + the IST [PersistedSession.loginAt]
+///   the auto-logout window is measured from)
 /// * 401 on any API call → [clearAuthToken] then [replaceAuthToken] with the
 ///   freshly minted one (see `configureDependencies`)
 /// * logout / session expiry → [clear]
@@ -84,6 +119,12 @@ abstract class SessionStore {
   PersistedSession? get current => _current;
 
   bool get hasSession => _current != null;
+
+  /// Time left in the signed-in agent's fixed auto-logout [window], on the IST
+  /// clock. [Duration.zero] when nobody is signed in — there is nothing left to
+  /// expire. See [PersistedSession.sessionRemaining].
+  Duration remainingSession(Duration window) =>
+      _current?.sessionRemaining(window) ?? Duration.zero;
 
   /// Loads the persisted session into [current] and returns it.
   ///
@@ -165,6 +206,7 @@ class SecureSessionStore extends SessionStore {
   static const _tokenKey = 'session.authToken';
   static const _agentKey = 'session.agent';
   static const _profileKey = 'session.profile';
+  static const _loginAtKey = 'session.loginAt';
 
   final FlutterSecureStorage _storage;
 
@@ -185,6 +227,7 @@ class SecureSessionStore extends SessionStore {
         profile: decodedProfile is Map<String, dynamic>
             ? PartnerLoginData.fromJson(decodedProfile)
             : null,
+        loginAt: istFromIso(await _storage.read(key: _loginAtKey)),
       );
     } catch (e, st) {
       // A rotated/invalidated keystore key (device restore, "clear data" on
@@ -211,6 +254,12 @@ class SecureSessionStore extends SessionStore {
     } else {
       await _storage.write(key: _profileKey, value: jsonEncode(profile.toJson()));
     }
+    final loginAt = session.loginAt;
+    if (loginAt == null) {
+      await _storage.delete(key: _loginAtKey);
+    } else {
+      await _storage.write(key: _loginAtKey, value: loginAt.toIso8601String());
+    }
   }
 
   @override
@@ -221,6 +270,7 @@ class SecureSessionStore extends SessionStore {
     await _storage.delete(key: _tokenKey);
     await _storage.delete(key: _agentKey);
     await _storage.delete(key: _profileKey);
+    await _storage.delete(key: _loginAtKey);
   }
 }
 

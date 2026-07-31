@@ -15,6 +15,7 @@ import 'package:asset_recovery_app/domain/usecases/submit_attempt_record_usecase
 import 'package:asset_recovery_app/domain/usecases/update_customer_details_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/update_customer_usecase.dart';
 import 'package:asset_recovery_app/presentation/features/attempt/attempt_section_screen.dart';
+import 'package:asset_recovery_app/presentation/shared/location_access_prompt.dart';
 import 'package:asset_recovery_app/presentation/shared/mark_ticket_in_progress.dart';
 import 'package:asset_recovery_app/presentation/state/attempt_controller.dart';
 import 'package:asset_recovery_app/presentation/state/auth_provider.dart';
@@ -27,7 +28,7 @@ import 'package:provider/provider.dart';
 /// independent action the Field Agent can open, fill and save in any order,
 /// any number of times — progress persists as a draft (item 13) until the
 /// Outcome action is submitted.
-class TicketActionsHub extends StatelessWidget {
+class TicketActionsHub extends StatefulWidget {
   const TicketActionsHub({
     super.key,
     required this.ticketId,
@@ -62,21 +63,35 @@ class TicketActionsHub extends StatelessWidget {
   };
 
   @override
+  State<TicketActionsHub> createState() => _TicketActionsHubState();
+}
+
+class _TicketActionsHubState extends State<TicketActionsHub> {
+  /// Offers the OS settings screen when [AttemptController.init]'s permission
+  /// request came back permanently refused, or with device location switched
+  /// off. Driven off the readiness the controller already resolved, so the
+  /// dialog can only appear once the system prompt is out of the way.
+  Future<void> _promptIfLocationBlocked(AttemptController controller) async {
+    if (!mounted) return;
+    await promptForLocationAccess(context, controller.locationReadiness);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final services = context.read<AppServices>();
     final agent = context.read<AuthProvider>().agent!;
     // agentName comes from the tickets API (Ticket.agentName from the list /
     // detail response), not the signed-in session.
     final ticketAgentName =
-        context.read<TicketProvider>().byId(ticketId)?.agentName ?? '';
+        context.read<TicketProvider>().byId(widget.ticketId)?.agentName ?? '';
     return ChangeNotifierProvider<AttemptController>(
       create: (_) {
         final c = AttemptController(
           flow: services.attemptFlow,
-          ticketId: ticketId,
-          battery: battery,
-          batteryDetail: batteryDetail,
-          ticketDetail: ticketDetail,
+          ticketId: widget.ticketId,
+          battery: widget.battery,
+          batteryDetail: widget.batteryDetail,
+          ticketDetail: widget.ticketDetail,
           agentId: agent.id,
           agentName: ticketAgentName,
           submitAttemptRecord: sl<SubmitAttemptRecordUseCase>(),
@@ -94,7 +109,8 @@ class TicketActionsHub extends StatelessWidget {
           getCallRecordings: sl<GetCallRecordingsUseCase>(),
           syncQueue: services.syncQueue,
           simCall: services.simCall,
-        )..init();
+        );
+        unawaited(c.init().then((_) => _promptIfLocationBlocked(c)));
         return c;
       },
       child: const _HubBody(),

@@ -220,6 +220,12 @@
   "validation.geofence": "You are outside the geo-fence. Move closer to the BP location.",
   "validation.locationUnavailable": "Location unavailable. Turn on location access for this app to submit recovery proof.",
 
+  "location.accessNeeded": "Location access needed",
+  "location.permissionBlocked": "Location permission is blocked for this app, so your arrival, route and photo locations can't be recorded. Allow location in settings to continue.",
+  "location.servicesOff": "Location is switched off on this device, so your arrival, route and photo locations can't be recorded. Turn on location to continue.",
+  "location.openSettings": "Open settings",
+  "location.notNow": "Not now",
+
   "opt.call.connected": "Connected",
   "opt.call.not_responding": "Not Responding",
   "opt.call.disconnected": "Call Disconnected",

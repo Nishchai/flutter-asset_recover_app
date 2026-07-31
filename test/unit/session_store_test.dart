@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:asset_recovery_app/core/services/session_store.dart';
+import 'package:asset_recovery_app/core/utils/ist_time.dart';
 import 'package:asset_recovery_app/domain/entities/agent.dart';
 import 'package:asset_recovery_app/domain/entities/partner_login_data.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -20,6 +21,7 @@ class FakeDiskSessionStore extends SessionStore {
   static const _tokenKey = 'session.authToken';
   static const _agentKey = 'session.agent';
   static const _profileKey = 'session.profile';
+  static const _loginAtKey = 'session.loginAt';
 
   @override
   Future<PersistedSession?> load() async {
@@ -34,6 +36,7 @@ class FakeDiskSessionStore extends SessionStore {
           ? null
           : PartnerLoginData.fromJson(
               jsonDecode(profileJson) as Map<String, dynamic>,),
+      loginAt: istFromIso(disk[_loginAtKey]),
     );
   }
 
@@ -47,6 +50,12 @@ class FakeDiskSessionStore extends SessionStore {
     } else {
       disk[_profileKey] = jsonEncode(profile.toJson());
     }
+    final loginAt = session.loginAt;
+    if (loginAt == null) {
+      disk.remove(_loginAtKey);
+    } else {
+      disk[_loginAtKey] = loginAt.toIso8601String();
+    }
   }
 
   @override
@@ -56,7 +65,8 @@ class FakeDiskSessionStore extends SessionStore {
   Future<void> erase() async => disk
     ..remove(_tokenKey)
     ..remove(_agentKey)
-    ..remove(_profileKey);
+    ..remove(_profileKey)
+    ..remove(_loginAtKey);
 }
 
 void main() {
@@ -303,6 +313,85 @@ void main() {
       expect((await store.restore())!.authToken, 'token-1');
       await store.clear();
       expect(await store.restore(), isNull);
+    });
+  });
+
+  /// The fixed post-login window (PRD §4.9). Every case is expressed the way
+  /// the field agent experiences it: signed in at 08:00 IST with a 12-hour
+  /// window means signed out at 20:00 IST, no matter what happens in between.
+  group('auto-logout window', () {
+    const window = Duration(hours: 12);
+
+    /// A session that signed in [ago] before now, on the IST clock.
+    PersistedSession signedIn(Duration ago) => PersistedSession(
+          authToken: 'token-1',
+          agent: agent,
+          loginAt: nowIst().subtract(ago),
+        );
+
+    test('a fresh sign-in has the whole window left', () {
+      expect(signedIn(Duration.zero).sessionRemaining(window).inMinutes,
+          closeTo(720, 1),);
+      expect(signedIn(Duration.zero).isSessionExpired(window), isFalse);
+    });
+
+    test('signed in at 08:00, opened at 12:00 — 8 hours left', () {
+      final session = signedIn(const Duration(hours: 4));
+
+      expect(session.sessionRemaining(window).inMinutes, closeTo(480, 1));
+      expect(session.isSessionExpired(window), isFalse);
+    });
+
+    test('signed in at 08:00, opened at 20:30 — the window is 30 minutes gone, '
+        'so the agent is already signed out', () {
+      final session = signedIn(const Duration(hours: 12, minutes: 30));
+
+      expect(session.sessionRemaining(window).isNegative, isTrue);
+      expect(session.sessionRemaining(window).inMinutes, closeTo(-30, 1));
+      expect(session.isSessionExpired(window), isTrue);
+    });
+
+    test('the window closes exactly on the deadline, not a moment later', () {
+      expect(signedIn(window).isSessionExpired(window), isTrue);
+      expect(
+        signedIn(window - const Duration(minutes: 1)).isSessionExpired(window),
+        isFalse,
+      );
+    });
+
+    test('the anchor survives a relaunch, so time spent with the app closed '
+        'still counts against the window', () async {
+      final disk = <String, String>{};
+      await FakeDiskSessionStore(disk).save(signedIn(const Duration(hours: 4)));
+
+      final restored = await FakeDiskSessionStore(disk).restore();
+
+      expect(restored!.loginAt, isNotNull);
+      expect(restored.sessionRemaining(window).inMinutes, closeTo(480, 1));
+    });
+
+    test('a 401 token re-mint does NOT extend the window', () async {
+      final store = FakeDiskSessionStore({});
+      await store.save(signedIn(const Duration(hours: 11, minutes: 30)));
+
+      await store.clearAuthToken();
+      await store.replaceAuthToken('fresh-token');
+
+      expect(store.current!.authToken, 'fresh-token');
+      expect(store.remainingSession(window).inMinutes, closeTo(30, 1),
+          reason: 'a new credential is not a new sign-in',);
+    });
+
+    test('a session persisted with no login time — an older build — is treated '
+        'as expired', () {
+      const session = PersistedSession(authToken: 'token-1', agent: agent);
+
+      expect(session.sessionRemaining(window), Duration.zero);
+      expect(session.isSessionExpired(window), isTrue);
+    });
+
+    test('nothing to expire when nobody is signed in', () {
+      expect(FakeDiskSessionStore({}).remainingSession(window), Duration.zero);
     });
   });
 }

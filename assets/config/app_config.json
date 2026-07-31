@@ -21,7 +21,7 @@
   },
 
   "session": {
-    "autoLogoutHours": 8,
+    "autoLogoutHours": 12,
     "warnBeforeLogoutMinutes": 5,
     "requireReauthOnResume": false
   },

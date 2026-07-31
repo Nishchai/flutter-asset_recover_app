@@ -33,7 +33,7 @@
     "create": "POST /tickets/{ticketId}/batteries/{bpId}/attempts",
     "history": "GET /batteries/{bpId}/attempts",
     "_comment_submit": "Standalone attempts service on its own host. Carries an ABSOLUTE URL so ApiClient uses it verbatim — no apiBaseUrl prefix and no agentId query param (the contract accepts no query params). Called on Submit Attempt from the Update Status screen.",
-    "submit": "POST http://10.10.60.110:5088/api/v1/attempts"
+    "submit": "POST /attempts"
   },
   "proof": {
     "upload": "POST /proof/upload"
@@ -41,8 +41,8 @@
   "customer": {
     "update": "PATCH /batteries/{bpId}/customer",
     "_comment_updateDetails": "Customers service on the same host as the attempts service, so these carry ABSOLUTE URLs — ApiClient sends them verbatim with no apiBaseUrl prefix and no agentId query param. Called on Save from the Visit Customer Address screen to patch the address components + alternate number the agent entered. Prefer `updateById` ({id} = the ticket detail's customer.id): phone numbers are NOT unique in this backend and `updateByPhone` answers 409 'Ambiguous phonePrimary' whenever several customers share one. `updateByPhone` is only the fallback for a ticket detail that carried no customer id.",
-    "updateById": "PATCH http://10.10.60.110:5088/api/v1/customers/{id}",
-    "updateByPhone": "PATCH http://10.10.60.110:5088/api/v1/customers/by-phone"
+    "updateById": "PATCH /customers/{id}",
+    "updateByPhone": "PATCH /customers/by-phone"
   },
   "qr": {
     "validate": "POST /batteries/validate-scan"

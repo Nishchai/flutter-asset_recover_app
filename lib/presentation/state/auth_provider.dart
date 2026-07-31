@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:asset_recovery_app/core/error/result.dart';
 import 'package:asset_recovery_app/core/services/audit_log_service.dart';
 import 'package:asset_recovery_app/core/services/session_store.dart';
+import 'package:asset_recovery_app/core/utils/ist_time.dart';
 import 'package:asset_recovery_app/domain/entities/agent.dart';
 import 'package:asset_recovery_app/domain/entities/partner_login_data.dart';
 import 'package:asset_recovery_app/domain/usecases/login_otp_usecase.dart';
@@ -113,10 +114,17 @@ class AuthProvider extends ChangeNotifier {
         // Persist so this is the last time the login screens are shown. Not
         // awaited: the UI must not wait on a keystore write, and a failure to
         // save only costs an extra OTP on the next launch.
+        //
+        // `loginAt` stamps the IST moment sign-in completed: it anchors the
+        // fixed auto-logout window (PRD §4.9), so from here the agent has
+        // exactly `session.autoLogoutHours` — sign in at 08:00 IST, signed out
+        // at 20:00 IST regardless of what they do in between. See
+        // `SessionManager`.
         unawaited(_sessionStore.save(PersistedSession(
           authToken: login.accessToken,
           agent: login.agent,
           profile: login.profile,
+          loginAt: nowIst(),
         ),),);
         unawaited(_auditLog.log(agentId: login.agent.id, action: 'login'));
         return true;

@@ -174,6 +174,12 @@ class AttemptController extends ChangeNotifier {
   /// seconds after a photo capture still carries its `proofUrls`.
   final Map<String, Future<void>> _uploadTasks = {};
   GeoPoint? _arrivalGps;
+
+  /// What [init] found standing between this attempt and a GPS fix. Read by the
+  /// hub to offer the matching recovery once loading finishes — the prompt is
+  /// driven off this single stored result rather than a second independent
+  /// check, so the agent can never be asked twice for the same grant.
+  LocationReadiness _locationReadiness = LocationReadiness.ready;
   GeoPoint? _liveLocation;
   bool _fetchingLiveLocation = false;
   bool _callInProgress = false;
@@ -202,6 +208,7 @@ class AttemptController extends ChangeNotifier {
 
   bool get loading => _loading;
   bool get submitting => _submitting;
+  LocationReadiness get locationReadiness => _locationReadiness;
   GeoPoint? get liveLocation => _liveLocation;
   bool get fetchingLiveLocation => _fetchingLiveLocation;
   bool get callInProgress => _callInProgress;
@@ -233,11 +240,17 @@ class AttemptController extends ChangeNotifier {
 
   /// Capture arrival GPS + load any saved draft. Call once after construction.
   Future<void> init() async {
+    // Opening an attempt is the agent's own deliberate action and the point at
+    // which GPS starts mattering (arrival, geo-fence, proof geo-tags), so this
+    // is where the runtime permission prompt belongs.
+    _locationReadiness = await _location.ensureReady();
     // Only a real fix counts as "where the agent arrived" — leaving this null
     // on a failed read lets every consumer fall through to its own fallback
     // instead of recording Null Island as the arrival point.
-    final arrival = await _location.currentLocation();
-    _arrivalGps = arrival.hasFix ? arrival : null;
+    if (_locationReadiness == LocationReadiness.ready) {
+      final arrival = await _location.currentLocation();
+      _arrivalGps = arrival.hasFix ? arrival : null;
+    }
     final result = await _getDraft(battery.bpId);
     final draft = result.valueOrNull;
     if (draft != null) {

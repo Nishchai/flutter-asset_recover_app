@@ -123,7 +123,19 @@ Future<void> configureDependencies({
   // what lets the app skip the mobile+OTP screens on relaunch. AuthProvider
   // reads `SessionStore.current` synchronously in its constructor, and the
   // restored token + agentId are already on the ApiClient for the first call.
-  await sessionStore.restore();
+  final restored = await sessionStore.restore();
+
+  // Auto-logout, cold-start half (PRD §4.9). The session window is a fixed
+  // `autoLogoutHours` from the IST moment the OTP was verified, so a session
+  // whose window ran out while the app was closed must NOT come back — a timer
+  // cannot enforce that across a process kill, only this clock comparison can.
+  // Done here, before AuthProvider exists, so the app opens straight on the
+  // login screen instead of flashing the home shell first. The in-app half is
+  // `SessionManager`, hosted by HomeShell.
+  if (restored != null &&
+      restored.isSessionExpired(Duration(hours: cfg.autoLogoutHours))) {
+    await sessionStore.clear();
+  }
 
   // Direct-to-Gupshup OTP client (login OTP send/verify). Credentials live in
   // the active environment file (cfg.env.gupshup).

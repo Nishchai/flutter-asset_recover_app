@@ -6,6 +6,7 @@ import 'package:asset_recovery_app/core/di/injector.dart';
 import 'package:asset_recovery_app/core/localization/app_localizations.dart';
 import 'package:asset_recovery_app/core/services/location_service.dart';
 import 'package:asset_recovery_app/core/services/session_manager.dart';
+import 'package:asset_recovery_app/core/services/session_store.dart';
 import 'package:asset_recovery_app/domain/usecases/update_agent_location_usecase.dart';
 import 'package:asset_recovery_app/presentation/features/home/task_list_screen.dart';
 import 'package:asset_recovery_app/presentation/features/map/map_screen.dart';
@@ -38,11 +39,18 @@ class _HomeShellState extends State<HomeShell> with RouteAware {
     _tasksTabIndex = config.navItems
         .indexWhere((item) => item['id'] == 'tasks');
     _session = SessionManager(
+      store: sl<SessionStore>(),
       sessionDuration: Duration(hours: config.autoLogoutHours),
       onExpired: () {
+        if (!mounted) return;
+        // Whatever is pushed over the shell (ticket detail, actions hub,
+        // scanner…) has to come down first: the root router only swaps
+        // HomeShell for LoginScreen, so a pushed route would otherwise sit on
+        // top of the login form and let the agent keep working.
+        Navigator.of(context).popUntil((route) => route.isFirst);
         // Auto-logout also wipes the stored session, so the next launch asks
         // for the OTP again (PRD §4.9).
-        if (mounted) unawaited(context.read<AuthProvider>().logout());
+        unawaited(context.read<AuthProvider>().logout());
       },
     )..start();
     // Landing #1: the agent just signed in / relaunched onto home. Deferred to
