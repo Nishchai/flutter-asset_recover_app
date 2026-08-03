@@ -24,7 +24,7 @@ file, hot-restart (config is loaded once at startup).
 
 ### Change the geo-fence radius / disable enforcement
 ```json
-"location": { "geofenceRadiusMeters": 50, "enforceGeofenceOnRecovery": true }
+"location": { "geofenceRadiusMeters": 50, "enforceGeofenceOnRecovery": false }
 ```
 
 ### Make a proof optional

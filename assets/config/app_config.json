@@ -28,7 +28,7 @@
 
   "location": {
     "geofenceRadiusMeters": 50,
-    "enforceGeofenceOnRecovery": true,
+    "enforceGeofenceOnRecovery": false,
     "requireLocationServicesOn": true,
     "distanceProvider": "google_road",
     "allowManualDistanceRefresh": true,

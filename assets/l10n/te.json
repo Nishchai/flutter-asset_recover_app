@@ -43,6 +43,7 @@
   "wizard.step.review": "సమీక్షించి సమర్పించు",
   "wizard.attemptOf": "ప్రయత్నం {current} / {max}",
   "wizard.submit": "ప్రయత్నం సమర్పించు",
+  "wizard.scanAndSubmit": "బ్యాటరీ స్కాన్ చేసి ప్రయత్నం సమర్పించు",
 
   "field.call_status": "కాల్ స్థితి",
   "field.outcome": "ఫలితం",
@@ -189,6 +190,10 @@
   "hub.title": "టికెట్ చర్యలు",
   "map.eta": "ETA {minutes} నిమి",
   "map.fetchingLiveLocation": "లైవ్ లొకేషన్ పొందుతోంది…",
+  "map.navigatingTo": "ఇక్కడికి నావిగేట్ చేస్తోంది",
+  "map.endNavigation": "నావిగేషన్ ముగించు",
+  "map.yourLocation": "మీ లొకేషన్",
+  "map.approximateRoute": "సుమారు సరళ రేఖ — లైవ్ దిశలు అందుబాటులో లేవు.",
   "map.todaysRoute": "ఈరోజు మార్గం",
   "map.stopOf": "స్టాప్ {current} / {total}",
   "map.startFullRoute": "పూర్తి మార్గం ప్రారంభించు",

@@ -43,6 +43,7 @@
   "wizard.step.review": "சரிபார்த்து சமர்ப்பி",
   "wizard.attemptOf": "முயற்சி {current} / {max}",
   "wizard.submit": "முயற்சியைச் சமர்ப்பி",
+  "wizard.scanAndSubmit": "பேட்டரியை ஸ்கேன் செய்து முயற்சியைச் சமர்ப்பி",
 
   "field.call_status": "அழைப்பு நிலை",
   "field.outcome": "முடிவு",
@@ -189,6 +190,10 @@
   "hub.title": "டிக்கெட் செயல்கள்",
   "map.eta": "வருகை நேரம் {minutes} நிமிடங்கள்",
   "map.fetchingLiveLocation": "நேரடி இருப்பிடத்தைப் பெறுகிறது…",
+  "map.navigatingTo": "இங்கு செல்கிறது",
+  "map.endNavigation": "வழிசெலுத்தலை முடிக்கவும்",
+  "map.yourLocation": "உங்கள் இருப்பிடம்",
+  "map.approximateRoute": "தோராயமான நேர்கோடு — நேரடி வழிகாட்டுதல் கிடைக்கவில்லை.",
   "map.todaysRoute": "இன்றைய பாதை",
   "map.stopOf": "நிறுத்தம் {current} / {total}",
   "map.startFullRoute": "முழு பாதையைத் தொடங்கு",

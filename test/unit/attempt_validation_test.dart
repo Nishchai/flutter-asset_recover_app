@@ -156,14 +156,15 @@ void main() {
     expect(c.isRequired(otp), isTrue);
   });
 
-  test('geo-fence enforcement rejects recovery proof captured too far away',
-      () async {
+  test('recovery proof captured far from the BP is accepted while '
+      'enforceGeofenceOnRecovery is off', () async {
     final c = controller();
     // Force the device far from the BP's last known location (Delhi vs BLR).
     env.location.forcedLocation = const GeoPoint(lat: 28.6139, lng: 77.2090);
     final proof = field(c, 'outcome', 'recoveryProof');
     final captured = await c.captureProof(proof);
-    expect(c.isProofWithinGeofence(captured), isFalse);
+    expect(c.isProofWithinGeofence(captured), isTrue);
+    expect(c.isProofLocationUnknown(captured), isFalse);
   });
 
   test('geo-fence passes when the agent is at the BP location', () async {

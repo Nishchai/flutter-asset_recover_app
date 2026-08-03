@@ -1,6 +1,7 @@
 import 'package:asset_recovery_app/core/config/config_service.dart';
 import 'package:asset_recovery_app/core/services/audit_log_service.dart';
 import 'package:asset_recovery_app/core/services/blob_upload_service.dart';
+import 'package:asset_recovery_app/core/services/directions_service.dart';
 import 'package:asset_recovery_app/core/services/location_service.dart';
 import 'package:asset_recovery_app/core/services/proof_service.dart';
 import 'package:asset_recovery_app/core/services/route_tracking_service.dart';
@@ -23,6 +24,7 @@ class AppServices {
     required this.auditLog,
     required this.syncQueue,
     required this.routeTracking,
+    required this.directions,
     SimCallService? simCall,
   }) : simCall = simCall ?? const NoopSimCallService();
 
@@ -34,6 +36,9 @@ class AppServices {
   final AuditLogService auditLog;
   final SyncQueueService syncQueue;
   final RouteTrackingService routeTracking;
+
+  /// Google Directions lookups behind the map's in-app navigation route line.
+  final DirectionsService directions;
 
   /// In-app SIM calling for the Call Customer action. Android-only — a
   /// [NoopSimCallService] elsewhere, which the UI treats as "unsupported".

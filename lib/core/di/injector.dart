@@ -7,6 +7,7 @@ import 'package:asset_recovery_app/core/services/api_client.dart';
 import 'package:asset_recovery_app/core/services/audit_log_service.dart';
 import 'package:asset_recovery_app/core/services/blob_upload_service.dart';
 import 'package:asset_recovery_app/core/services/connectivity_service.dart';
+import 'package:asset_recovery_app/core/services/directions_service.dart';
 import 'package:asset_recovery_app/core/services/location_service.dart';
 import 'package:asset_recovery_app/core/services/proof_service.dart';
 import 'package:asset_recovery_app/core/services/route_tracking_service.dart';
@@ -97,6 +98,11 @@ Future<void> configureDependencies({
         minDistanceMeters: cfg.doubleValue('business.routeTrackingMinDistanceMeters', fallback: 50),
         maxPoints: cfg.intValue('business.routeTrackingMaxPoints', fallback: 500),
       ),);
+
+  // Google Directions lookups for the map's in-app navigation route line.
+  // Degrades on its own when `mapsApiKey` is absent (test/mock envs), so it
+  // needs no environment switch here.
+  sl.registerLazySingleton<DirectionsService>(() => DirectionsService(cfg));
 
   // --- Data (repository selection: mock vs real API) ------------------------
   // Single shared ApiClient so the auth token set on login (see
@@ -195,6 +201,7 @@ Future<void> configureDependencies({
         auditLog: sl(),
         syncQueue: sl(),
         routeTracking: sl(),
+        directions: sl(),
         simCall: sl(),
       ),);
 

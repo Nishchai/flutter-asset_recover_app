@@ -7,6 +7,7 @@ import 'package:asset_recovery_app/core/utils/formatters.dart';
 import 'package:asset_recovery_app/domain/entities/form_field_config.dart';
 import 'package:asset_recovery_app/presentation/features/attempt/dynamic_field.dart';
 import 'package:asset_recovery_app/presentation/features/map/map_screen.dart';
+import 'package:asset_recovery_app/presentation/features/qr/qr_scan_screen.dart';
 import 'package:asset_recovery_app/presentation/shared/widgets/pill_button.dart';
 import 'package:asset_recovery_app/presentation/state/attempt_controller.dart';
 import 'package:asset_recovery_app/presentation/state/ticket_provider.dart';
@@ -120,6 +121,29 @@ class _AttemptSectionScreenState extends State<AttemptSectionScreen>
     final l = AppLocalizations.of(context);
 
     if (widget.isOutcome) {
+      // The outcome is only recorded against a battery the agent has physically
+      // verified, so the scan runs here — between the form and the attempts API.
+      //
+      // Validate first: an incomplete form would be rejected by submitOutcome
+      // anyway, and there is no point sending the agent to the scanner only to
+      // bounce them back. A mismatch never reaches the API — QrScanScreen shows
+      // the QR-mismatch screen and returns without a confirmed match, which
+      // leaves the agent on this screen with everything they entered intact.
+      final invalid = controller.validateSection(widget.section, l.t);
+      if (invalid != null) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(invalid)));
+        return;
+      }
+      final verified = await Navigator.of(context).push<bool>(
+        MaterialPageRoute<bool>(
+          builder: (_) => QrScanScreen(
+            battery: controller.battery,
+            ticketId: controller.ticketId,
+          ),
+        ),
+      );
+      if (!context.mounted || verified != true) return;
+
       final tickets = context.read<TicketProvider>();
       final error = await controller.submitOutcome(tickets, l.t);
       if (!context.mounted) return;
@@ -233,7 +257,12 @@ class _AttemptSectionScreenState extends State<AttemptSectionScreen>
                             child: CircularProgressIndicator(
                                 strokeWidth: 2, color: Colors.white,),
                           )
-                        : Text(widget.isOutcome ? l.t('wizard.submit') : l.t('section.save')),
+                        : Text(
+                            widget.isOutcome
+                                ? l.t('wizard.scanAndSubmit')
+                                : l.t('section.save'),
+                            textAlign: TextAlign.center,
+                          ),
                   ),
                 ),
               ),

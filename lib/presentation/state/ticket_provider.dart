@@ -314,12 +314,18 @@ class TicketProvider extends ChangeNotifier {
           t.status == TicketStatus.unrecoverable,)
       .toList();
 
-  /// Every non-completed ticket (All Tasks + In Progress), for the map view.
+  /// Every non-completed ticket (All Tasks + In Progress).
   List<Ticket> get activeTickets => _all
       .where((t) =>
           t.status != TicketStatus.closed &&
           t.status != TicketStatus.unrecoverable,)
       .toList();
+
+  /// The stops the Map view plots: strictly the tickets the agent has already
+  /// started. `assigned` work hasn't been begun and `pending` is sitting with
+  /// the AC for approval, so neither is a stop still to be driven to.
+  List<Ticket> get inProgressTickets =>
+      _all.where((t) => t.status == TicketStatus.inProgress).toList();
 
   void _applySort(List<Ticket> list, DateTime now) {
     switch (_sort) {

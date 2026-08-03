@@ -16,7 +16,6 @@ import 'package:asset_recovery_app/domain/usecases/get_battery_detail_usecase.da
 import 'package:asset_recovery_app/domain/usecases/get_ticket_full_detail_usecase.dart';
 import 'package:asset_recovery_app/presentation/features/attempt/ticket_actions_hub.dart';
 import 'package:asset_recovery_app/presentation/features/map/map_screen.dart';
-import 'package:asset_recovery_app/presentation/features/qr/qr_scan_screen.dart';
 import 'package:asset_recovery_app/presentation/features/tracking/battery_tracking_screen.dart';
 import 'package:asset_recovery_app/presentation/shared/mark_ticket_in_progress.dart';
 import 'package:asset_recovery_app/presentation/shared/widgets/info_chip.dart';
@@ -1129,60 +1128,43 @@ class _Actions extends StatelessWidget {
         top: false,
         child: Padding(
           padding: const EdgeInsets.all(14),
-          child: Row(
-            children: [
-              Expanded(
-                child: PillButton.outline(
-                  l.t('detail.scanQr'),
-                  palette: palette,
-                  icon: Icons.qr_code_scanner,
-                  onPressed: () {
-                    unawaited(markTicketInProgress(ticket.ticketId));
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) =>
-                            QrScanScreen(battery: bp, ticketId: ticket.ticketId),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                flex: 2,
-                child: PillButton.dark(
-                  l.t('detail.ticketActions'),
-                  palette: palette,
-                  trailingArrow: true,
-                  onPressed: () {
-                    // Attempt cap (Rule 7): a BP that has already used its
-                    // allowance never opens the hub — bounce with a toast
-                    // BEFORE the in-progress mark, so a blocked tap leaves the
-                    // ticket's status untouched.
-                    if (_attemptsExhausted(maxAttempts)) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(l.t('detail.maxAttemptsReached',
-                              {'max': maxAttempts},),),
+          // Ticket Actions is the only CTA here — the battery scan is no longer
+          // a standalone action off this screen; it now runs as the first half
+          // of Update Status → "Scan Battery and Submit Attempt", so a scan
+          // always belongs to the attempt it verifies.
+          child: SizedBox(
+            width: double.infinity,
+            child: PillButton.dark(
+              l.t('detail.ticketActions'),
+              palette: palette,
+              trailingArrow: true,
+              onPressed: () {
+                // Attempt cap (Rule 7): a BP that has already used its
+                // allowance never opens the hub — bounce with a toast
+                // BEFORE the in-progress mark, so a blocked tap leaves the
+                // ticket's status untouched.
+                if (_attemptsExhausted(maxAttempts)) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(l.t('detail.maxAttemptsReached',
+                          {'max': maxAttempts},),),
+                    ),
+                  );
+                  return;
+                }
+                unawaited(markTicketInProgress(ticket.ticketId));
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => TicketActionsHub(
+                          ticketId: ticket.ticketId,
+                          battery: bp,
+                          batteryDetail: batteryDetail,
+                          ticketDetail: detail,
                         ),
-                      );
-                      return;
-                    }
-                    unawaited(markTicketInProgress(ticket.ticketId));
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => TicketActionsHub(
-                              ticketId: ticket.ticketId,
-                              battery: bp,
-                              batteryDetail: batteryDetail,
-                              ticketDetail: detail,
-                            ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
+                  ),
+                );
+              },
+            ),
           ),
         ),
       ),

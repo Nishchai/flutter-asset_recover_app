@@ -22,6 +22,12 @@ import 'package:provider/provider.dart';
 /// ignored while a result is being handled. On platforms without a usable camera
 /// (e.g. some emulators) the manual-entry path remains, and goes through the
 /// same comparison.
+///
+/// Push it with `Navigator.push<bool>`: it pops `true` — and only `true` — once
+/// the agent has confirmed a MATCHED battery on the result screen. A mismatch
+/// shows the QR-mismatch screen and drops back to the viewfinder for a retry;
+/// backing out pops null. Callers gate their own work on that verdict — the
+/// Update Status screen submits its attempt only when it gets `true` back.
 enum _ScanState { idle, detected, wrong }
 
 class QrScanScreen extends StatefulWidget {
@@ -78,8 +84,8 @@ class _QrScanScreenState extends State<QrScanScreen> {
     setState(() => _state = ok ? _ScanState.detected : _ScanState.wrong);
     await Future<void>.delayed(const Duration(milliseconds: 450));
     if (!mounted) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
+    final confirmed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
         builder: (_) => QrResultScreen(
           ticketId: widget.ticketId,
           expectedBpId: widget.battery.bpId,
@@ -89,7 +95,14 @@ class _QrScanScreenState extends State<QrScanScreen> {
       ),
     );
     if (!mounted) return;
-    // Returned from the result screen — reset so the agent can scan again.
+    // A confirmed match ends the scan: hand the verdict up so the caller can
+    // act on a battery the agent has physically verified.
+    if (ok && confirmed == true) {
+      Navigator.of(context).pop(true);
+      return;
+    }
+    // Mismatch (the result screen has already shown it), or the agent closed
+    // the confirmation without proceeding — reset so they can scan again.
     setState(() {
       _state = _ScanState.idle;
       _busy = false;

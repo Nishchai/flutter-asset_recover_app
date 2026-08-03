@@ -103,6 +103,7 @@
   "wizard.step.review": "समीक्षा और जमा करें",
   "wizard.attemptOf": "प्रयास {current} / {max}",
   "wizard.submit": "प्रयास जमा करें",
+  "wizard.scanAndSubmit": "बैटरी स्कैन करें और प्रयास जमा करें",
   "wizard.reviewIntro": "जमा करने से पहले सभी विवरणों की समीक्षा करें।",
 
   "field.call_status": "कॉल स्थिति",
@@ -286,6 +287,10 @@
   "hub.subtitle": "नीचे दी गई कोई भी कार्रवाई, किसी भी क्रम में पूरी करें।",
   "hub.title": "टिकट कार्रवाई",
   "map.fetchingLiveLocation": "लाइव स्थान प्राप्त हो रहा है…",
+  "map.navigatingTo": "यहाँ नेविगेट कर रहे हैं",
+  "map.endNavigation": "नेविगेशन समाप्त करें",
+  "map.yourLocation": "आपका स्थान",
+  "map.approximateRoute": "अनुमानित सीधी रेखा — लाइव दिशा-निर्देश उपलब्ध नहीं।",
   "map.liveLocation": "लाइव बीपी स्थान",
   "map.openExternalMaps": "गूगल मैप्स में खोलें ↗",
   "map.title": "मानचित्र",

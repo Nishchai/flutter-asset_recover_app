@@ -49,3 +49,10 @@ class GeoPoint {
 
   static double _rad(double deg) => deg * math.pi / 180.0;
 }
+
+/// Bengaluru city centre — the operating city, used wherever a real coordinate
+/// is missing: the Map view's home camera position, and the stand-in for a BP
+/// whose `lastKnownLocation` the tickets API left null (the current response
+/// omits it). Keeps pins in the city the agents work in rather than dropping
+/// them on Null Island, 0°N 0°E, in the Gulf of Guinea.
+const GeoPoint kBengaluruCenter = GeoPoint(lat: 12.9716, lng: 77.5946);

@@ -60,11 +60,13 @@ class ApiTicketRepository implements TicketRepository {
         address: json['customerAddress'] as String? ?? '',
       ),
       // lastKnownLocation is nullable on the wire (null in the current
-      // response); the model field is non-null, so fall back to (0,0) until a
-      // real fix is captured in the field.
+      // response) and the model field is non-null, so fall back to the
+      // operating city's centre. (0,0) would put every such BP on Null Island,
+      // half a world away — which is what the Map view's markers, the
+      // nearest-first route order and every distance readout would then use.
       lastKnownLocation: json['lastKnownLocation'] is Map<String, dynamic>
           ? GeoPoint.fromJson(json['lastKnownLocation'] as Map<String, dynamic>)
-          : const GeoPoint(lat: 0, lng: 0), // MAP: lastKnownLocation
+          : kBengaluruCenter, // MAP: lastKnownLocation
       zoneStatus: zoneFromString(json['zoneStatus'] as String?),
       bpState: bpStateFromString(json['bpState'] as String?),
       vehicleType: json['vehicleType'] as String? ?? '', // MAP: vehicleType

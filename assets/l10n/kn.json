@@ -43,6 +43,7 @@
   "wizard.step.review": "ಪರಿಶೀಲಿಸಿ ಸಲ್ಲಿಸಿ",
   "wizard.attemptOf": "ಪ್ರಯತ್ನ {current} / {max}",
   "wizard.submit": "ಪ್ರಯತ್ನ ಸಲ್ಲಿಸಿ",
+  "wizard.scanAndSubmit": "ಬ್ಯಾಟರಿ ಸ್ಕ್ಯಾನ್ ಮಾಡಿ ಮತ್ತು ಪ್ರಯತ್ನ ಸಲ್ಲಿಸಿ",
 
   "field.call_status": "ಕರೆ ಸ್ಥಿತಿ",
   "field.outcome": "ಫಲಿತಾಂಶ",
@@ -189,6 +190,10 @@
   "hub.title": "ಟಿಕೆಟ್ ಕ್ರಿಯೆಗಳು",
   "map.eta": "ETA {minutes} ನಿಮಿಷ",
   "map.fetchingLiveLocation": "ಲೈವ್ ಸ್ಥಳವನ್ನು ಪಡೆಯಲಾಗುತ್ತಿದೆ…",
+  "map.navigatingTo": "ಇಲ್ಲಿಗೆ ನ್ಯಾವಿಗೇಟ್ ಮಾಡಲಾಗುತ್ತಿದೆ",
+  "map.endNavigation": "ನ್ಯಾವಿಗೇಷನ್ ಕೊನೆಗೊಳಿಸಿ",
+  "map.yourLocation": "ನಿಮ್ಮ ಸ್ಥಳ",
+  "map.approximateRoute": "ಅಂದಾಜು ನೇರ ರೇಖೆ — ಲೈವ್ ಮಾರ್ಗಸೂಚಿ ಲಭ್ಯವಿಲ್ಲ.",
   "map.todaysRoute": "ಇಂದಿನ ಮಾರ್ಗ",
   "map.stopOf": "ನಿಲುಗಡೆ {current} / {total}",
   "map.startFullRoute": "ಪೂರ್ಣ ಮಾರ್ಗ ಪ್ರಾರಂಭಿಸಿ",

@@ -43,6 +43,7 @@
   "wizard.step.review": "पुनरावलोकन व सबमिट",
   "wizard.attemptOf": "प्रयत्न {current} / {max}",
   "wizard.submit": "प्रयत्न सबमिट करा",
+  "wizard.scanAndSubmit": "बॅटरी स्कॅन करा आणि प्रयत्न सबमिट करा",
 
   "field.call_status": "कॉल स्थिती",
   "field.outcome": "निकाल",
@@ -189,6 +190,10 @@
   "hub.title": "तिकीट क्रिया",
   "map.eta": "अंदाजित वेळ {minutes} मि.",
   "map.fetchingLiveLocation": "लाइव्ह स्थान मिळवत आहे…",
+  "map.navigatingTo": "येथे नेव्हिगेट करत आहे",
+  "map.endNavigation": "नेव्हिगेशन संपवा",
+  "map.yourLocation": "तुमचे स्थान",
+  "map.approximateRoute": "अंदाजे सरळ रेषा — थेट दिशानिर्देश उपलब्ध नाहीत.",
   "map.todaysRoute": "आजचा मार्ग",
   "map.stopOf": "थांबा {current} / {total}",
   "map.startFullRoute": "संपूर्ण मार्ग सुरू करा",
