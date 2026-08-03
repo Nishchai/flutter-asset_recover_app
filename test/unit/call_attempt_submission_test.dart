@@ -3,6 +3,7 @@ import 'package:asset_recovery_app/core/error/failure.dart';
 import 'package:asset_recovery_app/core/error/result.dart';
 import 'package:asset_recovery_app/domain/entities/attempt_submission.dart';
 import 'package:asset_recovery_app/domain/entities/battery.dart';
+import 'package:asset_recovery_app/domain/entities/customer_details_update.dart';
 import 'package:asset_recovery_app/domain/entities/form_field_config.dart';
 import 'package:asset_recovery_app/domain/entities/geo_point.dart';
 import 'package:asset_recovery_app/domain/usecases/call_usecase.dart';
@@ -10,7 +11,6 @@ import 'package:asset_recovery_app/domain/usecases/draft_attempt_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/get_live_location_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/submit_attempt_record_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/update_customer_details_usecase.dart';
-import 'package:asset_recovery_app/domain/usecases/update_customer_usecase.dart';
 import 'package:asset_recovery_app/presentation/state/attempt_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -35,12 +35,27 @@ class _CapturingSubmit extends SubmitAttemptRecordUseCase {
   }
 }
 
+/// Captures the customer-detail patch the Call Customer save sends, standing in
+/// for `PATCH /customers/{id}` / `PATCH /customers/by-phone`.
+class _CapturingCustomerDetails extends UpdateCustomerDetailsUseCase {
+  _CapturingCustomerDetails(super.repo);
+
+  final List<CustomerDetailsUpdate> updates = [];
+
+  @override
+  Future<Result<bool>> call(CustomerDetailsUpdate params) async {
+    updates.add(params);
+    return const Ok(true);
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late TestEnv env;
   late Battery bp;
   late _CapturingSubmit submit;
+  late _CapturingCustomerDetails customerDetails;
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
@@ -52,6 +67,7 @@ void main() {
         .batteries
         .firstWhere((b) => b.bpId == 'BP-IF-09823-A');
     submit = _CapturingSubmit(env.repository);
+    customerDetails = _CapturingCustomerDetails(env.repository);
   });
 
   AttemptController controller({SubmitAttemptRecordUseCase? submitRecord}) =>
@@ -66,8 +82,7 @@ void main() {
         proof: env.services.proof,
         getDraft: sl<GetDraftUseCase>(),
         saveDraft: sl<SaveDraftUseCase>(),
-        updateCustomer: sl<UpdateCustomerUseCase>(),
-        updateCustomerDetails: sl<UpdateCustomerDetailsUseCase>(),
+        updateCustomerDetails: customerDetails,
         auditLog: env.services.auditLog,
         getLiveLocation: sl<GetLiveLocationUseCase>(),
         startCallUseCase: sl<StartCallUseCase>(),
@@ -135,6 +150,39 @@ void main() {
     expect(meta['callStatus'], 'connected');
     expect(meta['callingRemark'], isNotEmpty);
     expect(meta['customerName'], bp.customer.name);
+  });
+
+  test('the updated mobile is PATCHed to the customers service as '
+      'phoneSecondary, the way the visit screen sends its edits', () async {
+    final c = controller();
+    // Save mirrors the new number onto the in-memory customer, so snapshot the
+    // number the ticket came with before it does.
+    final originalMobile = bp.customer.mobile;
+    fillCall(c, mobile: '9998887776');
+    await c.saveSection(callSection(c), _t);
+
+    final sent = customerDetails.updates.single;
+    expect(sent.phoneSecondary, '9998887776');
+    // The lookup key stays the number the ticket came with, never the new one.
+    expect(sent.phonePrimary, originalMobile);
+    expect(bp.customer.mobile, '9998887776');
+    // This screen edits no address — those go up as the contract's explicit
+    // nulls, and the body carries no metadata.
+    final body = sent.toJson();
+    expect(body['addressLine1'], isNull);
+    expect(body['city'], isNull);
+    expect(body['state'], isNull);
+    expect(body['pincode'], isNull);
+    expect(body.containsKey('metadata'), isFalse);
+  });
+
+  test('no customer PATCH when the agent left the mobile field alone',
+      () async {
+    final c = controller();
+    fillCall(c, mobile: null);
+    await c.saveSection(callSection(c), _t);
+
+    expect(customerDetails.updates, isEmpty);
   });
 
   test('attemptedAt is when the screen opened, completedAt when Save ran',

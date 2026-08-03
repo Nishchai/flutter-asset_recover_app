@@ -1,5 +1,7 @@
 /// The customer-detail edits the agent makes on the Visit Customer Address
-/// screen, sent to the customers service on Save.
+/// screen (address components + alternate number) or on the Call Customer
+/// screen (the updated mobile, as [phoneSecondary]), sent to the customers
+/// service on Save.
 ///
 /// Addressed by [customerId] (`PATCH /api/v1/customers/{id}`) whenever the
 /// ticket detail carried one. Phone numbers are not unique in that backend —

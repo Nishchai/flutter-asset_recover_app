@@ -18,7 +18,6 @@ import 'package:asset_recovery_app/domain/entities/attempt_submission.dart';
 import 'package:asset_recovery_app/domain/entities/battery.dart';
 import 'package:asset_recovery_app/domain/entities/battery_detail.dart';
 import 'package:asset_recovery_app/domain/entities/call_recording.dart';
-import 'package:asset_recovery_app/domain/entities/customer.dart';
 import 'package:asset_recovery_app/domain/entities/customer_details_update.dart';
 import 'package:asset_recovery_app/domain/entities/draft_attempt.dart';
 import 'package:asset_recovery_app/domain/entities/enums.dart';
@@ -31,7 +30,6 @@ import 'package:asset_recovery_app/domain/usecases/draft_attempt_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/get_live_location_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/submit_attempt_record_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/update_customer_details_usecase.dart';
-import 'package:asset_recovery_app/domain/usecases/update_customer_usecase.dart';
 import 'package:asset_recovery_app/presentation/state/ticket_provider.dart';
 import 'package:flutter/foundation.dart';
 
@@ -83,7 +81,6 @@ class AttemptController extends ChangeNotifier {
     BlobUploadService? blobUpload,
     required GetDraftUseCase getDraft,
     required SaveDraftUseCase saveDraft,
-    required UpdateCustomerUseCase updateCustomer,
     required UpdateCustomerDetailsUseCase updateCustomerDetails,
     required AuditLogService auditLog,
     required GetLiveLocationUseCase getLiveLocation,
@@ -103,7 +100,6 @@ class AttemptController extends ChangeNotifier {
         _blobUpload = blobUpload ?? const NoopBlobUploadService(),
         _getDraft = getDraft,
         _saveDraft = saveDraft,
-        _updateCustomer = updateCustomer,
         _updateCustomerDetails = updateCustomerDetails,
         _auditLog = auditLog,
         _getLiveLocation = getLiveLocation,
@@ -140,7 +136,6 @@ class AttemptController extends ChangeNotifier {
   final BlobUploadService _blobUpload;
   final GetDraftUseCase _getDraft;
   final SaveDraftUseCase _saveDraft;
-  final UpdateCustomerUseCase _updateCustomer;
   final UpdateCustomerDetailsUseCase _updateCustomerDetails;
   final AuditLogService _auditLog;
   final GetLiveLocationUseCase _getLiveLocation;
@@ -834,10 +829,35 @@ class AttemptController extends ChangeNotifier {
     return null;
   }
 
+  /// Save on the Call Customer screen: pushes the number the agent typed into
+  /// "Update Customer Mobile Number" to the customers service the same way the
+  /// Visit Customer Address screen pushes its edits — by customer id when the
+  /// ticket detail carried one, `customer.updateByPhone`
+  /// (`PATCH /customers/by-phone`) as the fallback.
+  ///
+  /// The new number rides as `phoneSecondary`; `phonePrimary` stays the number
+  /// parsed off the ticket detail, since that is the key the by-phone route
+  /// identifies the record by. This screen edits no address, so those fields go
+  /// up as the contract's explicit nulls.
+  ///
+  /// No-ops when the agent left the field blank or retyped the number the
+  /// customer already has — nothing to patch, and the explicit nulls would
+  /// blank out server-side values on a save that only recorded a call.
   Future<void> _maybeUpdateMobile() async {
-    final mobile = (_values['newCustomerMobile'] as String?)?.trim();
-    if (mobile == null || mobile.isEmpty || mobile == battery.customer.mobile) return;
-    await _updateCustomerField(battery.customer.copyWith(mobile: mobile), 'mobile');
+    final mobile = _entered('newCustomerMobile');
+    if (mobile == null || mobile == battery.customer.mobile) return;
+
+    // Built before the local mirror below so [customerPrimaryPhone] still
+    // reports the number the ticket came with, not the one being sent.
+    final update = CustomerDetailsUpdate(
+      customerId: ticketDetail?.customer?.id ?? '',
+      phonePrimary: customerPrimaryPhone,
+      phoneSecondary: mobile,
+    );
+    // Mirror the edit locally first (offline-first UX — the agent's input is
+    // never silently lost), then confirm against the server or queue for retry.
+    battery.customer = battery.customer.copyWith(mobile: mobile);
+    await _sendCustomerDetails(update, field: 'mobile');
   }
 
   /// Save on the Visit Customer Address screen: pushes the agent's
@@ -872,6 +892,17 @@ class AttemptController extends ChangeNotifier {
     // Mirror the edits locally first (offline-first UX — the agent's input is
     // never silently lost), then confirm against the server or queue for retry.
     _applyCustomerEditsLocally(update);
+    await _sendCustomerDetails(update, field: 'address');
+  }
+
+  /// Sends [update] to the customers service under the offline-first contract
+  /// both customer-editing screens share: a rejection or an unreachable service
+  /// is never fatal — the patch goes on the sync queue for retry instead of
+  /// being lost. [field] only labels the audit entry.
+  Future<void> _sendCustomerDetails(
+    CustomerDetailsUpdate update, {
+    required String field,
+  }) async {
     final result = await _updateCustomerDetails(update);
     if (result.isErr) {
       await _syncQueue.enqueue(
@@ -882,7 +913,7 @@ class AttemptController extends ChangeNotifier {
       action: 'customer_details_updated',
       entityType: 'battery',
       entityId: battery.bpId,
-      metadata: {'queued': result.isErr},
+      metadata: {'field': field, 'queued': result.isErr},
     ),);
   }
 
@@ -907,27 +938,6 @@ class AttemptController extends ChangeNotifier {
   String? _entered(String id) {
     final v = (_values[id] as String?)?.trim();
     return (v == null || v.isEmpty) ? null : v;
-  }
-
-  /// Applies the edit locally right away (offline-first UX — the agent's
-  /// input is never silently lost) and either confirms it against the
-  /// server immediately or, on failure (CC-04), queues it for retry.
-  Future<void> _updateCustomerField(Customer updated, String field) async {
-    battery.customer = updated;
-    final result = await _updateCustomer(UpdateCustomerParams(battery.bpId, updated));
-    if (result.isErr) {
-      await _syncQueue.enqueue('update_customer', {
-        'bpId': battery.bpId,
-        'customer': updated.toJson(),
-      });
-    }
-    unawaited(_auditLog.log(
-      agentId: agentId,
-      action: 'customer_updated',
-      entityType: 'battery',
-      entityId: battery.bpId,
-      metadata: {'field': field, 'queued': result.isErr},
-    ),);
   }
 
   Future<void> _persistDraft() => _saveDraft(SaveDraftParams(

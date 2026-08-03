@@ -6,7 +6,7 @@
   "business": {
     "slaDays": 90,
     "slaWarnDays": 7,
-    "maxAttemptsPerBp": 6,
+    "maxAttemptsPerBp": 10,
     "allowReattemptAfterMax": false,
     "ticketIdPrefix": "TKT",
     "bpIdPrefix": "BP",
