@@ -17,7 +17,6 @@ void main() {
 
   test('loads business values from app_config.json', () {
     expect(config.slaDays, 90);
-    expect(config.maxAttemptsPerBp, 3);
     expect(config.autoLogoutHours, 12);
     expect(config.geofenceRadiusMeters, 50);
   });

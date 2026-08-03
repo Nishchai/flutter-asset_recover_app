@@ -125,12 +125,16 @@ class ConfigService {
   String get appName => stringValue('appName', fallback: 'Asset Recovery');
   int get slaDays => intValue('business.slaDays', fallback: 90);
   int get slaWarnDays => intValue('business.slaWarnDays', fallback: 7);
-  int get maxAttemptsPerBp => intValue('business.maxAttemptsPerBp', fallback: 3);
   int get autoLogoutHours => intValue('session.autoLogoutHours', fallback: 12);
   double get geofenceRadiusMeters =>
       doubleValue('location.geofenceRadiusMeters', fallback: 50);
   bool get enforceGeofence =>
       flag('location.enforceGeofenceOnRecovery', fallback: true);
+
+  /// Cadence of the foreground `PATCH /agents/location` heartbeat. 0 turns the
+  /// heartbeat off and leaves only the landing-triggered reports.
+  int get locationReportIntervalMinutes =>
+      intValue('location.reportIntervalMinutes', fallback: 5);
   String get defaultLanguage =>
       stringValue('localization.defaultLanguage', fallback: 'en');
   List<String> get supportedLanguages =>

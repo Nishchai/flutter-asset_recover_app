@@ -89,6 +89,27 @@ class _MapScreenState extends State<MapScreen> {
   /// in its normal stop-list mode. Set by [_startNavigation].
   _ActiveNavigation? _navigation;
 
+  /// Where the device says the agent is, read once when the screen opens — the
+  /// map's home camera position and the origin the suggested route is planned
+  /// from. Null until the fix lands, and stays null when there is none, which is
+  /// the only case that falls back to [kBengaluruCenter].
+  GeoPoint? _deviceLocation;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadDeviceLocation());
+  }
+
+  /// Asks the device where the agent is so the map opens on them rather than on
+  /// the city-centre fallback. Never blocks the screen: the map builds on
+  /// whatever it has and re-centres when (or if) the fix arrives.
+  Future<void> _loadDeviceLocation() async {
+    final fix = await context.read<AppServices>().location.currentLocation();
+    if (!mounted || !fix.hasFix) return;
+    setState(() => _deviceLocation = fix);
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = context.read<AppPalette>();
@@ -110,9 +131,12 @@ class _MapScreenState extends State<MapScreen> {
         ticketOf[bp.bpId] = t.ticketId;
       }
     }
+    // The device fix is the truest "where the agent is now"; the position the
+    // session last reported stands in until it lands.
+    final here = _deviceLocation ?? agent.currentLocation;
     final open = planRoute(
       unordered,
-      agent.currentLocation ??
+      here ??
           (unordered.isEmpty ? kBengaluruCenter : unordered.first.lastKnownLocation),
     );
 
@@ -139,6 +163,7 @@ class _MapScreenState extends State<MapScreen> {
                 selectedIndex: selectedIndex,
                 onSelect: (i) => setState(() => _selected = i),
                 focusPoint: focusBp != null ? point : null,
+                userLocation: here != null && here.hasFix ? here : null,
                 palette: palette,
                 navigation: nav,
               ),
@@ -449,6 +474,7 @@ class _GoogleMapView extends StatefulWidget {
     required this.onSelect,
     required this.focusPoint,
     required this.palette,
+    this.userLocation,
     this.navigation,
   });
 
@@ -456,6 +482,10 @@ class _GoogleMapView extends StatefulWidget {
   final int selectedIndex;
   final ValueChanged<int> onSelect;
   final GeoPoint? focusPoint;
+
+  /// Where the agent is (device fix, else the session's last reported position),
+  /// or null while there is neither — the overview map's home camera position.
+  final GeoPoint? userLocation;
   final AppPalette palette;
 
   /// When set, the map draws this leg instead of the suggested-route overview
@@ -507,6 +537,21 @@ class _GoogleMapViewState extends State<_GoogleMapView> {
     if (nav != null && !identical(oldWidget.navigation, nav)) {
       _controller?.animateCamera(
         CameraUpdate.newLatLngBounds(_boundsOf(nav.route.points), 64),
+      );
+      return;
+    }
+
+    // The device fix usually lands after the map is already built, so the
+    // initial camera position missed it — centre on the agent once it arrives.
+    // Only on the way from "no position" to a real one: a later fix must not
+    // yank the camera back while the agent is panning around.
+    final me = widget.userLocation;
+    if (me != null &&
+        oldWidget.userLocation == null &&
+        widget.focusPoint == null &&
+        widget.navigation == null) {
+      _controller?.animateCamera(
+        CameraUpdate.newLatLngZoom(_toLatLng(me), _kUserLocationZoom),
       );
       return;
     }
@@ -610,7 +655,12 @@ class _GoogleMapViewState extends State<_GoogleMapView> {
         ),
     };
 
+    // The map opens on the agent, not on the city — the stops are planned
+    // nearest-first from there anyway, so the first one is right next to them.
+    // kBengaluruCenter is the last resort: no fix, no session position, no stops.
+    final me = widget.userLocation;
     final initialTarget = focus ??
+        me ??
         (widget.open.isEmpty
             ? kBengaluruCenter
             : widget.open.first.lastKnownLocation);
@@ -618,10 +668,17 @@ class _GoogleMapViewState extends State<_GoogleMapView> {
     return GoogleMap(
       initialCameraPosition: CameraPosition(
         target: _toLatLng(initialTarget),
-        zoom: focus != null ? 15 : 12,
+        zoom: focus != null
+            ? 15
+            : me != null
+                ? _kUserLocationZoom
+                : 12,
       ),
       markers: markers,
       polylines: polylines,
+      // The blue dot: with the camera on the agent, they should be able to see
+      // themselves on it.
+      myLocationEnabled: true,
       myLocationButtonEnabled: false,
       zoomControlsEnabled: false,
       onMapCreated: (controller) => _controller = controller,
@@ -639,6 +696,10 @@ const double _kStopRowGap = 8;
 /// non-empty rectangle. 0.001° is roughly 110 m — a sane zoom for a leg that
 /// starts and ends in the same place.
 const double _kBoundsEpsilon = 0.001;
+
+/// Zoom used when the map is centred on the agent's own position — close enough
+/// to place them on a street, wide enough to show the stops around them.
+const double _kUserLocationZoom = 14;
 
 /// The panel shown while the map is in navigation mode: which BP is being
 /// driven to, how far and how long the route is, and the two ways out — hand

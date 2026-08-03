@@ -32,7 +32,7 @@ All tokens live in `assets/config/theme_config.json`.
 | **Daily logout flow** : end-of-shift OTP sheet | `features/tasks/widgets/end_shift_sheet.dart` + `state/shift_provider.dart` |
 | **Daily logout flow** : "Oops — outside shift zone" | geo-fence enforcement (`attempt_controller.dart`, `validation.geofence`) |
 | **Flow 7 – FIR** | outcome `fir_lost` + `firDocument` upload field (config-driven) |
-| **Flow 10 – Retry** | re-attempt — multiple attempts per BP up to `maxAttemptsPerBp` |
+| **Flow 10 – Retry** | re-attempt — unlimited attempts per BP |
 
 ## Personas / IDs (from the Figma)
 

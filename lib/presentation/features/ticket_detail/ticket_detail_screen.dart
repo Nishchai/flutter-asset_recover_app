@@ -121,7 +121,8 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                     ticket: ticket,
                     bp: bp,
                     palette: palette,
-                    batteryDetail: _batteryDetail,),
+                    batteryDetail: _batteryDetail,
+                    detail: _detail,),
                 const SizedBox(height: 12),
                 _CustomerCard(
                     bp: bp,
@@ -370,7 +371,6 @@ class _SlaBanner extends StatelessWidget {
                 children: [
                   TextSpan(
                     text: l.t('detail.slaCriticalBody', {
-                      'attempts': config.maxAttemptsPerBp,
                       'days': config.slaDays,
                     }),
                     style: TextStyle(
@@ -396,6 +396,7 @@ class _CaseDetailsCard extends StatelessWidget {
     required this.bp,
     required this.palette,
     this.batteryDetail,
+    this.detail,
   });
   final Ticket ticket;
   final Battery bp;
@@ -405,7 +406,18 @@ class _CaseDetailsCard extends StatelessWidget {
   /// arrived. Takes precedence for "Last SOC" (`lastSoc`).
   final BatteryDetail? batteryDetail;
 
+  /// Full ticket detail from the ticket-detail endpoint, when it has arrived.
+  /// Source of "Recovery Attempts" — the same `attempts` array the Attempt
+  /// History card renders.
+  final TicketDetail? detail;
+
   String _dash(String? v) => (v == null || v.isEmpty) ? '—' : v;
+
+  /// Recovery attempts — the `attempts` array from the ticket-detail response
+  /// is authoritative; until it lands, the list summary's `attemptCount` fills
+  /// in (the paged home response can leave it stale).
+  String _recoveryAttempts() =>
+      '${detail?.attempts.length ?? bp.attemptCount}';
 
   /// Last SOC — the battery telemetry's `lastSoc` wins; then the base
   /// battery's `soc`; em-dash when neither is present. Rendered as a whole
@@ -432,7 +444,6 @@ class _CaseDetailsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final config = context.read<AppServices>().config;
     final agent = context.read<AuthProvider>().agent;
     final lastAttempt = bp.latestAttempt;
 
@@ -454,7 +465,9 @@ class _CaseDetailsCard extends StatelessWidget {
       (l.t('detail.lastStation'), _dash(bp.lastStation.isEmpty ? null : bp.lastStation)),
       (l.t('caseDetails.assignedTo'), _dash(agent?.name)),
       (l.t('caseDetails.assignedOn'), Formatters.date(ticket.createdAt)),
-      (l.t('caseDetails.recoveryAttempts'), '${bp.attemptCount} / ${config.maxAttemptsPerBp}'),
+      // Attempts are uncapped, so the count stands on its own — there is no
+      // "of N" allowance left to render against it.
+      (l.t('caseDetails.recoveryAttempts'), _recoveryAttempts()),
       (
         l.t('caseDetails.lastAttemptDate'),
         lastAttempt == null ? '—' : Formatters.date(lastAttempt.createdAt),
@@ -729,7 +742,6 @@ class _AttemptHistory extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final config = context.read<AppServices>().config;
     final attempts = detail?.attempts ?? const <TicketDetailAttempt>[];
     return Container(
       padding: const EdgeInsets.all(16),
@@ -744,7 +756,7 @@ class _AttemptHistory extends StatelessWidget {
           Text(l.t('detail.attemptHistory'),
               style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),),
           const SizedBox(height: 2),
-          Text(l.t('detail.attemptHistorySub', {'n': config.maxAttemptsPerBp}),
+          Text(l.t('detail.attemptHistorySub'),
               style: TextStyle(color: palette.muted, fontSize: 12),),
           const SizedBox(height: 14),
           if (attempts.isEmpty)
@@ -1101,24 +1113,9 @@ class _Actions extends StatelessWidget {
   /// customer card above instead of re-fetching it.
   final TicketDetail? detail;
 
-  /// Blocks the Ticket Actions hub once the BP has used up its attempts.
-  ///
-  /// The persisted `attempts` on the ticket detail are the source of truth —
-  /// the same records the Attempt History card renders — rather than the list
-  /// summary's `attemptCount`, which the paged home response can leave stale.
-  ///
-  /// A null [detail] means the full-detail fetch has not landed (or failed):
-  /// the count is unknown, so the agent is let through rather than locked out
-  /// of a BP that may well have attempts left.
-  bool _attemptsExhausted(int maxAttempts) {
-    final attempts = detail?.attempts;
-    return attempts != null && attempts.length >= maxAttempts;
-  }
-
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final maxAttempts = context.read<AppServices>().config.maxAttemptsPerBp;
     return Container(
       decoration: BoxDecoration(
         color: palette.surface,
@@ -1139,19 +1136,8 @@ class _Actions extends StatelessWidget {
               palette: palette,
               trailingArrow: true,
               onPressed: () {
-                // Attempt cap (Rule 7): a BP that has already used its
-                // allowance never opens the hub — bounce with a toast
-                // BEFORE the in-progress mark, so a blocked tap leaves the
-                // ticket's status untouched.
-                if (_attemptsExhausted(maxAttempts)) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(l.t('detail.maxAttemptsReached',
-                          {'max': maxAttempts},),),
-                    ),
-                  );
-                  return;
-                }
+                // No attempt cap: an agent may log as many attempts as a BP
+                // needs, so the hub always opens.
                 unawaited(markTicketInProgress(ticket.ticketId));
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(

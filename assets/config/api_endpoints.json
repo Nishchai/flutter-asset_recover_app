@@ -21,7 +21,7 @@
     "status": "PATCH /tickets/status"
   },
   "agent": {
-    "_comment_location": "Reports the agent's current device coordinates. Body: {agentId, lat, lng}. Fired every time the Field Agent lands on the home screen — first open, returning from a pushed screen, and switching back to the Tasks tab.",
+    "_comment_location": "Reports the agent's current device coordinates. Body: {agentId, lat, lng}. Fired every time the Field Agent lands on the home screen — first open, returning from a pushed screen, switching back to the Tasks tab, and app resume — plus a periodic heartbeat every `location.reportIntervalMinutes` (app_config.json, default 5) for as long as the app stays in the foreground. Skipped when there is no GPS fix.",
     "location": "PATCH /agents/location"
   },
   "shift": {

@@ -6,8 +6,6 @@
   "business": {
     "slaDays": 90,
     "slaWarnDays": 7,
-    "maxAttemptsPerBp": 10,
-    "allowReattemptAfterMax": false,
     "ticketIdPrefix": "TKT",
     "bpIdPrefix": "BP",
     "caseIdPrefix": "AAR",
@@ -32,7 +30,9 @@
     "requireLocationServicesOn": true,
     "distanceProvider": "google_road",
     "allowManualDistanceRefresh": true,
-    "gpsAccuracyThresholdMeters": 30
+    "gpsAccuracyThresholdMeters": 30,
+    "_comment_reportIntervalMinutes": "How often the app PATCHes the agent's current device coordinates to /agents/location while it is in the foreground. The heartbeat pauses when the app is backgrounded (there is no background location permission) and fires once immediately on resume. 0 disables the heartbeat — the landing-triggered reports still happen.",
+    "reportIntervalMinutes": 5
   },
 
   "proof": {

@@ -16,15 +16,25 @@ file, hot-restart (config is loaded once at startup).
 
 ## Common changes
 
-### Change the SLA or attempt limit
+### Change the SLA
 `app_config.json`:
 ```json
-"business": { "slaDays": 90, "maxAttemptsPerBp": 3 }
+"business": { "slaDays": 90, "slaWarnDays": 7 }
 ```
+Recovery attempts are not capped — an agent can log as many attempts per battery
+pack as a case needs.
 
 ### Change the geo-fence radius / disable enforcement
 ```json
 "location": { "geofenceRadiusMeters": 50, "enforceGeofenceOnRecovery": false }
+```
+
+### Change how often the agent's location is reported
+`PATCH /agents/location` runs on a heartbeat while the app is in the foreground.
+Set `0` to switch the heartbeat off, leaving only the reports fired when the
+agent lands on the home screen.
+```json
+"location": { "reportIntervalMinutes": 5 }
 ```
 
 ### Make a proof optional
