@@ -215,6 +215,7 @@
   "map.stopOf": "पड़ाव {current} / {total}",
   "map.startFullRoute": "पूरा मार्ग शुरू करें",
   "map.stops": "{count} पड़ाव",
+  "map.activeStops": "सक्रिय पड़ाव",
   "map.noStops": "अभी मानचित्र पर कोई सक्रिय कार्य नहीं है।",
 
   "profile.language": "भाषा",

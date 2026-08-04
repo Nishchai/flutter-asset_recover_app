@@ -202,6 +202,7 @@
   "map.stopOf": "நிறுத்தம் {current} / {total}",
   "map.startFullRoute": "முழு பாதையைத் தொடங்கு",
   "map.stops": "{count} நிறுத்தங்கள்",
+  "map.activeStops": "செயலில் உள்ள நிறுத்தங்கள்",
   "map.noStops": "தற்போது வரைபடத்தில் செயலில் உள்ள பணிகள் இல்லை.",
   "map.liveLocation": "நேரடி BP இருப்பிடம்",
   "map.openExternalMaps": "Google Maps-இல் திற ↗",

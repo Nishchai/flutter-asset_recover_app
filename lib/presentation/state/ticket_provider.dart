@@ -323,11 +323,21 @@ class TicketProvider extends ChangeNotifier {
           t.status != TicketStatus.unrecoverable,)
       .toList();
 
-  /// The stops the Map view plots: strictly the tickets the agent has already
-  /// started. `assigned` work hasn't been begun and `pending` is sitting with
-  /// the AC for approval, so neither is a stop still to be driven to.
-  List<Ticket> get inProgressTickets =>
-      _all.where((t) => t.status == TicketStatus.inProgress).toList();
+  /// The stops the Map view plots: every ticket that still has a drive to it —
+  /// `inProgress` (already started) and `assigned` (rendered as "Open" —
+  /// nothing done on it yet). `pending` is sitting with the AC for approval and
+  /// closed/unrecoverable are finished, so neither is a stop still to be driven
+  /// to.
+  ///
+  /// In practice the tickets API has so far only handed this app started work,
+  /// which is why the map used to plot `inProgress` alone; Open tickets are
+  /// expected to start arriving on the same list, and they belong on the route
+  /// the moment they do.
+  List<Ticket> get mapTickets => _all
+      .where((t) =>
+          t.status == TicketStatus.inProgress ||
+          t.status == TicketStatus.assigned,)
+      .toList();
 
   void _applySort(List<Ticket> list, DateTime now) {
     switch (_sort) {

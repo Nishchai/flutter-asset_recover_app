@@ -202,6 +202,7 @@
   "map.stopOf": "ನಿಲುಗಡೆ {current} / {total}",
   "map.startFullRoute": "ಪೂರ್ಣ ಮಾರ್ಗ ಪ್ರಾರಂಭಿಸಿ",
   "map.stops": "{count} ನಿಲುಗಡೆಗಳು",
+  "map.activeStops": "ಸಕ್ರಿಯ ನಿಲುಗಡೆಗಳು",
   "map.noStops": "ಈಗ ನಕ್ಷೆಯಲ್ಲಿ ಯಾವುದೇ ಸಕ್ರಿಯ ಕೆಲಸಗಳಿಲ್ಲ.",
   "map.liveLocation": "ಲೈವ್ BP ಸ್ಥಳ",
   "map.openExternalMaps": "Google Maps ನಲ್ಲಿ ತೆರೆಯಿರಿ ↗",

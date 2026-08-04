@@ -202,6 +202,7 @@
   "map.stopOf": "थांबा {current} / {total}",
   "map.startFullRoute": "संपूर्ण मार्ग सुरू करा",
   "map.stops": "{count} थांबे",
+  "map.activeStops": "सक्रिय थांबे",
   "map.noStops": "सध्या नकाशावर कोणतीही सक्रिय कामे नाहीत.",
   "map.liveLocation": "लाइव्ह BP स्थान",
   "map.openExternalMaps": "Google Maps मध्ये उघडा ↗",

@@ -10,6 +10,7 @@ import 'package:asset_recovery_app/core/services/location_service.dart';
 import 'package:asset_recovery_app/core/theme/app_theme.dart';
 import 'package:asset_recovery_app/core/utils/formatters.dart';
 import 'package:asset_recovery_app/domain/entities/battery.dart';
+import 'package:asset_recovery_app/domain/entities/enums.dart';
 import 'package:asset_recovery_app/domain/entities/geo_point.dart';
 import 'package:asset_recovery_app/domain/usecases/get_battery_detail_usecase.dart';
 import 'package:asset_recovery_app/presentation/features/ticket_detail/ticket_detail_screen.dart';
@@ -41,14 +42,33 @@ List<Battery> planRoute(List<Battery> stops, GeoPoint origin) {
   return ordered;
 }
 
+/// What a stop's row, pill and marker info-window call its ticket's status.
+/// Only Open (`assigned`) and In Progress reach the map — see
+/// [TicketProvider.mapTickets] — and an unknown/absent status renders as Open,
+/// the same way the home list treats an unrecognised one.
+String _stopStatusLabel(AppLocalizations l, TicketStatus? status) =>
+    status == TicketStatus.inProgress
+        ? l.t('filter.inProgress')
+        : l.t('filter.open');
+
+/// The colour that carries a stop's status through the panel — matched to the
+/// marker hues in [_GoogleMapViewState.build]: warning/orange for Open work not
+/// yet begun, info/azure for work already underway.
+Color _stopStatusColor(AppPalette palette, TicketStatus? status) =>
+    status == TicketStatus.inProgress ? palette.info : palette.warning;
+
 /// Map view (PRD §5.2 Map View). Renders a live `google_maps_flutter` widget
 /// with numbered markers for each stop and a polyline for the suggested
 /// route; the route sheet + navigation entries are wired to real data.
 ///
-/// In its default (list) mode this plots every **in-progress** ticket from the
-/// home list as a numbered stop, ordered nearest-first as the suggested route,
-/// with a connecting route line. The floating panel over the map lists all of
-/// those stops — scrollable, one row each — and expanding a row (the `>`)
+/// In its default (list) mode this plots every ticket from the home list that
+/// still has a drive to it — **Open** and **In Progress** alike (see
+/// [TicketProvider.mapTickets]) — as a numbered stop, ordered nearest-first as
+/// the suggested route, with a connecting route line. Each stop carries its
+/// ticket's status, both as a pill on its row and as its marker colour, so a
+/// case the agent hasn't begun is never mistaken for one already underway. The
+/// floating panel over the map lists all of those stops — scrollable, one row
+/// each — and expanding a row (the `>`)
 /// reveals that BP's id + customer name with its two actions: Start navigation
 /// and View details. "Start navigation" draws the drivable route to that BP on
 /// this same map (see [_ActiveNavigation]) rather than handing the agent off to
@@ -123,22 +143,26 @@ class _MapScreenState extends State<MapScreen> {
     final l = AppLocalizations.of(context);
     final focusBp = widget.focusBp;
 
-    // Flatten the BPs of every in-progress ticket and map each to its ticket
-    // id, then order them into a suggested route (M3-01) via nearest-neighbor
-    // chaining from the agent's current position — a real "plan", not just a
-    // radial distance sort.
+    // Flatten the BPs of every ticket still to be driven to — Open as well as
+    // In Progress — and map each to its ticket id and status, then order them
+    // into a suggested route (M3-01) via nearest-neighbor chaining from the
+    // agent's current position — a real "plan", not just a radial distance
+    // sort. Status doesn't reorder the route: geography does, and the pill on
+    // each row says which work is already underway.
     final unordered = <Battery>[];
     final ticketOf = <String, String>{};
-    for (final t in tickets.inProgressTickets) {
+    final statusOf = <String, TicketStatus>{};
+    for (final t in tickets.mapTickets) {
       for (final bp in t.batteries) {
         unordered.add(bp);
         ticketOf[bp.bpId] = t.ticketId;
+        statusOf[bp.bpId] = t.status;
       }
     }
     // The device fix is the truest "where the agent is now"; the position the
     // session last reported stands in until it lands.
     final here = _deviceLocation ?? agent.currentLocation;
-    final open = planRoute(
+    final stops = planRoute(
       unordered,
       here ??
           (unordered.isEmpty ? kBengaluruCenter : unordered.first.lastKnownLocation),
@@ -146,7 +170,7 @@ class _MapScreenState extends State<MapScreen> {
 
     // -1 (nothing expanded) travels through as-is; the map just highlights no
     // marker. Clamped so a shrinking list can't leave a stale index dangling.
-    final selectedIndex = _selected >= open.length ? -1 : _selected;
+    final selectedIndex = _selected >= stops.length ? -1 : _selected;
     final point = widget.focusLocation ?? focusBp?.lastKnownLocation;
 
     // Navigation mode replaces the stop list (or the focused-BP card) and the
@@ -163,7 +187,8 @@ class _MapScreenState extends State<MapScreen> {
             // single marker when focused on one BP's freshly-fetched location).
             Positioned.fill(
               child: _GoogleMapView(
-                open: focusBp == null ? open : const [],
+                stops: focusBp == null ? stops : const [],
+                statusOf: statusOf,
                 selectedIndex: selectedIndex,
                 onSelect: (i) => setState(() => _selected = i),
                 focusPoint: focusBp != null ? point : null,
@@ -172,12 +197,12 @@ class _MapScreenState extends State<MapScreen> {
                 navigation: nav,
               ),
             ),
-            if (focusBp == null && nav == null && open.isNotEmpty)
+            if (focusBp == null && nav == null && stops.isNotEmpty)
               Positioned(
                 top: 12,
                 left: 16,
                 right: 16,
-                child: _RouteHeader(stopCount: open.length, palette: palette),
+                child: _RouteHeader(stopCount: stops.length, palette: palette),
               ),
             if (focusBp == null && _tracking)
               Positioned(
@@ -219,13 +244,14 @@ class _MapScreenState extends State<MapScreen> {
                       ),
                     )
                   : _StopsPanel(
-                      stops: open,
+                      stops: stops,
+                      statusOf: statusOf,
                       palette: palette,
                       selectedIndex: selectedIndex,
                       liveLocations: _liveLocations,
                       loadingLocations: _loadingLocations,
                       navigatingBpId: _navigatingBpId,
-                      onToggle: (i) => _toggleStop(i, open[i]),
+                      onToggle: (i) => _toggleStop(i, stops[i]),
                       onNavigate: (bp) =>
                           _startNavigation(services, bp, agent.currentLocation),
                       onViewDetails: (bp) => Navigator.of(context).push(
@@ -496,7 +522,8 @@ class _RouteHeader extends StatelessWidget {
 /// marker (Rule 8b — freshly-fetched live location).
 class _GoogleMapView extends StatefulWidget {
   const _GoogleMapView({
-    required this.open,
+    required this.stops,
+    required this.statusOf,
     required this.selectedIndex,
     required this.onSelect,
     required this.focusPoint,
@@ -505,7 +532,11 @@ class _GoogleMapView extends StatefulWidget {
     this.navigation,
   });
 
-  final List<Battery> open;
+  final List<Battery> stops;
+
+  /// Each stop's ticket status by bpId — colours its marker so Open stops read
+  /// apart from ones already in progress.
+  final Map<String, TicketStatus> statusOf;
   final int selectedIndex;
   final ValueChanged<int> onSelect;
   final GeoPoint? focusPoint;
@@ -586,9 +617,9 @@ class _GoogleMapViewState extends State<_GoogleMapView> {
     // -1 means the panel collapsed every row; leave the camera where it is
     // rather than snapping back to the first stop.
     final i = widget.selectedIndex;
-    if (oldWidget.selectedIndex != i && i >= 0 && i < widget.open.length) {
+    if (oldWidget.selectedIndex != i && i >= 0 && i < widget.stops.length) {
       _controller?.animateCamera(
-        CameraUpdate.newLatLng(_toLatLng(widget.open[i].lastKnownLocation)),
+        CameraUpdate.newLatLng(_toLatLng(widget.stops[i].lastKnownLocation)),
       );
     }
   }
@@ -659,23 +690,34 @@ class _GoogleMapViewState extends State<_GoogleMapView> {
     final markers = <Marker>{
       if (focus != null)
         Marker(markerId: const MarkerId('focus'), position: _toLatLng(focus)),
-      for (var i = 0; i < widget.open.length; i++)
+      for (var i = 0; i < widget.stops.length; i++)
         Marker(
-          markerId: MarkerId(widget.open[i].bpId),
-          position: _toLatLng(widget.open[i].lastKnownLocation),
+          markerId: MarkerId(widget.stops[i].bpId),
+          position: _toLatLng(widget.stops[i].lastKnownLocation),
+          // Selection still wins (red), so the expanded stop stays findable;
+          // otherwise the hue is the ticket's status — orange for Open work not
+          // yet begun, azure for work already in progress.
           icon: BitmapDescriptor.defaultMarkerWithHue(
-            i == widget.selectedIndex ? BitmapDescriptor.hueRed : BitmapDescriptor.hueAzure,
+            i == widget.selectedIndex
+                ? BitmapDescriptor.hueRed
+                : widget.statusOf[widget.stops[i].bpId] == TicketStatus.assigned
+                    ? BitmapDescriptor.hueOrange
+                    : BitmapDescriptor.hueAzure,
           ),
-          infoWindow: InfoWindow(title: '${i + 1}. ${widget.open[i].bpId}'),
+          infoWindow: InfoWindow(
+            title: '${i + 1}. ${widget.stops[i].bpId}',
+            snippet: _stopStatusLabel(
+                AppLocalizations.of(context), widget.statusOf[widget.stops[i].bpId],),
+          ),
           onTap: () => widget.onSelect(i),
         ),
     };
 
     final polylines = <Polyline>{
-      if (widget.open.length > 1)
+      if (widget.stops.length > 1)
         Polyline(
           polylineId: const PolylineId('suggested_route'),
-          points: [for (final bp in widget.open) _toLatLng(bp.lastKnownLocation)],
+          points: [for (final bp in widget.stops) _toLatLng(bp.lastKnownLocation)],
           color: widget.palette.primaryDark,
           width: 3,
           patterns: [PatternItem.dash(20), PatternItem.gap(10)],
@@ -688,9 +730,9 @@ class _GoogleMapViewState extends State<_GoogleMapView> {
     final me = widget.userLocation;
     final initialTarget = focus ??
         me ??
-        (widget.open.isEmpty
+        (widget.stops.isEmpty
             ? kBengaluruCenter
-            : widget.open.first.lastKnownLocation);
+            : widget.stops.first.lastKnownLocation);
 
     return GoogleMap(
       initialCameraPosition: CameraPosition(
@@ -898,12 +940,14 @@ class _FocusedBpCard extends StatelessWidget {
   }
 }
 
-/// The panel floating over the map: every in-progress stop, scrollable, one
-/// row each. Expanding a row (its `>`) reveals that BP's id + customer name
-/// with Start navigation / View details, and highlights its marker.
+/// The panel floating over the map: every stop still to be driven to — Open and
+/// In Progress alike, each tagged with which it is — scrollable, one row each.
+/// Expanding a row (its `>`) reveals that BP's id + customer name with Start
+/// navigation / View details, and highlights its marker.
 class _StopsPanel extends StatefulWidget {
   const _StopsPanel({
     required this.stops,
+    required this.statusOf,
     required this.palette,
     required this.selectedIndex,
     required this.liveLocations,
@@ -915,6 +959,9 @@ class _StopsPanel extends StatefulWidget {
   });
 
   final List<Battery> stops;
+
+  /// Each stop's ticket status by bpId — the pill on its row.
+  final Map<String, TicketStatus> statusOf;
   final AppPalette palette;
 
   /// Index of the expanded row, or -1 when they are all collapsed.
@@ -984,7 +1031,7 @@ class _StopsPanelState extends State<_StopsPanel> {
         children: [
           Row(
             children: [
-              Text(l.t('map.inProgressStops').toUpperCase(),
+              Text(l.t('map.activeStops').toUpperCase(),
                   style: TextStyle(
                       fontSize: 11, color: palette.muted, letterSpacing: 0.5,),),
               const Spacer(),
@@ -1015,6 +1062,7 @@ class _StopsPanelState extends State<_StopsPanel> {
                 itemBuilder: (context, i) => _StopRow(
                   stopNumber: i + 1,
                   bp: widget.stops[i],
+                  status: widget.statusOf[widget.stops[i].bpId],
                   palette: palette,
                   expanded: i == widget.selectedIndex,
                   loadingLiveLocation:
@@ -1040,6 +1088,7 @@ class _StopRow extends StatelessWidget {
   const _StopRow({
     required this.stopNumber,
     required this.bp,
+    required this.status,
     required this.palette,
     required this.expanded,
     required this.loadingLiveLocation,
@@ -1052,6 +1101,11 @@ class _StopRow extends StatelessWidget {
 
   final int stopNumber;
   final Battery bp;
+
+  /// The stop's ticket status — Open or In Progress (see
+  /// [TicketProvider.mapTickets]); null when the ticket it came from is no
+  /// longer in the list, which renders as Open.
+  final TicketStatus? status;
   final AppPalette palette;
   final bool expanded;
 
@@ -1110,6 +1164,8 @@ class _StopRow extends StatelessWidget {
                       ],
                     ),
                   ),
+                  _StopStatusPill(status: status, palette: palette),
+                  const SizedBox(width: 4),
                   Icon(expanded ? Icons.expand_more : Icons.chevron_right,
                       color: expanded ? palette.primaryDark : palette.muted,),
                   const SizedBox(width: 8),
@@ -1215,6 +1271,36 @@ class _LiveLocationStatus extends StatelessWidget {
                   '${loc.lng.toStringAsFixed(5)}',
             }),
       style: style,
+    );
+  }
+}
+
+/// Whether a stop is work the agent has already started or an Open case they
+/// have yet to touch — tinted to match that stop's marker on the map
+/// ([_stopStatusColor]), so the row and the pin read as the same thing.
+class _StopStatusPill extends StatelessWidget {
+  const _StopStatusPill({required this.status, required this.palette});
+
+  final TicketStatus? status;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _stopStatusColor(palette, status);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        _stopStatusLabel(AppLocalizations.of(context), status),
+        style: TextStyle(
+          fontSize: 10.5,
+          fontWeight: FontWeight.w700,
+          color: color,
+        ),
+      ),
     );
   }
 }

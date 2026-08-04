@@ -202,6 +202,7 @@
   "map.stopOf": "స్టాప్ {current} / {total}",
   "map.startFullRoute": "పూర్తి మార్గం ప్రారంభించు",
   "map.stops": "{count} స్టాప్‌లు",
+  "map.activeStops": "యాక్టివ్ స్టాప్‌లు",
   "map.noStops": "ప్రస్తుతం మ్యాప్‌లో యాక్టివ్ జాబ్‌లు ఏవీ లేవు.",
   "map.liveLocation": "లైవ్ BP లొకేషన్",
   "map.openExternalMaps": "గూగుల్ మ్యాప్స్‌లో తెరవండి ↗",

@@ -311,7 +311,7 @@
   "pickup.failed": "Couldn't pick up that case. It may already be assigned.",
 
   "map.nearestCase": "Nearest case",
-  "map.inProgressStops": "In progress",
+  "map.activeStops": "Active stops",
   "map.startNavigation": "Start navigation",
   "map.openingNavigation": "Opening maps…",
   "map.viewDetails": "View details",
@@ -323,7 +323,7 @@
   "map.stopOf": "Stop {current} of {total}",
   "map.startFullRoute": "Start Full Route",
   "map.stops": "{count} stops",
-  "map.noStops": "No in-progress jobs on the map right now.",
+  "map.noStops": "No open or in-progress jobs on the map right now.",
 
   "profile.language": "Language",
   "profile.role": "Field Agent",
