@@ -793,7 +793,7 @@ class _AttemptTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final urls = attempt.proofUrls;
-    final type = _humanizeWireValue(attempt.attemptType);
+    final type = _attemptTypeLabel(attempt.attemptType);
     final outcome = _humanizeWireValue(attempt.outcome);
     final batteryRemark = _humanizeWireValue(attempt.batteryRemarkReason);
     final customerRemark = _humanizeWireValue(attempt.customerRemarkReason);
@@ -917,6 +917,18 @@ String _humanizeWireValue(String raw) => raw
     .where((w) => w.isNotEmpty)
     .map((w) => w[0].toUpperCase() + w.substring(1))
     .join(' ');
+
+/// The `attemptType` an attempt was recorded under, named as the ticket action
+/// the agent took — the same three labels the actions hub shows. The attempt
+/// controller sends one enum member per action (`_sectionAttempts`), so this is
+/// that mapping read back; anything else (e.g. `recovery`, or the Update Status
+/// flow's `field_visit`) falls through to the generic humanizer.
+String _attemptTypeLabel(String raw) => switch (raw) {
+      'call' => 'Call Customer',
+      'field_visit' => 'Visit BP Location',
+      'home_visit' => 'Visit Customer Address',
+      _ => _humanizeWireValue(raw),
+    };
 
 /// Filled, bold pill used for the attempt's type and outcome — the two values
 /// the history card leads with.

@@ -1130,10 +1130,10 @@ class AttemptController extends ChangeNotifier {
   /// NOTE on `attemptType`: the service enum-validates this and 422s
   /// "Invalid attemptType — Must be one of: call, field_visit, home_visit,
   /// recovery." on anything else, so these are wire values, NOT screen labels.
-  /// Both visit sections deliberately report `field_visit` — the service does
-  /// also accept `home_visit`, but keeping one value means the two sections
-  /// aren't told apart by `attemptType`; `metadata` carries the section's own
-  /// fields (e.g. `homeVisitStatus` vs `visitStatus`) if they need separating.
+  /// One member per ticket action, so the three actions are told apart by
+  /// `attemptType` alone: `call` = Call Customer, `field_visit` = Visit BP
+  /// Location, `home_visit` = Visit Customer Address. The attempt history on the
+  /// ticket detail screen maps them back to those action names for display.
   static const _sectionAttempts = <String, _SectionAttemptSpec>{
     'call': _SectionAttemptSpec(
       attemptType: 'call',
@@ -1149,7 +1149,7 @@ class AttemptController extends ChangeNotifier {
       notesField: 'locationRemark',
     ),
     'home_visit': _SectionAttemptSpec(
-      attemptType: 'field_visit',
+      attemptType: 'home_visit',
       // "Battery status at location" (homeVisitStatus).
       outcomeField: 'homeVisitStatus',
       notesField: 'customerVisitRemark',
