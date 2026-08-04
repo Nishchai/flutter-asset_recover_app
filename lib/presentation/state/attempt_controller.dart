@@ -293,8 +293,11 @@ class AttemptController extends ChangeNotifier {
       case 'lastKnownLatLong':
         return navigationTarget.display;
       case 'customerSummary':
+        // Display only — masked like every other on-screen number. The dialer
+        // and the API get their number from [customerPrimaryPhone] /
+        // [callableNumbers], which stay raw.
         final c = battery.customer;
-        return '${c.name} · ${c.mobile}';
+        return '${c.name} · ${Formatters.maskedPhone(c.mobile)}';
       case 'customerAddress':
         return customerAddressDisplay;
       default:
@@ -330,13 +333,20 @@ class AttemptController extends ChangeNotifier {
 
   /// The customer's phone as the BP detail screen's customer card shows it:
   /// the ticket detail's primary and secondary numbers, joined when both are
-  /// present, falling back to the cached masked mobile while
-  /// `GET /tickets/{UUID}` hasn't landed.
+  /// present, falling back to the cached mobile while `GET /tickets/{UUID}`
+  /// hasn't landed.
+  ///
+  /// Every number is masked, per number and BEFORE the join — a mask that
+  /// counted from the start of the joined string would leave the second number
+  /// fully readable. Display only: [customerPrimaryPhone] and
+  /// [callableNumbers] are the raw values the API and the dialer use.
   String get customerPhoneDisplay {
     final c = ticketDetail?.customer;
-    if (c == null) return battery.customer.maskedMobile();
-    final parts =
-        [c.phonePrimary, c.phoneSecondary].where((p) => p.isNotEmpty).toList();
+    if (c == null) return Formatters.maskedPhone(battery.customer.mobile);
+    final parts = [c.phonePrimary, c.phoneSecondary]
+        .where((p) => p.isNotEmpty)
+        .map(Formatters.maskedPhone)
+        .toList();
     return parts.isEmpty ? '—' : parts.join(', ');
   }
 

@@ -11,6 +11,7 @@ import 'package:asset_recovery_app/domain/usecases/update_agent_location_usecase
 import 'package:asset_recovery_app/presentation/features/home/task_list_screen.dart';
 import 'package:asset_recovery_app/presentation/features/map/map_screen.dart';
 import 'package:asset_recovery_app/presentation/features/profile/profile_screen.dart';
+import 'package:asset_recovery_app/presentation/shared/location_gate.dart';
 import 'package:asset_recovery_app/presentation/state/auth_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -47,6 +48,12 @@ class _HomeShellState extends State<HomeShell>
   /// read + PATCH on top of one a landing already started.
   bool _reportingLocation = false;
 
+  /// Set while the blocking location gate is on screen. Home is the single
+  /// enforcement point for location access, and every landing runs the check —
+  /// so this stops a resume, a pop and a tab switch from stacking three
+  /// dialogs on top of each other.
+  bool _locationGateOpen = false;
+
   @override
   void initState() {
     super.initState();
@@ -72,10 +79,11 @@ class _HomeShellState extends State<HomeShell>
       },
     )..start();
     // Landing #1: the agent just signed in / relaunched onto home. Deferred to
-    // a post-frame callback so the GPS read never runs mid-build. This first
-    // report also starts the heartbeat chain, which then re-arms itself.
+    // a post-frame callback so the permission request and GPS read never run
+    // mid-build. This first report also starts the heartbeat chain, which then
+    // re-arms itself.
     WidgetsBinding.instance
-        .addPostFrameCallback((_) => _reportAgentLocation());
+        .addPostFrameCallback((_) => unawaited(_ensureLocationThenReport()));
   }
 
   @override
@@ -88,7 +96,7 @@ class _HomeShellState extends State<HomeShell>
   /// Landing #2: a screen pushed on top of home (ticket detail, actions hub,
   /// map, scanner…) has popped and home is in front again.
   @override
-  void didPopNext() => _reportAgentLocation();
+  void didPopNext() => unawaited(_ensureLocationThenReport());
 
   /// Landing #4 / heartbeat: the app came back to the foreground. Dispatch may
   /// have been stale for however long it sat in the background, so report at
@@ -97,11 +105,35 @@ class _HomeShellState extends State<HomeShell>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      unawaited(_reportAgentLocation());
+      unawaited(_ensureLocationThenReport());
     } else {
       _locationTimer?.cancel();
       _locationTimer = null;
     }
+  }
+
+  /// Every landing on home goes through here: hold the app until location is
+  /// usable, then report. Home is the only place that enforces this, so the
+  /// gate has to run on all four landings — sign-in/relaunch, a pushed screen
+  /// popping, a tab switch back, and a foreground resume — or an agent who
+  /// switches location off mid-shift keeps working without coordinates until
+  /// the next cold start.
+  ///
+  /// The report is deliberately *after* the gate: with location off there is no
+  /// fix to send, and the heartbeat this call arms would only be spinning up a
+  /// GPS read every few minutes to throw the result away.
+  Future<void> _ensureLocationThenReport() async {
+    // The gate is already up and owns the retry loop; a second landing while
+    // it's showing has nothing to add. It re-reports once it closes.
+    if (_locationGateOpen || !mounted) return;
+    _locationGateOpen = true;
+    try {
+      await enforceLocationAccess(context);
+    } finally {
+      _locationGateOpen = false;
+    }
+    if (!mounted) return;
+    await _reportAgentLocation();
   }
 
   /// Reports where the device is to `PATCH /agents/location`. Fire-and-forget:
@@ -195,7 +227,7 @@ class _HomeShellState extends State<HomeShell>
             // Landing #3: back on the tasks tab from Map/Profile. The tabs
             // live in an IndexedStack, so TaskListScreen is never rebuilt and
             // nothing else would notice the agent returned to home.
-            if (i == _tasksTabIndex) unawaited(_reportAgentLocation());
+            if (i == _tasksTabIndex) unawaited(_ensureLocationThenReport());
           },
           destinations: [
             for (final item in navItems)

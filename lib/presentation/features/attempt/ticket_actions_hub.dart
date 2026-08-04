@@ -14,7 +14,6 @@ import 'package:asset_recovery_app/domain/usecases/get_live_location_usecase.dar
 import 'package:asset_recovery_app/domain/usecases/submit_attempt_record_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/update_customer_details_usecase.dart';
 import 'package:asset_recovery_app/presentation/features/attempt/attempt_section_screen.dart';
-import 'package:asset_recovery_app/presentation/shared/location_access_prompt.dart';
 import 'package:asset_recovery_app/presentation/shared/mark_ticket_in_progress.dart';
 import 'package:asset_recovery_app/presentation/state/attempt_controller.dart';
 import 'package:asset_recovery_app/presentation/state/auth_provider.dart';
@@ -65,16 +64,12 @@ class TicketActionsHub extends StatefulWidget {
   State<TicketActionsHub> createState() => _TicketActionsHubState();
 }
 
+/// No location dialog here any more: reaching this screen already means the
+/// agent passed [enforceLocationAccess] at home, so a prompt on top of the
+/// actions hub would be a second ask for something already granted.
+/// [AttemptController.locationReadiness] is still resolved by `init` — the
+/// sections use it to decide what they can capture.
 class _TicketActionsHubState extends State<TicketActionsHub> {
-  /// Offers the OS settings screen when [AttemptController.init]'s permission
-  /// request came back permanently refused, or with device location switched
-  /// off. Driven off the readiness the controller already resolved, so the
-  /// dialog can only appear once the system prompt is out of the way.
-  Future<void> _promptIfLocationBlocked(AttemptController controller) async {
-    if (!mounted) return;
-    await promptForLocationAccess(context, controller.locationReadiness);
-  }
-
   @override
   Widget build(BuildContext context) {
     final services = context.read<AppServices>();
@@ -108,7 +103,7 @@ class _TicketActionsHubState extends State<TicketActionsHub> {
           syncQueue: services.syncQueue,
           simCall: services.simCall,
         );
-        unawaited(c.init().then((_) => _promptIfLocationBlocked(c)));
+        unawaited(c.init());
         return c;
       },
       child: const _HubBody(),

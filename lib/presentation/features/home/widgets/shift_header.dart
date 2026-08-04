@@ -12,17 +12,23 @@ class ShiftHeader extends StatelessWidget {
     required this.palette,
     required this.shiftActive,
     required this.assigned,
-    required this.inProgress,
-    required this.pending,
+    required this.inProgressOrOpen,
+    required this.closed,
     required this.onToggleShift,
   });
 
   final Agent agent;
   final AppPalette palette;
   final bool shiftActive;
+
+  /// Total tickets assigned to the agent, any status.
   final int assigned;
-  final int inProgress;
-  final int pending;
+
+  /// Tickets still live — In Progress plus Open (wire status `assigned`).
+  final int inProgressOrOpen;
+
+  /// Tickets the coordinator has closed.
+  final int closed;
   final ValueChanged<bool> onToggleShift;
 
   String _greetingKey() {
@@ -137,9 +143,9 @@ class ShiftHeader extends StatelessWidget {
                 children: [
                   _stat(l.t('stats.assigned'), assigned, highlight: true),
                   const SizedBox(width: 10),
-                  _stat(l.t('stats.inProgress'), inProgress),
+                  _stat(l.t('stats.inProgressOpen'), inProgressOrOpen),
                   const SizedBox(width: 10),
-                  _stat(l.t('stats.pending'), pending),
+                  _stat(l.t('stats.closed'), closed),
                 ],
               ),
             ],
@@ -168,8 +174,19 @@ class ShiftHeader extends StatelessWidget {
                   color: highlight ? palette.primary : palette.onDark,
                 ),),
             const SizedBox(height: 2),
-            Text(label,
-                style: TextStyle(fontSize: 10.5, color: palette.mutedDark),),
+            // The label must stay on ONE line — the three cards share a row, so
+            // a label that wraps ("PROGRESS/OPEN" is the tightest fit) would
+            // make its card taller than the other two. Scaled down to fit
+            // rather than wrapped or ellipsised, so it stays fully readable on
+            // narrow screens and in the longer translations.
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(label,
+                  maxLines: 1,
+                  softWrap: false,
+                  style: TextStyle(fontSize: 10.5, color: palette.mutedDark),),
+            ),
           ],
         ),
       ),

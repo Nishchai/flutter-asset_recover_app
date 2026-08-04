@@ -18,7 +18,7 @@ import 'package:asset_recovery_app/domain/usecases/ticket_pickup_usecase.dart';
 import 'package:flutter/foundation.dart';
 
 /// Home tabs (item 1): All Tasks (every ticket the API returned, any status) /
-/// In Progress (at least one action taken, including outcomes still awaiting AC
+/// In Progress/Open (anything not finished — Open, started, or awaiting AC
 /// approval) / Completed (closed or unrecoverable).
 enum TicketFilter { allTasks, inProgress, completed }
 
@@ -293,10 +293,12 @@ class TicketProvider extends ChangeNotifier {
           // status — the In Progress / Completed tabs are the narrowed views.
           return true;
         case TicketFilter.inProgress:
-          // Any BP with at least one action taken but not yet closed —
-          // includes outcomes (Recovered / FIR-Lost) still awaiting AC
-          // approval, since the Field Agent never closes a ticket directly.
+          // Everything still to finish: Open (wire status `assigned` — nothing
+          // done on it yet), started work, and outcomes (Recovered / FIR-Lost)
+          // still awaiting AC approval, since the Field Agent never closes a
+          // ticket directly.
           return t.status == TicketStatus.inProgress ||
+              t.status == TicketStatus.assigned ||
               t.status == TicketStatus.pending;
         case TicketFilter.completed:
           return t.status == TicketStatus.closed ||
@@ -360,12 +362,26 @@ class TicketProvider extends ChangeNotifier {
   // Derived live from `_all` (not the one-shot `_stats` snapshot) so the
   // header recounts on every notifyListeners() — e.g. right after
   // submitAttempt() changes a ticket's status.
-  int get assignedCount =>
-      _all.where((t) => t.status == TicketStatus.assigned).length;
-  int get inProgressCount =>
-      _all.where((t) => t.status == TicketStatus.inProgress).length;
-  int get pendingCount =>
-      _all.where((t) => t.status == TicketStatus.pending).length;
+
+  /// Header card 1 (ASSIGNED): every ticket the API returned for this agent,
+  /// whatever its status — the agent's whole workload, not just the untouched
+  /// ones.
+  int get totalCount => _all.length;
+
+  /// Header card 2 (IN PROGRESS/OPEN): work that is live. `assigned` is the
+  /// wire status for an Open ticket (nothing done on it yet), so both count as
+  /// still-to-finish.
+  int get inProgressOrOpenCount => _all
+      .where((t) =>
+          t.status == TicketStatus.inProgress ||
+          t.status == TicketStatus.assigned,)
+      .length;
+
+  /// Header card 3 (CLOSED): tickets the coordinator has closed. Deliberately
+  /// excludes `unrecoverable` — that is a separate terminal status, not a
+  /// closure.
+  int get closedCount =>
+      _all.where((t) => t.status == TicketStatus.closed).length;
 
   /// Recomputes road distance from the agent to every BP (PRD §4.8).
   ///

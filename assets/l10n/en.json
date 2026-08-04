@@ -60,13 +60,14 @@
   "endShift.contactSupport": "Contact Support",
 
   "stats.assigned": "ASSIGNED",
-  "stats.inProgress": "IN PROGRESS",
-  "stats.pending": "PENDING",
+  "stats.inProgressOpen": "PROGRESS/OPEN",
+  "stats.closed": "CLOSED",
 
   "filter.all": "All",
   "filter.allTasks": "All Tasks",
   "filter.open": "Open",
   "filter.inProgress": "In Progress",
+  "filter.inProgressOpen": "In Progress/Open",
   "filter.pending": "Pending",
   "filter.completed": "Completed",
 
@@ -230,7 +231,10 @@
   "location.accessNeeded": "Location access needed",
   "location.permissionBlocked": "Location permission is blocked for this app, so your arrival, route and photo locations can't be recorded. Allow location in settings to continue.",
   "location.servicesOff": "Location is switched off on this device, so your arrival, route and photo locations can't be recorded. Turn on location to continue.",
+  "location.permissionNeeded": "This app needs location access to record your arrival, route and photo locations. Tap Retry and allow location when the device asks.",
+  "location.unavailable": "Location can't be read on this device, so your arrival, route and photo locations can't be recorded.",
   "location.openSettings": "Open settings",
+  "location.retry": "Retry",
   "location.notNow": "Not now",
 
   "opt.call.connected": "Connected",
