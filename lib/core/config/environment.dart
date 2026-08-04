@@ -27,11 +27,11 @@ class EnvironmentConfig {
   final int apiTimeoutSeconds;
   final String mapsApiKey;
 
-  /// Base URL of the backend live battery-tracking web page, opened in an
-  /// in-app WebView from the BP detail map icon. The page tracks a BP's live
-  /// position by id; the app appends `batteryId`, `lat` and `lng` query params
-  /// and attaches the Bearer token to the initial request. Empty disables the
-  /// feature (the map icon falls back to the internal map route).
+  /// Base URL of the backend live battery-tracking web page. No longer opened
+  /// by the app — the BP detail map icon shows the in-app map ([MapScreen])
+  /// centred on the BP's coordinates from `battery.getBatteryDetails` instead.
+  /// Kept so the environment files keep parsing and the page stays reachable if
+  /// it is ever wired back in.
   final String batteryTrackingUrl;
 
   final String callRecordingProvider;

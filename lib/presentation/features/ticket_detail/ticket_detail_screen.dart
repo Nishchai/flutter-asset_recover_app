@@ -16,7 +16,6 @@ import 'package:asset_recovery_app/domain/usecases/get_battery_detail_usecase.da
 import 'package:asset_recovery_app/domain/usecases/get_ticket_full_detail_usecase.dart';
 import 'package:asset_recovery_app/presentation/features/attempt/ticket_actions_hub.dart';
 import 'package:asset_recovery_app/presentation/features/map/map_screen.dart';
-import 'package:asset_recovery_app/presentation/features/tracking/battery_tracking_screen.dart';
 import 'package:asset_recovery_app/presentation/shared/mark_ticket_in_progress.dart';
 import 'package:asset_recovery_app/presentation/shared/widgets/info_chip.dart';
 import 'package:asset_recovery_app/presentation/shared/widgets/photo_gallery_viewer.dart';
@@ -97,8 +96,8 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     final isClosed = ticket.status == TicketStatus.closed ||
         ticket.status == TicketStatus.unrecoverable;
 
-    // Coordinates behind the customer card's "Last Seen" — passed to the live
-    // tracking page opened from the header map icon so both show the same spot.
+    // Coordinates behind the customer card's "Last Seen" — passed to the map
+    // opened from the header map icon so both show the same spot.
     final lastSeen = resolveLastSeenPoint(bp, _detail, _batteryDetail);
 
     return Scaffold(
@@ -156,8 +155,8 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
 /// following the SAME source precedence as `_CustomerCard._lastSeen`: battery
 /// telemetry lat/lng → ticket-detail customer `geoLocation` (parsed from its
 /// normalised "lat, lng" string) → the base battery's last-known location. The
-/// live tracking page (`BatteryTrackingScreen`) is fed this so its map centres
-/// on exactly what the card shows.
+/// header map icon feeds this to [MapScreen] as its `focusLocation` so the map
+/// centres on exactly what the card shows.
 GeoPoint resolveLastSeenPoint(
   Battery bp,
   TicketDetail? detail,
@@ -229,22 +228,16 @@ class _Header extends StatelessWidget {
                   ),
                   const Spacer(),
                   InkWell(
-                    onTap: () {
-                      // Live tracking page (backend WebView) when configured;
-                      // otherwise fall back to the internal route map.
-                      final trackingUrl = context
-                          .read<AppServices>()
-                          .config
-                          .env
-                          .batteryTrackingUrl;
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => trackingUrl.isNotEmpty
-                              ? BatteryTrackingScreen(bp: bp, location: lastSeen)
-                              : MapScreen(focusBp: bp),
-                        ),
-                      );
-                    },
+                    // The app's own map (same widget the Map tab and the
+                    // attempt screen use), focused on this one BP at the
+                    // coordinates the Battery Master lookup on this screen
+                    // returned — no backend tracking web page.
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) =>
+                            MapScreen(focusBp: bp, focusLocation: lastSeen),
+                      ),
+                    ),
                     child: Icon(Icons.map_outlined, color: palette.onDark),
                   ),
                 ],

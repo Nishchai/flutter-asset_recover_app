@@ -56,7 +56,11 @@ List<Battery> planRoute(List<Battery> stops, GeoPoint origin) {
 /// navigation card.
 ///
 /// Pass [focusBp] (Rule 8b) to open straight onto one BP's location instead —
-/// e.g. from "Visit BP Location" using its freshly-fetched live coordinates.
+/// e.g. from "Visit BP Location", or from the BP detail header's map icon,
+/// using the coordinates the Battery Master lookup on that screen already
+/// returned ([focusLocation]). That single-BP view gets the same in-app
+/// navigation as a stop in the list: "Start navigation" draws the drivable
+/// route to it on this map, with the Maps-app hand-off as the secondary way out.
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key, this.focusBp, this.focusLocation});
 
@@ -145,9 +149,9 @@ class _MapScreenState extends State<MapScreen> {
     final selectedIndex = _selected >= open.length ? -1 : _selected;
     final point = widget.focusLocation ?? focusBp?.lastKnownLocation;
 
-    // Navigation mode replaces the stop list and the route header with the
-    // single leg being driven — it never applies to the focused-BP view.
-    final nav = focusBp == null ? _navigation : null;
+    // Navigation mode replaces the stop list (or the focused-BP card) and the
+    // route header with the single leg being driven.
+    final nav = _navigation;
 
     return Scaffold(
       appBar: focusBp != null ? AppBar(title: Text(AppLocalizations.of(context).t('map.title'))) : null,
@@ -190,15 +194,29 @@ class _MapScreenState extends State<MapScreen> {
               left: 12,
               right: 12,
               bottom: 12,
-              child: focusBp != null
-                  ? _FocusedBpCard(bp: focusBp, point: point, palette: palette)
-                  : nav != null
+              child: nav != null
                   ? _NavigationCard(
                       navigation: nav,
                       palette: palette,
                       onOpenExternal: () =>
                           _openExternalDirections(nav.destination, nav.origin),
                       onEnd: () => setState(() => _navigation = null),
+                    )
+                  : focusBp != null
+                  ? _FocusedBpCard(
+                      bp: focusBp,
+                      point: point,
+                      palette: palette,
+                      navigating: _navigatingBpId == focusBp.bpId,
+                      // The screen was opened with this BP's coordinates
+                      // already resolved, so route straight to them instead of
+                      // repeating the Battery Master lookup.
+                      onNavigate: () => _startNavigation(
+                        services,
+                        focusBp,
+                        agent.currentLocation,
+                        destination: point,
+                      ),
                     )
                   : _StopsPanel(
                       stops: open,
@@ -263,10 +281,14 @@ class _MapScreenState extends State<MapScreen> {
     });
   }
 
-  /// "Start navigation" on an expanded stop: draws the drivable route from the
-  /// agent's current position to the BP's live coordinates (falling back to its
-  /// last known location when the Battery Master API had none) on this screen's
-  /// own map — no hand-off to the external Maps app.
+  /// "Start navigation" on an expanded stop (or on the focused-BP card): draws
+  /// the drivable route from the agent's current position to the BP's live
+  /// coordinates (falling back to its last known location when the Battery
+  /// Master API had none) on this screen's own map — no hand-off to the external
+  /// Maps app.
+  ///
+  /// [destination] overrides where to route to — passed by the focused-BP view,
+  /// which was handed coordinates its caller had already fetched.
   ///
   /// The origin is a fresh device fix, falling back to the position the session
   /// last reported. With neither there is nothing to route *from*, so this
@@ -276,11 +298,16 @@ class _MapScreenState extends State<MapScreen> {
   /// A device fix plus a Directions round-trip takes long enough to look
   /// unresponsive, so [_navigatingBpId] spins the button until the route lands.
   Future<void> _startNavigation(
-      AppServices services, Battery bp, GeoPoint? sessionLocation,) async {
+    AppServices services,
+    Battery bp,
+    GeoPoint? sessionLocation, {
+    GeoPoint? destination,
+  }) async {
     if (_navigatingBpId != null) return;
     setState(() => _navigatingBpId = bp.bpId);
     try {
-      final to = _liveLocations[bp.bpId] ?? bp.lastKnownLocation;
+      final to =
+          destination ?? _liveLocations[bp.bpId] ?? bp.lastKnownLocation;
       final fix = await services.location.currentLocation();
       final from = fix.hasFix ? fix : sessionLocation;
       if (from == null || !from.hasFix) {
@@ -780,16 +807,25 @@ class _NavigationCard extends StatelessWidget {
 }
 
 /// The card shown when the map is focused on a single BP (Rule 8b) — its
-/// freshly-fetched live location, with a hand-off to the device's Maps app.
+/// freshly-fetched live location, with the same two actions a stop in the list
+/// gets: draw the drivable route to it on this map, or hand the leg to the
+/// device's Maps app.
 class _FocusedBpCard extends StatelessWidget {
   const _FocusedBpCard({
     required this.bp,
     required this.palette,
+    required this.navigating,
+    required this.onNavigate,
     this.point,
   });
   final Battery bp;
   final GeoPoint? point;
   final AppPalette palette;
+
+  /// True while this BP's route is being resolved (device fix + Directions
+  /// lookup) — spins the button so the tap isn't repeated.
+  final bool navigating;
+  final VoidCallback onNavigate;
 
   @override
   Widget build(BuildContext context) {
@@ -822,6 +858,27 @@ class _FocusedBpCard extends StatelessWidget {
             style: TextStyle(color: palette.muted),
           ),
           const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: navigating ? null : onNavigate,
+              icon: navigating
+                  ? SizedBox(
+                      width: 14,
+                      height: 14,
+                      // Explicit colour: the button is disabled while it spins,
+                      // and the theme's accent would wash out against the
+                      // disabled fill.
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: palette.onSurface,),
+                    )
+                  : const Icon(Icons.navigation, size: 16),
+              label: Text(navigating
+                  ? l.t('map.openingNavigation')
+                  : l.t('map.startNavigation'),),
+            ),
+          ),
+          const SizedBox(height: 8),
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(

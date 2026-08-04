@@ -38,11 +38,6 @@ dependencies:
   # needs a Google Maps API key; this is the fallback external-intent path).
   url_launcher: ^6.3.0
 
-  # In-app WebView — hosts the backend live battery-tracking page
-  # (env.batteryTrackingUrl) opened from the BP detail map icon. The app's
-  # Bearer token is attached to the initial request. See BatteryTrackingScreen.
-  webview_flutter: ^4.7.0
-
   # Real device camera for proof capture (Rule 9) — opens the phone's camera
   # app and returns the captured photo.
   image_picker: ^1.1.2
