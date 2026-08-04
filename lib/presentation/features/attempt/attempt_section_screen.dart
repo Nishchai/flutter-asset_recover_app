@@ -121,8 +121,11 @@ class _AttemptSectionScreenState extends State<AttemptSectionScreen>
     final l = AppLocalizations.of(context);
 
     if (widget.isOutcome) {
-      // The outcome is only recorded against a battery the agent has physically
+      // A recovery is only recorded against a battery the agent has physically
       // verified, so the scan runs here — between the form and the attempts API.
+      // Every other outcome (FIR, Not Found / Refused, Customer Not
+      // Cooperating) has no battery in hand to scan, so it submits straight
+      // from the form.
       //
       // Validate first: an incomplete form would be rejected by submitOutcome
       // anyway, and there is no point sending the agent to the scanner only to
@@ -134,15 +137,17 @@ class _AttemptSectionScreenState extends State<AttemptSectionScreen>
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(invalid)));
         return;
       }
-      final verified = await Navigator.of(context).push<bool>(
-        MaterialPageRoute<bool>(
-          builder: (_) => QrScanScreen(
-            battery: controller.battery,
-            ticketId: controller.ticketId,
+      if (controller.requiresBatteryScan) {
+        final verified = await Navigator.of(context).push<bool>(
+          MaterialPageRoute<bool>(
+            builder: (_) => QrScanScreen(
+              battery: controller.battery,
+              ticketId: controller.ticketId,
+            ),
           ),
-        ),
-      );
-      if (!context.mounted || verified != true) return;
+        );
+        if (!context.mounted || verified != true) return;
+      }
 
       final tickets = context.read<TicketProvider>();
       final error = await controller.submitOutcome(tickets, l.t);
@@ -259,7 +264,11 @@ class _AttemptSectionScreenState extends State<AttemptSectionScreen>
                           )
                         : Text(
                             widget.isOutcome
-                                ? l.t('wizard.scanAndSubmit')
+                                // The scan is part of submitting only when the
+                                // outcome needs it, so the CTA says so only then.
+                                ? l.t(controller.requiresBatteryScan
+                                    ? 'wizard.scanAndSubmit'
+                                    : 'wizard.submit',)
                                 : l.t('section.save'),
                             textAlign: TextAlign.center,
                           ),

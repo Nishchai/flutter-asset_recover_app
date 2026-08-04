@@ -1,6 +1,8 @@
 /// Ticket lifecycle status. Mirrors PRD §4.2 Recovery Lifecycle and the Figma
 /// home filters (Open / In Progress / Pending). `pending` = awaiting coordinator
-/// approval (e.g. FIR / physical-recovery validation).
+/// approval (e.g. FIR / physical-recovery validation) — the backend's
+/// `pending_verification` is the same state and maps here, NOT onto [assigned]
+/// (which renders as "Open").
 enum TicketStatus {
   assigned,
   inProgress,
@@ -8,11 +10,17 @@ enum TicketStatus {
   closed,
   unrecoverable;
 
+  /// Maps a wire status onto the enum. Case- and separator-insensitive: the
+  /// backend uses camelCase in places (`inProgress`, `pendingVerification`) and
+  /// snake_case in others (`in_progress`, `pending_verification`), and an
+  /// unrecognised spelling falls through to [assigned] — i.e. renders as
+  /// "Open" — which is worse than any near-miss this normalisation allows.
   static TicketStatus fromString(String? v) {
-    switch (v) {
-      case 'in_progress':
+    switch (_normalize(v)) {
+      case 'inprogress':
         return TicketStatus.inProgress;
       case 'pending':
+      case 'pendingverification':
         return TicketStatus.pending;
       case 'closed':
         return TicketStatus.closed;
@@ -23,6 +31,11 @@ enum TicketStatus {
         return TicketStatus.assigned;
     }
   }
+
+  /// Lower-cases and strips `_`/`-`/spaces, so every spelling of a status
+  /// collapses onto one key (`pending_verification` == `pendingVerification`).
+  static String _normalize(String? v) =>
+      (v ?? '').toLowerCase().replaceAll(RegExp(r'[_\-\s]'), '');
 
   String get wire => switch (this) {
         TicketStatus.assigned => 'assigned',

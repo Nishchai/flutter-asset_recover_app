@@ -60,15 +60,16 @@
   "endShift.contactSupport": "Contact Support",
 
   "stats.assigned": "ASSIGNED",
-  "stats.inProgressOpen": "PROGRESS/OPEN",
-  "stats.closed": "CLOSED",
+  "stats.inProgress": "PROGRESS",
+  "stats.pending": "PENDING",
 
   "filter.all": "All",
   "filter.allTasks": "All Tasks",
   "filter.open": "Open",
   "filter.inProgress": "In Progress",
-  "filter.inProgressOpen": "In Progress/Open",
+  "filter.inProgressPending": "In Progress/Pending",
   "filter.pending": "Pending",
+  "filter.pendingVerification": "Pending Verification",
   "filter.completed": "Completed",
 
   "sort.title": "Sort tickets by",

@@ -18,8 +18,8 @@ import 'package:asset_recovery_app/domain/usecases/ticket_pickup_usecase.dart';
 import 'package:flutter/foundation.dart';
 
 /// Home tabs (item 1): All Tasks (every ticket the API returned, any status) /
-/// In Progress/Open (anything not finished — Open, started, or awaiting AC
-/// approval) / Completed (closed or unrecoverable).
+/// In Progress/Pending (anything not finished — Open, started, or pending
+/// verification) / Completed (closed or unrecoverable).
 enum TicketFilter { allTasks, inProgress, completed }
 
 /// Presentation state for the ticket list. Talks to the domain exclusively
@@ -368,20 +368,17 @@ class TicketProvider extends ChangeNotifier {
   /// ones.
   int get totalCount => _all.length;
 
-  /// Header card 2 (IN PROGRESS/OPEN): work that is live. `assigned` is the
-  /// wire status for an Open ticket (nothing done on it yet), so both count as
-  /// still-to-finish.
-  int get inProgressOrOpenCount => _all
-      .where((t) =>
-          t.status == TicketStatus.inProgress ||
-          t.status == TicketStatus.assigned,)
-      .length;
+  /// Header card 2 (PROGRESS): strictly the tickets the agent has started —
+  /// wire status `in_progress`. Open work (`assigned`) is deliberately excluded;
+  /// it is counted by [totalCount] and listed under the In Progress/Pending tab.
+  int get inProgressCount =>
+      _all.where((t) => t.status == TicketStatus.inProgress).length;
 
-  /// Header card 3 (CLOSED): tickets the coordinator has closed. Deliberately
-  /// excludes `unrecoverable` — that is a separate terminal status, not a
-  /// closure.
-  int get closedCount =>
-      _all.where((t) => t.status == TicketStatus.closed).length;
+  /// Header card 3 (PENDING): tickets sitting with the coordinator for
+  /// verification — the backend's `pending_verification`, which
+  /// [TicketStatus.fromString] maps onto [TicketStatus.pending].
+  int get pendingCount =>
+      _all.where((t) => t.status == TicketStatus.pending).length;
 
   /// Recomputes road distance from the agent to every BP (PRD §4.8).
   ///

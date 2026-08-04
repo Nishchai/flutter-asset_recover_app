@@ -122,8 +122,11 @@ class TicketCard extends StatelessWidget {
         return l.t('filter.open');
       case TicketStatus.inProgress:
         return l.t('filter.inProgress');
+      // `pending` covers the backend's `pending_verification` — shown verbatim
+      // rather than as a bare "Pending" so the agent can tell it apart from
+      // work they have yet to start.
       case TicketStatus.pending:
-        return l.t('filter.pending');
+        return l.t('filter.pendingVerification');
       case TicketStatus.closed:
       case TicketStatus.unrecoverable:
         return l.t('detail.closedIn');

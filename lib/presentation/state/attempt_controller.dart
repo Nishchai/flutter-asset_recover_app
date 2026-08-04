@@ -969,6 +969,15 @@ class AttemptController extends ChangeNotifier {
     return opt?.boolExtra('requiresApproval') ?? false;
   }
 
+  /// Whether the outcome has to be backed by a battery QR scan before it is
+  /// submitted. Only a recovery hands a physical battery over, so that is the
+  /// one outcome carrying `requiresScan` in `dropdowns.json`; every other
+  /// outcome submits the attempt straight from the form.
+  bool get requiresBatteryScan {
+    final opt = _config.optionByValue('outcome', selectedOutcome);
+    return opt?.boolExtra('requiresScan') ?? false;
+  }
+
   String _buildRemark() {
     final parts = <String>[];
     final calling = (_values['callingRemark'] as String?)?.trim();

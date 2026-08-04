@@ -12,8 +12,8 @@ class ShiftHeader extends StatelessWidget {
     required this.palette,
     required this.shiftActive,
     required this.assigned,
-    required this.inProgressOrOpen,
-    required this.closed,
+    required this.inProgress,
+    required this.pending,
     required this.onToggleShift,
   });
 
@@ -24,11 +24,12 @@ class ShiftHeader extends StatelessWidget {
   /// Total tickets assigned to the agent, any status.
   final int assigned;
 
-  /// Tickets still live — In Progress plus Open (wire status `assigned`).
-  final int inProgressOrOpen;
+  /// Tickets the agent has started — wire status `in_progress` only.
+  final int inProgress;
 
-  /// Tickets the coordinator has closed.
-  final int closed;
+  /// Tickets awaiting coordinator verification — wire status
+  /// `pending_verification`.
+  final int pending;
   final ValueChanged<bool> onToggleShift;
 
   String _greetingKey() {
@@ -143,9 +144,9 @@ class ShiftHeader extends StatelessWidget {
                 children: [
                   _stat(l.t('stats.assigned'), assigned, highlight: true),
                   const SizedBox(width: 10),
-                  _stat(l.t('stats.inProgressOpen'), inProgressOrOpen),
+                  _stat(l.t('stats.inProgress'), inProgress),
                   const SizedBox(width: 10),
-                  _stat(l.t('stats.closed'), closed),
+                  _stat(l.t('stats.pending'), pending),
                 ],
               ),
             ],
@@ -175,8 +176,8 @@ class ShiftHeader extends StatelessWidget {
                 ),),
             const SizedBox(height: 2),
             // The label must stay on ONE line — the three cards share a row, so
-            // a label that wraps ("PROGRESS/OPEN" is the tightest fit) would
-            // make its card taller than the other two. Scaled down to fit
+            // a label that wraps would make its card taller than the other two
+            // (the longer translations are the tightest fit). Scaled down to fit
             // rather than wrapped or ellipsised, so it stays fully readable on
             // narrow screens and in the longer translations.
             FittedBox(

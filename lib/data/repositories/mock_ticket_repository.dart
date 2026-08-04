@@ -582,13 +582,11 @@ class MockTicketRepository implements TicketRepository {
 
   @override
   Future<void> updateTicketStatus(String ticketId, String status) async {
-    // The wire vocabulary is camelCase ("inProgress") while [TicketStatus]
-    // parses snake_case, so fold the case before mapping onto the local model.
-    final normalized = status.replaceAllMapped(
-        RegExp('[A-Z]'), (m) => '_${m[0]!.toLowerCase()}',);
+    // The wire vocabulary is camelCase ("inProgress") in places and snake_case
+    // in others; [TicketStatus.fromString] normalises both, so pass it through.
     for (final t in _tickets) {
       if (t.ticketId == ticketId || t.caseId == ticketId) {
-        t.status = TicketStatus.fromString(normalized);
+        t.status = TicketStatus.fromString(status);
       }
     }
     return _delayed(null);
