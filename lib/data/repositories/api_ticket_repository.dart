@@ -3,6 +3,7 @@ import 'dart:developer' as developer;
 import 'package:asset_recovery_app/core/services/api_client.dart';
 import 'package:asset_recovery_app/data/datasources/gupshup_otp_datasource.dart';
 import 'package:asset_recovery_app/domain/entities/agent.dart';
+import 'package:asset_recovery_app/domain/entities/agent_route.dart';
 import 'package:asset_recovery_app/domain/entities/attempt.dart';
 import 'package:asset_recovery_app/domain/entities/attempt_submission.dart';
 import 'package:asset_recovery_app/domain/entities/battery.dart';
@@ -230,6 +231,14 @@ class ApiTicketRepository implements TicketRepository {
       'inProgress': (res['inProgress'] as num?)?.toInt() ?? 0,
       'pending': (res['pending'] as num?)?.toInt() ?? 0,
     };
+  }
+
+  @override
+  Future<AgentRoute> agentRoute(String agentId) async {
+    final res = await _api.call('agent.route', pathParams: {'agentId': agentId});
+    _logResponse('agent.route', res);
+    if (res is! Map<String, dynamic>) return AgentRoute.empty;
+    return AgentRoute.fromJson(res);
   }
 
   @override

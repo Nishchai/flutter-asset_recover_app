@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:asset_recovery_app/domain/entities/agent.dart';
+import 'package:asset_recovery_app/domain/entities/agent_route.dart';
 import 'package:asset_recovery_app/domain/entities/attempt.dart';
 import 'package:asset_recovery_app/domain/entities/attempt_submission.dart';
 import 'package:asset_recovery_app/domain/entities/battery.dart';
@@ -450,6 +451,48 @@ class MockTicketRepository implements TicketRepository {
       // Aggregate counts shown on the home header. In production these come from
       // the backend; the detailed list above is the (paginated) working set.
       _delayed(const {'assigned': 27, 'inProgress': 16, 'pending': 11});
+
+  /// Stands in for the backend's route planner: takes the tickets still to be
+  /// driven to, chains them nearest-neighbour from [_base], and reports the
+  /// resulting order with haversine leg distances — the same shape
+  /// `GET /agents/{agentId}/route` returns.
+  @override
+  Future<AgentRoute> agentRoute(String agentId) {
+    final remaining = _tickets
+        .where((t) =>
+            t.status == TicketStatus.assigned ||
+            t.status == TicketStatus.inProgress,)
+        .toList();
+    final stops = <RouteStop>[];
+    var from = _base;
+    var total = 0.0;
+    while (remaining.isNotEmpty) {
+      remaining.sort((a, b) => from
+          .haversineMeters(a.primaryBp.lastKnownLocation)
+          .compareTo(from.haversineMeters(b.primaryBp.lastKnownLocation)),);
+      final next = remaining.removeAt(0);
+      final at = next.primaryBp.lastKnownLocation;
+      final legKm =
+          double.parse((from.haversineMeters(at) / 1000 * 1.35).toStringAsFixed(2));
+      total += legKm;
+      stops.add(RouteStop(
+        ticketId: next.caseId.isNotEmpty ? next.caseId : next.ticketId,
+        ticketNumber: next.ticketId,
+        customerName: next.primaryBp.customer.name,
+        sequence: stops.length + 1,
+        lat: at.lat,
+        lng: at.lng,
+        legDistanceKm: legKm,
+      ),);
+      from = at;
+    }
+    return _delayed(AgentRoute(
+      agentId: agentId,
+      agentName: _agent.name,
+      stops: stops,
+      totalDistanceKm: double.parse(total.toStringAsFixed(2)),
+    ),);
+  }
 
   @override
   Future<Ticket> ticketDetail(String ticketId) =>

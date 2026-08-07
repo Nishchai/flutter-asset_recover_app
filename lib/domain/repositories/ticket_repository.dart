@@ -1,4 +1,5 @@
 import 'package:asset_recovery_app/domain/entities/agent.dart';
+import 'package:asset_recovery_app/domain/entities/agent_route.dart';
 import 'package:asset_recovery_app/domain/entities/attempt.dart';
 import 'package:asset_recovery_app/domain/entities/attempt_submission.dart';
 import 'package:asset_recovery_app/domain/entities/battery_detail.dart';
@@ -71,6 +72,11 @@ abstract class TicketRepository {
   /// Aggregate shift counters for the home header: keys `assigned`,
   /// `inProgress`, `pending`.
   Future<Map<String, int>> shiftStats(String agentId);
+
+  /// The agent's server-planned route (`agent.route` —
+  /// `GET /agents/{agentId}/route`): the stops to visit, in the backend's own
+  /// visiting order, with per-leg and total distances. Drives the Map tab.
+  Future<AgentRoute> agentRoute(String agentId);
 
   Future<Ticket> ticketDetail(String ticketId);
 

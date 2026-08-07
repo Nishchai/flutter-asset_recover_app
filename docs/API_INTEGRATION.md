@@ -65,6 +65,7 @@ here — keep one source of truth.
 | Proof upload | `proof.upload` | proof capture |
 | QR scan validation | `qr.validate` | QR screen |
 | Road distance | `distance.roadDistance` | distance refresh |
+| Planned route for the shift | `agent.route` | map tab |
 | Customer update | `customer.update` | BP detail |
 | Handover OTP request/verify | `otp.request` / `otp.verify` | physical recovery |
 

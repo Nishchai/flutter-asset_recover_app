@@ -35,6 +35,15 @@ class _HomeShellState extends State<HomeShell>
   /// -1 when the config has no such tab.
   int _tasksTabIndex = 0;
 
+  /// Index of the map tab, or -1 when the config has no such tab.
+  int _mapTabIndex = -1;
+
+  /// Ticked on every tap of the map icon; [MapScreen] listens and re-reads
+  /// `agent.route`. The tabs live in an [IndexedStack], so the map is built once
+  /// at launch and never disposed — without this it could only ever load on app
+  /// start, which is not when the agent asked for their route.
+  final ValueNotifier<int> _mapReload = ValueNotifier<int>(0);
+
   /// Foreground location heartbeat (`location.reportIntervalMinutes`). Chained
   /// single-shot timers rather than [Timer.periodic] so the gap is measured
   /// from the *end* of the last report — a landing-triggered report pushes the
@@ -63,6 +72,7 @@ class _HomeShellState extends State<HomeShell>
         Duration(minutes: config.locationReportIntervalMinutes.clamp(0, 1440));
     _tasksTabIndex = config.navItems
         .indexWhere((item) => item['id'] == 'tasks');
+    _mapTabIndex = config.navItems.indexWhere((item) => item['id'] == 'map');
     _session = SessionManager(
       store: sl<SessionStore>(),
       sessionDuration: Duration(hours: config.autoLogoutHours),
@@ -185,6 +195,7 @@ class _HomeShellState extends State<HomeShell>
     WidgetsBinding.instance.removeObserver(this);
     appRouteObserver.unsubscribe(this);
     _session?.dispose();
+    _mapReload.dispose();
     super.dispose();
   }
 
@@ -197,7 +208,7 @@ class _HomeShellState extends State<HomeShell>
   Widget _screenFor(String id) {
     switch (id) {
       case 'map':
-        return const MapScreen();
+        return MapScreen(reloadSignal: _mapReload);
       case 'profile':
         return const ProfileScreen();
       case 'tasks':
@@ -228,6 +239,10 @@ class _HomeShellState extends State<HomeShell>
             // live in an IndexedStack, so TaskListScreen is never rebuilt and
             // nothing else would notice the agent returned to home.
             if (i == _tasksTabIndex) unawaited(_ensureLocationThenReport());
+            // The map icon: this tap IS the request for today's route, so it
+            // fetches `agent.route` every time — including a re-tap while the
+            // map tab is already showing, which reads as "refresh".
+            if (i == _mapTabIndex) _mapReload.value++;
           },
           destinations: [
             for (final item in navItems)

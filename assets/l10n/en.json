@@ -323,7 +323,9 @@
   "map.stopOf": "Stop {current} of {total}",
   "map.startFullRoute": "Start Full Route",
   "map.stops": "{count} stops",
-  "map.noStops": "No open or in-progress jobs on the map right now.",
+  "map.loadingRoute": "Loading today's route…",
+  "map.routeError": "Couldn't load today's route.",
+  "map.noStops": "No stops on today's route.",
 
   "profile.language": "Language",
   "profile.role": "Field Agent",

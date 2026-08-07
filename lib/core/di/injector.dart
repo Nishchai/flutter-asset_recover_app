@@ -27,6 +27,7 @@ import 'package:asset_recovery_app/domain/repositories/audit_repository.dart';
 import 'package:asset_recovery_app/domain/repositories/ticket_repository.dart';
 import 'package:asset_recovery_app/domain/usecases/call_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/draft_attempt_usecase.dart';
+import 'package:asset_recovery_app/domain/usecases/get_agent_route_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/get_assigned_tickets_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/get_battery_detail_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/get_live_location_usecase.dart';
@@ -210,6 +211,7 @@ Future<void> configureDependencies({
   sl.registerLazySingleton(() => VerifyLoginOtpUseCase(sl(), cfg.env.authToken));
   sl.registerLazySingleton(() => GetAssignedTicketsUseCase(sl()));
   sl.registerLazySingleton(() => GetShiftStatsUseCase(sl()));
+  sl.registerLazySingleton(() => GetAgentRouteUseCase(sl()));
   sl.registerLazySingleton(() => GetTicketFullDetailUseCase(sl()));
   sl.registerLazySingleton(() => GetBatteryDetailUseCase(sl()));
   sl.registerLazySingleton(() => SubmitAttemptUseCase(sl()));
