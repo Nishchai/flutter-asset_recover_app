@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:asset_recovery_app/core/di/app_services.dart';
 import 'package:asset_recovery_app/core/di/injector.dart';
@@ -594,6 +595,22 @@ class _GoogleMapView extends StatefulWidget {
 class _GoogleMapViewState extends State<_GoogleMapView> {
   GoogleMapController? _controller;
 
+  /// Numbered pin bitmaps, keyed `'<sequence>:<highlighted>'` — see
+  /// [_buildNumberedPin]. Painting one is asynchronous, so the markers fall back
+  /// to plain coloured pins for the frame or two before the cache fills.
+  final Map<String, BitmapDescriptor> _pins = {};
+
+  /// The device pixel ratio [_pins] were rasterised at. A change (the app moved
+  /// to another display) invalidates them.
+  double _pinPixelRatio = 0;
+
+  /// Guards against two [_ensurePins] passes painting the same pin twice when
+  /// rebuilds land while one is still running.
+  bool _paintingPins = false;
+
+  static String _pinKey(int sequence, {required bool highlighted}) =>
+      '$sequence:$highlighted';
+
   static LatLng _toLatLng(GeoPoint p) => LatLng(p.lat, p.lng);
 
   /// The box containing every point, for framing a route. Google rejects
@@ -623,8 +640,69 @@ class _GoogleMapViewState extends State<_GoogleMapView> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final ratio = MediaQuery.of(context).devicePixelRatio;
+    if (ratio != _pinPixelRatio) {
+      _pinPixelRatio = ratio;
+      _pins.clear();
+    }
+    unawaited(_ensurePins());
+  }
+
+  /// Paints whatever numbered pins the current stop list still needs, then
+  /// rebuilds so the markers pick them up.
+  ///
+  /// Both the plain and the highlighted bitmap are painted for every sequence up
+  /// front: the alternative is painting on selection, which would leave the
+  /// tapped pin showing the wrong colour until its bitmap landed.
+  Future<void> _ensurePins() async {
+    if (_paintingPins || _pinPixelRatio == 0) return;
+    _paintingPins = true;
+    var painted = false;
+    try {
+      // Recomputed each pass rather than listed once: a route can reload while
+      // this is still painting, and its stops would otherwise wait for another
+      // rebuild to be noticed.
+      for (var missing = _missingPins();
+          missing.isNotEmpty;
+          missing = _missingPins()) {
+        for (final (sequence, highlighted) in missing) {
+          _pins[_pinKey(sequence, highlighted: highlighted)] =
+              await _buildNumberedPin(
+            number: sequence,
+            // The tapped stop wins red so it stays findable among the rest,
+            // which share the brand's dark surface — the same split the plain
+            // pins used before they carried numbers.
+            fill:
+                highlighted ? widget.palette.danger : widget.palette.secondary,
+            label: Colors.white,
+            pixelRatio: _pinPixelRatio,
+          );
+          painted = true;
+        }
+        if (!mounted) return;
+      }
+    } finally {
+      _paintingPins = false;
+    }
+    if (painted && mounted) setState(() {});
+  }
+
+  /// The (sequence, highlighted) pairs the current stops need and [_pins] does
+  /// not hold yet.
+  List<(int, bool)> _missingPins() => [
+        for (final sequence in {for (final s in widget.stops) s.sequence})
+          for (final highlighted in const [false, true])
+            if (!_pins.containsKey(_pinKey(sequence, highlighted: highlighted)))
+              (sequence, highlighted),
+      ];
+
+  @override
   void didUpdateWidget(_GoogleMapView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    // A reloaded route brings sequences this cache may not hold yet.
+    if (!identical(oldWidget.stops, widget.stops)) unawaited(_ensurePins());
 
     // Entering navigation (or switching destination): frame the whole leg so
     // the agent sees both ends of it at once.
@@ -761,14 +839,20 @@ class _GoogleMapViewState extends State<_GoogleMapView> {
         Marker(
           markerId: MarkerId('stop_${widget.stops[i].sequence}'),
           position: _toLatLng(widget.stops[i].location),
-          // The highlighted stop wins red so it stays findable; every other stop
-          // is the same azure — the route's order is carried by the sequence
-          // number on the popup and the row, not by colour.
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            i == widget.highlightIndex
-                ? BitmapDescriptor.hueRed
-                : BitmapDescriptor.hueAzure,
-          ),
+          // The pin carries the stop's sequence number, so the drive reads 1, 2,
+          // 3 … straight off the map. The highlighted stop wins red so it stays
+          // findable; the rest share the brand dark. Until the bitmap for a
+          // sequence has been painted the marker falls back to a plain coloured
+          // pin — the same position, just without its number for a frame.
+          icon: _pins[_pinKey(widget.stops[i].sequence,
+                  highlighted: i == widget.highlightIndex,)] ??
+              BitmapDescriptor.defaultMarkerWithHue(
+                i == widget.highlightIndex
+                    ? BitmapDescriptor.hueRed
+                    : BitmapDescriptor.hueAzure,
+              ),
+          // The tip is what points at the battery, not the middle of the head.
+          anchor: const Offset(0.5, 1),
           // Deliberately NO `infoWindow`: the tap opens [_StopPopupCard]
           // instead, which a native info window cannot be — it takes no chevron
           // and no tap target of its own.
@@ -825,6 +909,100 @@ class _GoogleMapViewState extends State<_GoogleMapView> {
       },
     );
   }
+}
+
+/// Logical size of a stop's map pin — the teardrop [_buildNumberedPin] paints.
+/// Wide enough for a two-digit sequence inside the head without shrinking the
+/// label; a route long enough for three digits falls back to a smaller one.
+const double _kPinWidth = 38;
+const double _kPinHeight = 50;
+
+/// Paints the pin a route stop's marker carries: a teardrop with [number] — the
+/// stop's `sequence` — set in its head, so the order of the drive is readable
+/// off the map itself rather than only off the panel below it.
+///
+/// Rendered rather than shipped as an asset because the number is data: there is
+/// one bitmap per (sequence, highlighted) pair, cached by
+/// [_GoogleMapViewState._pins]. [pixelRatio] is the device's, so the bitmap is
+/// rasterised at native resolution and handed to Google Maps at the logical size
+/// above — a pin baked at 1× would be soft on every real phone.
+Future<BitmapDescriptor> _buildNumberedPin({
+  required int number,
+  required Color fill,
+  required Color label,
+  required double pixelRatio,
+}) async {
+  const w = _kPinWidth;
+  const h = _kPinHeight;
+  // The rim is stroked centred on the path, so the head sits half a stroke in
+  // from the edge to keep it from being clipped.
+  const radius = w / 2 - 2;
+  const center = Offset(w / 2, w / 2);
+  const tipY = h - 2;
+
+  final recorder = ui.PictureRecorder();
+  final canvas = Canvas(recorder)..scale(pixelRatio);
+
+  // Head and tail unioned into one outline: stroking them separately would draw
+  // a rim across the seam where the tail meets the circle.
+  final tail = Path()
+    ..moveTo(center.dx - radius * 0.72, center.dy + radius * 0.62)
+    ..quadraticBezierTo(center.dx - radius * 0.36, tipY - 7, center.dx, tipY)
+    ..quadraticBezierTo(
+        center.dx + radius * 0.36, tipY - 7, center.dx + radius * 0.72,
+        center.dy + radius * 0.62,)
+    ..close();
+  final pin = Path.combine(
+    PathOperation.union,
+    Path()..addOval(Rect.fromCircle(center: center, radius: radius)),
+    tail,
+  );
+
+  canvas
+    // A soft drop shadow keeps the pin off a busy map tile.
+    ..drawPath(
+      pin.shift(const Offset(0, 1)),
+      Paint()
+        ..color = Colors.black.withValues(alpha: 0.28)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2),
+    )
+    ..drawPath(pin, Paint()..color = fill)
+    ..drawPath(
+      pin,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5
+        ..color = Colors.white,
+    );
+
+  final text = TextPainter(
+    text: TextSpan(
+      text: '$number',
+      style: TextStyle(
+        color: label,
+        // Three digits only fit at a smaller size; two are the common case.
+        fontSize: number >= 100 ? 12 : 15,
+        fontWeight: FontWeight.w800,
+        height: 1,
+      ),
+    ),
+    textDirection: TextDirection.ltr,
+  )..layout();
+  text.paint(
+    canvas,
+    Offset(center.dx - text.width / 2, center.dy - text.height / 2),
+  );
+
+  final image = await recorder.endRecording().toImage(
+        (w * pixelRatio).ceil(),
+        (h * pixelRatio).ceil(),
+      );
+  final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+  image.dispose();
+  return BitmapDescriptor.bytes(
+    bytes!.buffer.asUint8List(),
+    imagePixelRatio: pixelRatio,
+  );
 }
 
 /// Height of a collapsed stop row and the gap between rows. Fixed so
@@ -1399,7 +1577,7 @@ class _FocusedBpCard extends StatelessWidget {
 }
 
 /// The stop's position in the backend's planned route — the same number its map
-/// marker carries in its info window.
+/// pin carries (see [_buildNumberedPin]).
 class _StopBadge extends StatelessWidget {
   const _StopBadge({required this.number, required this.palette});
   final int number;
