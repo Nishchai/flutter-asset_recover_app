@@ -34,7 +34,7 @@ class ApiClient {
   String? authToken;
 
   /// The id every relative request is scoped to, sent as the `agentId` query
-  /// param. Sourced from the signed-in session — the `partnerId` the
+  /// param. Sourced from the signed-in session — the `userId` the
   /// `commonLogin` response carried (see `PersistedSession.apiAgentId`) — and
   /// kept in sync by [SessionStore], so it survives restarts with the session
   /// and is cleared on logout. Null before the first sign-in, in which case the

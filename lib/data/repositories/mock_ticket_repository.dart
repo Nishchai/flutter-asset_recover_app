@@ -367,7 +367,7 @@ class MockTicketRepository implements TicketRepository {
   /// walks the same two-step login as the real backend: any 10-digit number is
   /// "found" in the directory.
   ///
-  /// `partnerId` — which `toAgent()` turns into the session's agent id — is the
+  /// `userId` — which `toAgent()` turns into the session's agent id — is the
   /// seeded agent's id, since every ticket in this mock is assigned to that one
   /// id and would otherwise filter out to an empty list.
   @override

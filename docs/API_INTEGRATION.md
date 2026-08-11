@@ -108,18 +108,18 @@ field-agent-only, so an unexpected role never locks an agent out.
 
 ### Request scoping (`agentId`)
 
-`ApiClient` attaches `agentId=<partnerId>` to every **relative** endpoint —
-the `partnerId` from the `commonLogin` response, exposed as
+`ApiClient` attaches `agentId=<userId>` to every **relative** endpoint —
+the `userId` (the `SUNMU…` series) from the `commonLogin` response, exposed as
 `PersistedSession.apiAgentId` and pushed into `ApiClient.agentId` by
 `SessionStore` on restore / login / logout. Nothing is hard-coded, and the value
 survives restarts with the session.
 
 Endpoints with an `{agentId}` **path** segment (e.g. `tickets.stats`) are filled
-by their callers from `Agent.id`, which is that same `partnerId` — one id
+by their callers from `Agent.id`, which is that same `userId` — one id
 everywhere, so the query param and the path segment can never disagree.
 
 - No session → the param is **omitted** (never sent empty).
-- No `partnerId` in the payload → falls back to `userId`, then the mobile number.
+- No `userId` in the payload → falls back to `partnerId`, then the mobile number.
 - The 401 token swap deliberately leaves it untouched: same agent, new
   credential, and the retried request still needs its scope.
 - Absolute endpoint URLs (Battery Master, `commonLogin`, the attempts service)

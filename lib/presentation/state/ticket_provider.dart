@@ -116,7 +116,7 @@ class TicketProvider extends ChangeNotifier {
   int get pendingSyncCount => _syncQueue.pendingCount;
 
   /// The agent id the current list was loaded for — the signed-in agent's id
-  /// (the `commonLogin` partnerId). Null before the first [load] and after
+  /// (the `commonLogin` userId). Null before the first [load] and after
   /// [reset]. The task list compares it against the signed-in agent so a new
   /// sign-in never renders the previous agent's tickets.
   String? get loadedAgentId => _lastAgentId;

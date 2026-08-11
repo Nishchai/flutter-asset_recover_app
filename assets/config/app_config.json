@@ -1,7 +1,7 @@
 {
   "appName": "Asset Recovery",
   "appTagline": "Field Agent",
-  "defaultEnvironment": "dev",
+  "defaultEnvironment": "prod",
 
   "business": {
     "slaDays": 90,

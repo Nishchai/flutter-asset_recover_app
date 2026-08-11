@@ -71,16 +71,16 @@ class FakeDiskSessionStore extends SessionStore {
 
 void main() {
   const agent = Agent(
-    id: 'SUNMU00002340',
+    id: 'SUNMU0000234',
     name: 'Ravi Kumar',
     cluster: 'Bengaluru South',
     recoveredCount: 7,
     phone: '9876543210',
   );
 
-  /// The `commonLogin` record the agent was resolved from. `partnerId` is what
+  /// The `commonLogin` record the agent was resolved from. `userId` is what
   /// scopes every API request — deliberately different from [agent]'s id here,
-  /// which models a session written by a build that stored the `userId`.
+  /// which models a session written by a build that stored the `partnerId`.
   const profile = PartnerLoginData(
     usermobileNumber: '9876543210',
     userId: 'SUNMU00002340',
@@ -182,7 +182,7 @@ void main() {
       expect(seen, [null, 'token-1', null, 'token-2', null]);
     });
 
-    test('the request-scoping agentId is the commonLogin partnerId', () async {
+    test('the request-scoping agentId is the commonLogin userId', () async {
       final seen = <String?>[];
       final disk = <String, String>{};
       final store = FakeDiskSessionStore(disk, onAgentIdChanged: seen.add);
@@ -192,21 +192,21 @@ void main() {
         agent: agent,
         profile: profile,
       ),);
-      expect(store.current!.apiAgentId, 'SUNMU0000234');
+      expect(store.current!.apiAgentId, 'SUNMU00002340');
 
-      // Relaunch: restored from disk, still the partnerId — and the restored
+      // Relaunch: restored from disk, still the userId — and the restored
       // agent is re-projected from the profile, so the id used in `{agentId}`
       // path segments matches the query param even though this record was
-      // written with the userId.
+      // written with the partnerId.
       final relaunched = FakeDiskSessionStore(disk, onAgentIdChanged: seen.add);
       await relaunched.restore();
-      expect(relaunched.current!.apiAgentId, 'SUNMU0000234');
-      expect(relaunched.current!.agent.id, 'SUNMU0000234');
+      expect(relaunched.current!.apiAgentId, 'SUNMU00002340');
+      expect(relaunched.current!.agent.id, 'SUNMU00002340');
       expect(relaunched.current!.agent.cluster, 'Bengaluru South',
           reason: 're-projection must not drop recovery-domain fields',);
 
       await store.clear();
-      expect(seen, ['SUNMU0000234', 'SUNMU0000234', null],
+      expect(seen, ['SUNMU00002340', 'SUNMU00002340', null],
           reason: 'set on login and restore, cleared on logout',);
     });
 
@@ -225,7 +225,7 @@ void main() {
         agent: agent,
         profile: profile,
       ),);
-      expect(apiAgentId, 'SUNMU0000234');
+      expect(apiAgentId, 'SUNMU00002340');
 
       // …and signs out: no agent id is left on the client, and nothing of the
       // session survives on disk to be restored.
@@ -234,7 +234,7 @@ void main() {
       expect(store.current, isNull);
       expect(disk, isEmpty);
 
-      // Agent B signs in on the same device. Their own commonLogin partnerId —
+      // Agent B signs in on the same device. Their own commonLogin userId —
       // not A's — is what every request is scoped by from here on.
       await store.save(const PersistedSession(
         authToken: 'token-b',
@@ -254,8 +254,8 @@ void main() {
         ),
       ),);
 
-      expect(apiAgentId, 'SUNMU0000999');
-      expect(store.current!.apiAgentId, 'SUNMU0000999');
+      expect(apiAgentId, 'SUNMU00009990');
+      expect(store.current!.apiAgentId, 'SUNMU00009990');
     });
 
     test('the 401 token swap does NOT disturb the agentId', () async {
@@ -270,13 +270,13 @@ void main() {
       await store.clearAuthToken();
       await store.replaceAuthToken('fresh-token');
 
-      expect(store.current!.apiAgentId, 'SUNMU0000234',
+      expect(store.current!.apiAgentId, 'SUNMU00002340',
           reason: 'the retried request still needs its agentId',);
-      expect(seen, ['SUNMU0000234', 'SUNMU0000234'],
+      expect(seen, ['SUNMU00002340', 'SUNMU00002340'],
           reason: 'no null pushed mid-swap — same agent throughout',);
     });
 
-    test('agentId falls back to the agent id when no partnerId was returned',
+    test('agentId falls back to the agent id when no userId was returned',
         () async {
       final store = FakeDiskSessionStore({});
 

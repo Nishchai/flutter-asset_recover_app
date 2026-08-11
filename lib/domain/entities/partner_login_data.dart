@@ -38,7 +38,8 @@ class PartnerLoginData {
   /// The mobile number the agent signed in with (as returned by the backend).
   final String usermobileNumber;
 
-  /// Business user id (e.g. `SUNMU00002340`).
+  /// Business user id (e.g. `SUNMU00002340`) — the id every backend request is
+  /// scoped by, so it becomes [Agent.id] (see [toAgent]).
   final String userId;
 
   final int? apppartneruserId;
@@ -47,8 +48,8 @@ class PartnerLoginData {
   final String emailId;
   final bool? isLoggedIn;
 
-  /// The partner this agent belongs to — the id every backend request is scoped
-  /// by, so it becomes [Agent.id] (see [toAgent]).
+  /// The partner this agent belongs to. Retained from the directory record but
+  /// NOT the request-scoping id — that is [userId] (see [toAgent]).
   final String partnerId;
 
   /// False for a deactivated agent — login is refused (see
@@ -70,10 +71,10 @@ class PartnerLoginData {
 
   /// Projects the partner record onto the app's session identity.
   ///
-  /// [Agent.id] is the [partnerId] — the app's one agent identifier, used both
-  /// as the `agentId` query param on every request and in `{agentId}` path
-  /// segments, so the two can never disagree. It falls back to [userId] and then
-  /// the mobile number if the payload omits it.
+  /// [Agent.id] is the [userId] (the `SUNMU…` series) — the app's one agent
+  /// identifier, used both as the `agentId` query param on every request and in
+  /// `{agentId}` path segments, so the two can never disagree. It falls back to
+  /// [partnerId] and then the mobile number if the payload omits it.
   ///
   /// The rest of the identity (name, phone, role) also comes from this record —
   /// it is the authoritative directory. `cluster` / `zone` / `recoveredCount` /
@@ -81,10 +82,10 @@ class PartnerLoginData {
   /// not carry, so they are taken from [base] (the agent the recovery backend
   /// returned, if any) and otherwise left empty.
   Agent toAgent({Agent? base}) => Agent(
-        id: partnerId.isNotEmpty
-            ? partnerId
-            : userId.isNotEmpty
-                ? userId
+        id: userId.isNotEmpty
+            ? userId
+            : partnerId.isNotEmpty
+                ? partnerId
                 : usermobileNumber,
         name: userName.isNotEmpty ? userName : base?.name ?? '',
         phone: usermobileNumber.isNotEmpty

@@ -57,7 +57,7 @@ class AuthProvider extends ChangeNotifier {
   Agent? get agent => _agent;
   String? get error => _error;
 
-  /// The full `commonLogin` record for the signed-in agent (partnerId, role,
+  /// The full `commonLogin` record for the signed-in agent (userId, role,
   /// email, app version…) — restored from encrypted storage on relaunch. Set
   /// from [requestOtp] onwards; null in mock mode's pre-login state.
   PartnerLoginData? get profile => _profile;

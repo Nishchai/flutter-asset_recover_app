@@ -178,21 +178,21 @@ void main() {
       final agent =
           (await (await _repo(cfg, client)).commonLogin('9876543210')).toAgent();
 
-      expect(agent.id, 'SUNMU0000234',
-          reason: 'partnerId is THE agent id — query param and path segment',);
+      expect(agent.id, 'SUNMU00002340',
+          reason: 'userId is THE agent id — query param and path segment',);
       expect(agent.name, 'Ravi Kumar');
       expect(agent.phone, '9876543210');
       expect(agent.role, AgentRole.fieldAgent);
     });
 
-    test('the agent id falls back to userId when partnerId is absent', () async {
+    test('the agent id falls back to partnerId when userId is absent', () async {
       final data = PartnerLoginData.fromJson({
         'usermobileNumber': '9876543210',
-        'userId': 'SUNMU00002340',
+        'partnerId': 'SUNMP00000465',
         'userName': 'Ravi Kumar',
       });
 
-      expect(data.toAgent().id, 'SUNMU00002340');
+      expect(data.toAgent().id, 'SUNMP00000465');
     });
 
     test('keeps recovery-domain fields the partner directory does not carry',
@@ -210,7 +210,8 @@ void main() {
 
       final agent = data.toAgent(base: fromRecoveryBackend);
 
-      expect(agent.id, 'SUNMU0000234', reason: 'identity wins from commonLogin');
+      expect(agent.id, 'SUNMU00002340',
+          reason: 'identity wins from commonLogin',);
       expect(agent.name, 'Ravi Kumar');
       expect(agent.cluster, 'Bengaluru South');
       expect(agent.zone, 'Zone 4');

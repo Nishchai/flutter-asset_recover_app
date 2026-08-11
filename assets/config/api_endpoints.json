@@ -3,7 +3,7 @@
 
   "auth": {
     "_comment_commonLogin": "SM-Partners directory lookup — step 1 of login, called the moment the agent submits their mobile number. Lives on its own host, so it carries an ABSOLUTE URL (used verbatim: no apiBaseUrl prefix, no agentId param). `appName` is fixed per app and travels in the URL; ApiTicketRepository appends `userMobilenumber`. A success (status 200 with a `data` block) gates the OTP send; the returned `data` is the real agent record.",
-    "commonLogin": "GET https://sm-partners-api-stage.azurewebsites.net/api/v1/commonLogin?appName=INDOFAST_PARTNER",
+    "commonLogin": "GET https://sm-partners-api.azurewebsites.net/api/v1/commonLogin?appName=INDOFAST_PARTNER",
     "requestOtp": "POST /auth/otp/request",
     "verifyOtp": "POST /auth/otp/verify", 
     "refresh": "POST /auth/refresh",
@@ -68,7 +68,7 @@
   },
   "battery": {
     "_comment": "Battery Master API lives on its own host (different base URL than apiBaseUrl), so this endpoint carries an ABSOLUTE URL. ApiClient uses absolute endpoint URLs verbatim (no apiBaseUrl prefix, no agentId param) while still attaching the Bearer token. {bpId} is filled from the ticket's bpId.",
-    "getBatteryDetails": "GET https://smartnetwork.azure-api.net/battery-master-api-stage/api/v3/WheelerBattery/SearchBattery/{bpId}"
+    "getBatteryDetails": "GET https://smartnetwork.azure-api.net/battery-master-api/api/v3/WheelerBattery/SearchBattery/{bpId}"
   },
   "calls": {
     "start": "POST /calls/ozonetel/click-to-call",

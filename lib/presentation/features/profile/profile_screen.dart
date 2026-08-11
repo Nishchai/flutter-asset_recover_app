@@ -37,15 +37,24 @@ class ProfileScreen extends StatelessWidget {
                           fontSize: 18,),),
                 ),
                 const SizedBox(width: 14),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(agent.name,
-                        style: const TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold,),),
-                    Text('${l.t('profile.role')} · ${agent.cluster}',
-                        style: TextStyle(color: palette.muted),),
-                  ],
+                // Expanded, so a long agent name (or a long localised
+                // role · cluster line) wraps inside the row instead of
+                // overflowing past the avatar — same treatment as ShiftHeader.
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(agent.name,
+                          style: const TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.bold,),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,),
+                      Text('${l.t('profile.role')} · ${agent.cluster}',
+                          style: TextStyle(color: palette.muted),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -102,11 +111,13 @@ class ProfileScreen extends StatelessWidget {
         children: [
           Icon(Icons.verified, color: palette.primary),
           const SizedBox(width: 10),
-          Text('$recovered ${l.t('common.recovered')}',
-              style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  color: palette.primaryDark,),),
+          Expanded(
+            child: Text('$recovered ${l.t('common.recovered')}',
+                style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: palette.primaryDark,),),
+          ),
         ],
       ),
     );

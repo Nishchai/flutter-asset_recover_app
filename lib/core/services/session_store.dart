@@ -13,7 +13,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 /// vice-versa) is not a usable session, so [SessionStore.restore] treats a
 /// half-written record as "no session" and the login screen is shown again.
 /// [profile] is the full `commonLogin` record the agent was resolved from
-/// (partnerId, role, email, thresholds…); it is stored whenever the real backend
+/// (userId, role, email, thresholds…); it is stored whenever the real backend
 /// supplied one.
 class PersistedSession {
   const PersistedSession({
@@ -38,15 +38,15 @@ class PersistedSession {
   final DateTime? loginAt;
 
   /// The id every backend request is scoped to (`agentId` query param): the
-  /// `commonLogin` [PartnerLoginData.partnerId].
+  /// `commonLogin` [PartnerLoginData.userId] — the `SUNMU…` series.
   ///
-  /// [Agent.id] is already the partnerId (`PartnerLoginData.toAgent`), so for a
+  /// [Agent.id] is already the userId (`PartnerLoginData.toAgent`), so for a
   /// current session the two agree — reading the profile first is what keeps a
-  /// session persisted by an older build (whose `agent.id` was the `userId`)
+  /// session persisted by an older build (whose `agent.id` was the `partnerId`)
   /// scoped correctly, and covers mock sessions that carry no profile at all.
   String get apiAgentId {
-    final partnerId = profile?.partnerId ?? '';
-    return partnerId.isNotEmpty ? partnerId : agent.id;
+    final userId = profile?.userId ?? '';
+    return userId.isNotEmpty ? userId : agent.id;
   }
 
   /// How much of the fixed post-login [window] is left, measured on the IST
@@ -129,7 +129,7 @@ abstract class SessionStore {
   /// Loads the persisted session into [current] and returns it.
   ///
   /// The stored agent is re-projected from the stored profile, so the id the app
-  /// runs on is always the current mapping (the `partnerId`) even for a session
+  /// runs on is always the current mapping (the `userId`) even for a session
   /// written by a build that persisted something else.
   Future<PersistedSession?> restore() async {
     var loaded = await load();

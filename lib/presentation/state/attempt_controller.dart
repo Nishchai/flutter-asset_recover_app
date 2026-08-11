@@ -1099,7 +1099,7 @@ class AttemptController extends ChangeNotifier {
         id: _generateAttemptId(),
         ticketId: ticketId,
         batteryId: battery.bpId,
-        // The signed-in agent's id — the `commonLogin` partnerId carried into
+        // The signed-in agent's id — the `commonLogin` userId carried into
         // the session on login (see `PersistedSession.apiAgentId`), passed down
         // from the ticket screen. Never a hard-coded id: after a logout the next
         // sign-in submits attempts under ITS own agent.
