@@ -1,0 +1,35 @@
+{
+  "environment": "dev",
+  "label": "Development",
+  "useMockData": false,
+  "apiBaseUrl": "https://smartnetwork-dev.azure-api.net/sm-asset-recovery-api-stage/api/v1/",
+  "_comment_auditLogBaseUrl": "Shared platform app API that hosts the audit log (POST /AuditLog). Different host from apiBaseUrl, so it is configured separately per environment.",
+  "auditLogBaseUrl": "https://smartnetwork.azure-api.net/audit-log-service-stage/api/v1/",
+  "apiTimeoutSeconds": 30,
+  "mapsApiKey": "REPLACE_WITH_DEV_MAPS_KEY",
+  "batteryTrackingUrl": "https://sm-battery-tracking.azurewebsites.net/",
+  "callRecordingProvider": "none",
+  "enableNetworkLogging": true,
+  "gupshup": {
+    "baseUrl": "https://enterprise.smsgupshup.com/GatewayAPI/rest",
+    "username": "REPLACE_WITH_GUPSHUP_USERNAME",
+    "password": "REPLACE_WITH_GUPSHUP_PASSWORD",
+    "encryptionKey": "REPLACE_WITH_BASE64URL_AES_KEY",
+    "otpMessageTemplate": "The OTP token for your ISEPL Application access request for Rider App is %code%",
+    "otpCodeLength": 4,
+    "otpCodeType": "NUMERIC",
+    "useEncryptedData": true
+  },
+  "authToken": {
+    "url": "https://login.microsoftonline.com/REPLACE_TENANT_ID/oauth2/token/",
+    "clientId": "REPLACE_CLIENT_ID",
+    "resource": "api://REPLACE_CLIENT_ID",
+    "clientSecret": "REPLACE_WITH_CLIENT_SECRET",
+    "grantType": "client_credentials"
+  },
+  "blobStorage": {
+    "connectionString": "DefaultEndpointsProtocol=https;AccountName=REPLACE_ACCOUNT_NAME;AccountKey=REPLACE_ACCOUNT_KEY;EndpointSuffix=core.windows.net",
+    "containerName": "asset-recovery"
+  },
+  "_comment": "Copy this file to dev.json and fill secrets (incl. mapsApiKey, gupshup.username/password/encryptionKey, authToken.clientId/clientSecret and blobStorage.connectionString). dev.json is git-ignored. API endpoints are wired in api_endpoints.json."
+}
