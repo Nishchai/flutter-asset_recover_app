@@ -147,6 +147,8 @@ Everything below is data, not code — see **[docs/CONFIGURATION.md](docs/CONFIG
 The app ships in **mock mode**. When backend endpoints are confirmed:
 
 1. Fill `assets/config/environments/prod.json` (copy from `prod.sample.json`).
+   For local development do the same for `dev.json` (copy from `dev.sample.json`)
+   — both files hold real credentials and are git-ignored.
 2. Set `useMockData: false`.
 3. Adjust endpoint paths in `assets/config/api_endpoints.json` and the response
    field mappings (lines marked `// MAP:`) in `ApiTicketRepository`.

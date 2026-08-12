@@ -14,6 +14,16 @@ file, hot-restart (config is loaded once at startup).
 | `api_endpoints.json` | Endpoint method+path strings (relative to base URL) |
 | `environments/{dev,test,prod}.json` | Per-environment base URL, mock toggle, keys |
 
+`dev.json` and `prod.json` hold real credentials and are **git-ignored**. After a
+fresh clone, copy the committed samples and fill in the secrets:
+
+```bash
+cp assets/config/environments/dev.sample.json  assets/config/environments/dev.json
+cp assets/config/environments/prod.sample.json assets/config/environments/prod.json
+```
+
+`test.json` is committed as-is — it runs on mock data and holds no real keys.
+
 ## Common changes
 
 ### Change the SLA
