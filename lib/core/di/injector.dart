@@ -185,9 +185,14 @@ Future<void> configureDependencies({
   }
 
   sl.registerLazySingleton<AuditRepository>(
-    () => cfg.env.useMockData ? MockAuditRepository() : ApiAuditRepository(sl()),
+    () => cfg.env.useMockData
+        ? MockAuditRepository()
+        : ApiAuditRepository(sl(), sl()),
   );
-  sl.registerLazySingleton<AuditLogService>(() => AuditLogService(sl(), sl(), sl()));
+  // Takes the session store too: `userName` on every audit entry is read from
+  // the signed-in profile here rather than passed in by each call site.
+  sl.registerLazySingleton<AuditLogService>(
+      () => AuditLogService(sl(), sl(), sl(), sl()),);
 
   // In-app SIM calling (Rule 8a). Resolves to the real platform-channel
   // implementation on Android and a no-op everywhere else.

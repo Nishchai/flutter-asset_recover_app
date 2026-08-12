@@ -9,6 +9,7 @@ class EnvironmentConfig {
     required this.label,
     required this.useMockData,
     required this.apiBaseUrl,
+    required this.auditLogBaseUrl,
     required this.apiTimeoutSeconds,
     required this.mapsApiKey,
     required this.batteryTrackingUrl,
@@ -24,6 +25,13 @@ class EnvironmentConfig {
   final String label;
   final bool useMockData;
   final String apiBaseUrl;
+
+  /// Base URL of the shared platform app API that hosts the audit log
+  /// (`POST /AuditLog`) — a different host from [apiBaseUrl], hence its own
+  /// entry. Empty disables audit sending (mock/test envs). See
+  /// `ApiAuditRepository`.
+  final String auditLogBaseUrl;
+
   final int apiTimeoutSeconds;
   final String mapsApiKey;
 
@@ -57,6 +65,7 @@ class EnvironmentConfig {
       label: json['label'] as String? ?? 'Development',
       useMockData: json['useMockData'] as bool? ?? true,
       apiBaseUrl: json['apiBaseUrl'] as String? ?? '',
+      auditLogBaseUrl: json['auditLogBaseUrl'] as String? ?? '',
       apiTimeoutSeconds: (json['apiTimeoutSeconds'] as num?)?.toInt() ?? 30,
       mapsApiKey: json['mapsApiKey'] as String? ?? '',
       batteryTrackingUrl: json['batteryTrackingUrl'] as String? ?? '',

@@ -61,7 +61,8 @@
     "save": "PUT /batteries/{bpId}/draft"
   },
   "audit": {
-    "log": "POST /audit/events"
+    "_comment": "Platform audit log. Lives on the shared app API, NOT on apiBaseUrl — the host differs per environment, so it is resolved against `auditLogBaseUrl` from the active environment file (prod: https://smartnetwork.azure-api.net/app/api/v1, dev: https://smartnetwork-dev.azure-api.net/app-staging/api/v1) instead of being written as an absolute URL here. Body = AuditEvent.toJson (transactionId, userId, userName, activityStartDate, activityEndDate, userActivity, appName, appVersion, status, activityContext). activityStartDate/activityEndDate are non-nullable Int64 epoch milliseconds — an ISO string or a null is rejected with a 400.",
+    "log": "POST /AuditLog"
   },
   "bp": {
     "liveLocation": "GET /batteries/{bpId}/live-location"

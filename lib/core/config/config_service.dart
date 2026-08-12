@@ -123,6 +123,10 @@ class ConfigService {
   // --- Convenience business accessors -----------------------------------------
 
   String get appName => stringValue('appName', fallback: 'Asset Recovery');
+
+  /// Version string reported to the backend (audit log). Mirrors pubspec's
+  /// `version:` — see the note in app_config.json.
+  String get appVersion => stringValue('appVersion');
   int get slaDays => intValue('business.slaDays', fallback: 90);
   int get slaWarnDays => intValue('business.slaWarnDays', fallback: 7);
   int get autoLogoutHours => intValue('session.autoLogoutHours', fallback: 12);

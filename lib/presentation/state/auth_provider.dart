@@ -120,13 +120,30 @@ class AuthProvider extends ChangeNotifier {
         // exactly `session.autoLogoutHours` — sign in at 08:00 IST, signed out
         // at 20:00 IST regardless of what they do in between. See
         // `SessionManager`.
-        unawaited(_sessionStore.save(PersistedSession(
-          authToken: login.accessToken,
-          agent: login.agent,
-          profile: login.profile,
-          loginAt: nowIst(),
-        ),),);
-        unawaited(_auditLog.log(agentId: login.agent.id, action: 'login'));
+        unawaited(() async {
+          try {
+            await _sessionStore.save(PersistedSession(
+              authToken: login.accessToken,
+              agent: login.agent,
+              profile: login.profile,
+              loginAt: nowIst(),
+            ),);
+          } finally {
+            // Emitted only AFTER the token mint succeeded and the session is in
+            // place — `save` is what pushes the new credential to `ApiClient`,
+            // so chaining the audit POST behind it means the first request of
+            // the session can never go out ahead of the `Bearer` header it
+            // needs (an audit entry sent unauthenticated would 401 and land on
+            // the offline queue for nothing). The mint itself already gates
+            // this: `VerifyLoginOtpUseCase` fails the whole login if it fails,
+            // so reaching here at all means there IS a token. Queued for retry
+            // by AuditLogService if the send still fails.
+            await _auditLog.log(
+              agentId: login.agent.id,
+              action: 'login_success',
+            );
+          }
+        }(),);
         return true;
       },
       (failure) {

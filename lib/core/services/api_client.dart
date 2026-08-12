@@ -54,11 +54,19 @@ class ApiClient {
   /// Calls the endpoint registered under [endpointPath] (dotted path into
   /// api_endpoints.json, e.g. `tickets.assigned`), filling `{param}` segments
   /// from [pathParams].
+  ///
+  /// [baseUrl] resolves a RELATIVE endpoint against a host other than
+  /// `apiBaseUrl` — for a service on its own host whose URL varies per
+  /// environment, so it cannot be baked into the endpoint string as an absolute
+  /// one (e.g. the platform audit log, `EnvironmentConfig.auditLogBaseUrl`).
+  /// Like an absolute endpoint, such a request carries no app-scoped `agentId`
+  /// query param; the Bearer token is still attached.
   Future<dynamic> call(
     String endpointPath, {
     Map<String, String> pathParams = const {},
     Map<String, String>? query,
     Object? body,
+    String? baseUrl,
   }) async {
     final spec = _resolve(endpointPath);
     final method = spec.$1;
@@ -80,9 +88,11 @@ class ApiClient {
             );
     } else {
       // Attach the signed-in agent's id to every request. Omitted entirely when
-      // there is no session yet — an empty `agentId=` is worse than none.
-      // Existing query params win if a caller passes an explicit `agentId`.
-      final scoped = agentId;
+      // there is no session yet — an empty `agentId=` is worse than none, and
+      // for a [baseUrl] override the host is not the app's API at all, so it
+      // neither expects nor wants the param. Existing query params win if a
+      // caller passes an explicit `agentId`.
+      final scoped = baseUrl == null ? agentId : null;
       final mergedQuery = <String, String>{
         if (scoped != null && scoped.isNotEmpty) 'agentId': scoped,
         ...?query,
@@ -91,7 +101,8 @@ class ApiClient {
       // Join base + path with exactly one slash: apiBaseUrl carries a trailing
       // slash and every endpoint path a leading one, so a naive concat yields a
       // `//` segment that routers reject (404). Normalize both sides.
-      final base = _config.env.apiBaseUrl.replaceAll(RegExp(r'/+$'), '');
+      final base =
+          (baseUrl ?? _config.env.apiBaseUrl).replaceAll(RegExp(r'/+$'), '');
       final rel = path.startsWith('/') ? path : '/$path';
       final resolved = Uri.parse('$base$rel');
       uri = mergedQuery.isEmpty
