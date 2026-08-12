@@ -1,6 +1,8 @@
 {
   "appName": "Asset Recovery",
   "appTagline": "Field Agent",
+  "_comment_appVersion": "Reported as `appVersion` on every audit-log entry. Keep it in step with pubspec.yaml's `version:` (the app has no package_info plugin, so this is the only place the running build knows its own version from).",
+  "appVersion": "1.0.3",
   "defaultEnvironment": "prod",
 
   "business": {
