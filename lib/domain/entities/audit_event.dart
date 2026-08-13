@@ -105,8 +105,10 @@ class AuditEvent {
   final DateTime activityStartDate;
   final DateTime? activityEndDate;
 
-  /// What the user did, e.g. `attempt_section_saved`, `outcome_submitted`,
-  /// `customer_details_updated`, `call_started`, `login`, `logout`.
+  /// What the user did, e.g. `call_customer_submitted`,
+  /// `visit_bp_location_submitted`, `visit_customer_address_submitted`,
+  /// `outcome_submitted`, `customer_details_updated`, `call_started`,
+  /// `login_success`, `logout`.
   final String userActivity;
 
   final String? appName;

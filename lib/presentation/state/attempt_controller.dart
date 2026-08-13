@@ -801,6 +801,33 @@ class AttemptController extends ChangeNotifier {
 
   // --- Save one action section (item 4/13) ------------------------------------
 
+  /// The audit activity each action screen's submit button records. One name per
+  /// screen rather than a single generic "section saved" for all three, so the
+  /// coordinator dashboard can tell a Call Customer submit from a Visit BP
+  /// Location one without reading `activityContext`. Update Status is not here —
+  /// it has its own activity, `outcome_submitted` (see [submitOutcome]).
+  ///
+  /// Keys are `attempt_flow.json` section ids; a section absent from this map
+  /// (none today) falls back to the generic activity.
+  static const _sectionAuditActivities = <String, String>{
+    'call': 'call_customer_submitted',
+    'location_visit': 'visit_bp_location_submitted',
+    'home_visit': 'visit_customer_address_submitted',
+  };
+
+  static const _genericSectionActivity = 'attempt_section_saved';
+
+  /// What the agent reported on [sectionId]'s own status dropdown
+  /// (`callStatus` / `visitStatus` / `homeVisitStatus`) — the single most useful
+  /// piece of context on that screen's audit entry. Empty when the section has
+  /// no status field or the agent left it blank.
+  String _sectionStatusValue(String sectionId) {
+    final field = _sectionAttempts[sectionId]?.outcomeField;
+    if (field == null) return '';
+    final value = _values[field];
+    return value is String ? value : '';
+  }
+
   /// Validates + persists [section] as a draft. Any BP action can be saved
   /// independently, in any order, without touching the others.
   Future<String?> saveSection(StepConfig section, Translate t) async {
@@ -829,12 +856,23 @@ class AttemptController extends ChangeNotifier {
     }
 
     await _persistDraft();
+    // Reached only on a successful submit — a validation failure returned above
+    // and never gets an entry.
+    final sectionStatus = _sectionStatusValue(section.id);
     unawaited(_auditLog.log(
       agentId: agentId,
-      action: 'attempt_section_saved',
+      action: _sectionAuditActivities[section.id] ?? _genericSectionActivity,
       entityType: 'battery',
       entityId: battery.bpId,
-      metadata: {'section': section.id},
+      metadata: {
+        'section': section.id,
+        'ticketId': ticketId,
+        // Only the sections that POST an attempt have a service result to
+        // report; on the others a `false` here would read as a failed send.
+        if (recordsOwnAttempt(section.id))
+          'submittedToService': lastSectionSubmittedToService,
+        if (sectionStatus.isNotEmpty) 'sectionStatus': sectionStatus,
+      },
     ),);
     return null;
   }
@@ -1312,12 +1350,21 @@ class AttemptController extends ChangeNotifier {
       await tickets.submitAttempt(ticketId, battery, buildAttempt());
       lastOutcomeWasQueued = tickets.lastSubmitWasQueued;
       await _saveDraft(SaveDraftParams(battery.bpId, const DraftAttempt()));
+      // The Update Status screen's submit button, same contract as the three
+      // action screens above: logged only once the submit went through.
       unawaited(_auditLog.log(
         agentId: agentId,
         action: 'outcome_submitted',
         entityType: 'battery',
         entityId: battery.bpId,
-        metadata: {'outcome': selectedOutcome, 'resolution': resolution},
+        metadata: {
+          'section': 'outcome',
+          'ticketId': ticketId,
+          'outcome': selectedOutcome,
+          'resolution': resolution,
+          'submittedToService': lastOutcomeSubmittedToService,
+          'queued': lastOutcomeWasQueued,
+        },
       ),);
       return null;
     } finally {
