@@ -18,7 +18,7 @@ import 'package:asset_recovery_app/domain/usecases/ticket_pickup_usecase.dart';
 import 'package:flutter/foundation.dart';
 
 /// Home tabs (item 1): All Tasks (every ticket the API returned, any status) /
-/// In Progress/Pending (anything not finished — Open, started, or pending
+/// In Progress/Open (anything not finished — Open, started, or pending
 /// verification) / Completed (closed or unrecoverable).
 enum TicketFilter { allTasks, inProgress, completed }
 
@@ -378,17 +378,14 @@ class TicketProvider extends ChangeNotifier {
   /// ones.
   int get totalCount => _all.length;
 
-  /// Header card 2 (PROGRESS): strictly the tickets the agent has started —
-  /// wire status `in_progress`. Open work (`assigned`) is deliberately excluded;
-  /// it is counted by [totalCount] and listed under the In Progress/Pending tab.
+  /// Header card 2 (OPEN): tickets not yet started — wire status `assigned`.
+  int get openCount =>
+      _all.where((t) => t.status == TicketStatus.assigned).length;
+
+  /// Header card 3 (PROGRESS): strictly the tickets the agent has started —
+  /// wire status `in_progress`.
   int get inProgressCount =>
       _all.where((t) => t.status == TicketStatus.inProgress).length;
-
-  /// Header card 3 (PENDING): tickets sitting with the coordinator for
-  /// verification — the backend's `pending_verification`, which
-  /// [TicketStatus.fromString] maps onto [TicketStatus.pending].
-  int get pendingCount =>
-      _all.where((t) => t.status == TicketStatus.pending).length;
 
   /// Recomputes road distance from the agent to every BP (PRD §4.8).
   ///

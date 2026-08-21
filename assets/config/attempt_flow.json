@@ -207,7 +207,7 @@
           "labelKey": "field.handover_otp",
           "hintKey": "field.handover_otp_hint",
           "required": true,
-          "visibleWhen": { "field": "outcome", "equals": "recovered" }
+          "visibleWhen": { "field": "outcome", "in": [] }
         },
         {
           "id": "firDocument",

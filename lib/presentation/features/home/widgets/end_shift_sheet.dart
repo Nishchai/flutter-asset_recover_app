@@ -196,22 +196,6 @@ class _EndShiftSheetState extends State<EndShiftSheet> {
                       onPressed: _submit,
                     ),
             ),
-            const SizedBox(height: 14),
-            Center(
-              child: Text.rich(
-                TextSpan(
-                  text: '${l.t('endShift.trouble')} ',
-                  style: TextStyle(color: palette.muted, fontSize: 13),
-                  children: [
-                    TextSpan(
-                      text: l.t('endShift.contactSupport'),
-                      style: TextStyle(
-                          color: palette.info, fontWeight: FontWeight.w600,),
-                    ),
-                  ],
-                ),
-              ),
-            ),
           ],
         ),
       ),

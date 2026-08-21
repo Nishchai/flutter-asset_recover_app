@@ -12,8 +12,8 @@ class ShiftHeader extends StatelessWidget {
     required this.palette,
     required this.shiftActive,
     required this.assigned,
+    required this.open,
     required this.inProgress,
-    required this.pending,
     required this.onToggleShift,
   });
 
@@ -24,12 +24,11 @@ class ShiftHeader extends StatelessWidget {
   /// Total tickets assigned to the agent, any status.
   final int assigned;
 
+  /// Tickets not yet started — wire status `assigned`.
+  final int open;
+
   /// Tickets the agent has started — wire status `in_progress` only.
   final int inProgress;
-
-  /// Tickets awaiting coordinator verification — wire status
-  /// `pending_verification`.
-  final int pending;
   final ValueChanged<bool> onToggleShift;
 
   String _greetingKey() {
@@ -144,9 +143,9 @@ class ShiftHeader extends StatelessWidget {
                 children: [
                   _stat(l.t('stats.assigned'), assigned, highlight: true),
                   const SizedBox(width: 10),
-                  _stat(l.t('stats.inProgress'), inProgress),
+                  _stat(l.t('stats.open'), open),
                   const SizedBox(width: 10),
-                  _stat(l.t('stats.pending'), pending),
+                  _stat(l.t('stats.inProgress'), inProgress),
                 ],
               ),
             ],

@@ -144,7 +144,7 @@ void main() {
     expect(c.validateSection(section(c, 'outcome'), _t), isNull);
   });
 
-  test('OTP field is required and validated only for physical recovery', () {
+  test('OTP field is hidden for every outcome, including recovered', () {
     final c = controller();
     final otp = field(c, 'outcome', 'handoverOtp');
 
@@ -152,8 +152,7 @@ void main() {
     expect(c.isVisible(otp), isFalse);
 
     c.setValue('outcome', 'recovered');
-    expect(c.isVisible(otp), isTrue);
-    expect(c.isRequired(otp), isTrue);
+    expect(c.isVisible(otp), isFalse);
   });
 
   test('recovery proof captured far from the BP is accepted while '

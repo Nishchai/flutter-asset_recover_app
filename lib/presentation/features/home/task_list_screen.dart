@@ -14,7 +14,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 /// Home screen (Figma): dark shift header + stats, then a filterable list of
-/// assigned tickets (All Tasks / In Progress-Pending / Completed).
+/// assigned tickets (All Tasks / In Progress-Open / Completed).
 class TaskListScreen extends StatefulWidget {
   const TaskListScreen({super.key});
 
@@ -190,8 +190,8 @@ class _TaskListScreenState extends State<TaskListScreen> {
             palette: palette,
             shiftActive: shift.active,
             assigned: tickets.totalCount,
+            open: tickets.openCount,
             inProgress: tickets.inProgressCount,
-            pending: tickets.pendingCount,
             onToggleShift: _onToggleShift,
           ),
           Expanded(
