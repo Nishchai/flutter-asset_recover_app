@@ -326,6 +326,8 @@
   "map.loadingRoute": "Loading today's route…",
   "map.routeError": "Couldn't load today's route.",
   "map.noStops": "No stops on today's route.",
+  "map.minimizeStops": "Minimize stops list",
+  "map.expandStops": "Show stops list",
 
   "profile.language": "Language",
   "profile.role": "Field Agent",

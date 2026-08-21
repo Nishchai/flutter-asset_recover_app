@@ -204,6 +204,8 @@
   "map.stops": "{count} थांबे",
   "map.activeStops": "सक्रिय थांबे",
   "map.noStops": "सध्या नकाशावर कोणतीही सक्रिय कामे नाहीत.",
+  "map.minimizeStops": "थांबे यादी लहान करा",
+  "map.expandStops": "थांबे यादी दाखवा",
   "map.liveLocation": "लाइव्ह BP स्थान",
   "map.openExternalMaps": "Google Maps मध्ये उघडा ↗",
   "map.title": "नकाशा",

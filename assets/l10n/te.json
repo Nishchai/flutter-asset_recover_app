@@ -204,6 +204,8 @@
   "map.stops": "{count} స్టాప్‌లు",
   "map.activeStops": "యాక్టివ్ స్టాప్‌లు",
   "map.noStops": "ప్రస్తుతం మ్యాప్‌లో యాక్టివ్ జాబ్‌లు ఏవీ లేవు.",
+  "map.minimizeStops": "స్టాప్‌ల జాబితాను చిన్నదిగా చేయి",
+  "map.expandStops": "స్టాప్‌ల జాబితాను చూపించు",
   "map.liveLocation": "లైవ్ BP లొకేషన్",
   "map.openExternalMaps": "గూగుల్ మ్యాప్స్‌లో తెరవండి ↗",
   "map.title": "మ్యాప్",

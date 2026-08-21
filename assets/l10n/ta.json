@@ -204,6 +204,8 @@
   "map.stops": "{count} நிறுத்தங்கள்",
   "map.activeStops": "செயலில் உள்ள நிறுத்தங்கள்",
   "map.noStops": "தற்போது வரைபடத்தில் செயலில் உள்ள பணிகள் இல்லை.",
+  "map.minimizeStops": "நிறுத்தங்கள் பட்டியலைச் சிறிதாக்கு",
+  "map.expandStops": "நிறுத்தங்கள் பட்டியலைக் காட்டு",
   "map.liveLocation": "நேரடி BP இருப்பிடம்",
   "map.openExternalMaps": "Google Maps-இல் திற ↗",
   "map.title": "வரைபடம்",

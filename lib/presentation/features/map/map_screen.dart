@@ -1131,12 +1131,21 @@ class _RouteStopsPanel extends StatefulWidget {
 class _RouteStopsPanelState extends State<_RouteStopsPanel> {
   final ScrollController _scroll = ScrollController();
 
+  /// Whether the stop list itself is hidden, leaving just the panel's header
+  /// bar — so the map underneath stays visible when the route has enough
+  /// stops to otherwise cover most of the screen. Toggled by the header's
+  /// chevron; independent of [_MapScreenState._selected] and `_popupIndex`,
+  /// neither of which this panel needs to change to collapse.
+  bool _collapsed = false;
+
   @override
   void didUpdateWidget(_RouteStopsPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
     // A marker tap expands a row that may be scrolled out of sight — bring it
     // up. Deferred a frame so the list has already grown by the expansion.
     if (oldWidget.selectedIndex != widget.selectedIndex) {
+      // The row it's expanding is only visible once the list itself is.
+      _collapsed = false;
       WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToSelected());
     }
   }
@@ -1184,41 +1193,71 @@ class _RouteStopsPanelState extends State<_RouteStopsPanel> {
                     letterSpacing: 0.5,
                   ),),
               const Spacer(),
-              if (widget.stops.isNotEmpty)
+              if (widget.stops.isNotEmpty) ...[
                 Text(l.t('map.stops', {'count': widget.stops.length}),
                     style: TextStyle(fontSize: 11, color: palette.muted),),
+                // Collapsing hides the list below, not this header — with many
+                // stops the panel can otherwise cover most of the map.
+                IconButton(
+                  onPressed: () => setState(() => _collapsed = !_collapsed),
+                  icon: Icon(
+                    _collapsed ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                    size: 20,
+                    color: palette.muted,
+                  ),
+                  tooltip: _collapsed
+                      ? l.t('map.expandStops')
+                      : l.t('map.minimizeStops'),
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                ),
+              ],
             ],
           ),
-          const SizedBox(height: 10),
-          if (widget.stops.isEmpty)
-            _EmptyState(
-              loading: widget.loading,
-              error: widget.error,
-              palette: palette,
-              onRetry: widget.onRetry,
-            )
-          else
-            ConstrainedBox(
-              // Never let the list swallow the map — it stays a panel over it.
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.42,
-              ),
-              child: ListView.separated(
-                controller: _scroll,
-                shrinkWrap: true,
-                padding: EdgeInsets.zero,
-                itemCount: widget.stops.length,
-                separatorBuilder: (_, __) => const SizedBox(height: _kStopRowGap),
-                itemBuilder: (context, i) => _StopRow(
-                  stop: widget.stops[i],
-                  palette: palette,
-                  expanded: i == widget.selectedIndex,
-                  onToggle: () => widget.onToggle(i),
-                  onViewDetails: () => widget.onViewDetails(widget.stops[i]),
-                  onOpenExternal: () => widget.onOpenExternal(widget.stops[i]),
-                ),
-              ),
-            ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+            alignment: Alignment.topCenter,
+            child: _collapsed
+                ? const SizedBox.shrink()
+                : Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: widget.stops.isEmpty
+                        ? _EmptyState(
+                            loading: widget.loading,
+                            error: widget.error,
+                            palette: palette,
+                            onRetry: widget.onRetry,
+                          )
+                        : ConstrainedBox(
+                            // Never let the list swallow the map — it stays a
+                            // panel over it.
+                            constraints: BoxConstraints(
+                              maxHeight:
+                                  MediaQuery.of(context).size.height * 0.42,
+                            ),
+                            child: ListView.separated(
+                              controller: _scroll,
+                              shrinkWrap: true,
+                              padding: EdgeInsets.zero,
+                              itemCount: widget.stops.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(height: _kStopRowGap),
+                              itemBuilder: (context, i) => _StopRow(
+                                stop: widget.stops[i],
+                                palette: palette,
+                                expanded: i == widget.selectedIndex,
+                                onToggle: () => widget.onToggle(i),
+                                onViewDetails: () =>
+                                    widget.onViewDetails(widget.stops[i]),
+                                onOpenExternal: () =>
+                                    widget.onOpenExternal(widget.stops[i]),
+                              ),
+                            ),
+                          ),
+                  ),
+          ),
         ],
       ),
     );

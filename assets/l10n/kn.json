@@ -204,6 +204,8 @@
   "map.stops": "{count} ನಿಲುಗಡೆಗಳು",
   "map.activeStops": "ಸಕ್ರಿಯ ನಿಲುಗಡೆಗಳು",
   "map.noStops": "ಈಗ ನಕ್ಷೆಯಲ್ಲಿ ಯಾವುದೇ ಸಕ್ರಿಯ ಕೆಲಸಗಳಿಲ್ಲ.",
+  "map.minimizeStops": "ನಿಲುಗಡೆ ಪಟ್ಟಿಯನ್ನು ಚಿಕ್ಕದಾಗಿಸಿ",
+  "map.expandStops": "ನಿಲುಗಡೆ ಪಟ್ಟಿಯನ್ನು ತೋರಿಸಿ",
   "map.liveLocation": "ಲೈವ್ BP ಸ್ಥಳ",
   "map.openExternalMaps": "Google Maps ನಲ್ಲಿ ತೆರೆಯಿರಿ ↗",
   "map.title": "ನಕ್ಷೆ",

@@ -217,6 +217,8 @@
   "map.stops": "{count} पड़ाव",
   "map.activeStops": "सक्रिय पड़ाव",
   "map.noStops": "अभी मानचित्र पर कोई सक्रिय कार्य नहीं है।",
+  "map.minimizeStops": "स्टॉप सूची छोटी करें",
+  "map.expandStops": "स्टॉप सूची दिखाएं",
 
   "profile.language": "भाषा",
   "profile.role": "फ़ील्ड एजेंट",
