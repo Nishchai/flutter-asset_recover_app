@@ -217,7 +217,10 @@ class ApiTicketRepository implements TicketRepository {
       pageSize: (envelope['pageSize'] as num?)?.toInt() ?? pageSize, // MAP: pageSize
       // Left null when absent — TicketPage.hasMore then reads a full window as
       // "there is probably more" rather than assuming this was the last one.
-      total: (envelope['total'] as num?)?.toInt(), // MAP: total
+      total: (envelope['total'] as num?)?.toInt(), // MAP: total -> home header ASSIGNED card
+      open: (envelope['open'] as num?)?.toInt(), // MAP: open -> home header OPEN card
+      inProgress: (envelope['inProgress'] as num?)?.toInt(), // MAP: inProgress -> home header PROGRESS card
+      closed: (envelope['closed'] as num?)?.toInt(), // MAP: closed
     );
   }
 

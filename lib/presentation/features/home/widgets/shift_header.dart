@@ -21,13 +21,14 @@ class ShiftHeader extends StatelessWidget {
   final AppPalette palette;
   final bool shiftActive;
 
-  /// Total tickets assigned to the agent, any status.
+  /// Total tickets assigned to the agent, any status. From the
+  /// `tickets.assigned` envelope's `total` counter.
   final int assigned;
 
-  /// Tickets not yet started — wire status `assigned`.
+  /// Tickets not yet started. From the envelope's `open` counter.
   final int open;
 
-  /// Tickets the agent has started — wire status `in_progress` only.
+  /// Tickets the agent has started. From the envelope's `inProgress` counter.
   final int inProgress;
   final ValueChanged<bool> onToggleShift;
 

@@ -11,6 +11,9 @@ class TicketPage {
     required this.page,
     required this.pageSize,
     this.total,
+    this.open,
+    this.inProgress,
+    this.closed,
   });
 
   /// No tickets and nothing further to fetch — the state before a first load.
@@ -28,6 +31,14 @@ class TicketPage {
   /// Total matching tickets server-side, when the envelope reported it. Null
   /// when it did not — [hasMore] then falls back to a full-page heuristic.
   final int? total;
+
+  /// Server-side counters over the agent's WHOLE ticket set (not just this
+  /// window), echoed on every window of the envelope. Null when the backend
+  /// omits them. Feed the home header's OPEN / PROGRESS cards — [total]
+  /// feeds the ASSIGNED card the same way.
+  final int? open;
+  final int? inProgress;
+  final int? closed;
 
   /// Whether another page is worth fetching.
   ///

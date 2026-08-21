@@ -71,6 +71,13 @@ class TicketProvider extends ChangeNotifier {
   bool _hasMorePages = true;
   bool _loadingMore = false;
   String? _loadMoreError;
+
+  /// Home header counters (ASSIGNED / OPEN / PROGRESS): the `tickets.assigned`
+  /// envelope's own `total`/`open`/`inProgress` fields, covering the agent's
+  /// WHOLE ticket set — not just the pages folded into [_all] so far.
+  int _headerAssigned = 0;
+  int _headerOpen = 0;
+  int _headerInProgress = 0;
   ShiftStats _stats = ShiftStats.empty;
   String _sort = 'distance';
   String? _lastAgentId;
@@ -102,6 +109,15 @@ class TicketProvider extends ChangeNotifier {
   /// on any full load/refresh. Distinct from [error] so a failed page-append
   /// never reads as "the whole list failed".
   String? get loadMoreError => _loadMoreError;
+
+  /// Header card 1 (ASSIGNED): `tickets.assigned`'s `total`.
+  int get totalCount => _headerAssigned;
+
+  /// Header card 2 (OPEN): `tickets.assigned`'s `open`.
+  int get openCount => _headerOpen;
+
+  /// Header card 3 (PROGRESS): `tickets.assigned`'s `inProgress`.
+  int get inProgressCount => _headerInProgress;
   ShiftStats get stats => _stats;
   List<String> get availableSorts =>
       _config.stringList('taskList.availableSorts');
@@ -177,6 +193,7 @@ class TicketProvider extends ChangeNotifier {
       _page = page.page;
       _hasMorePages = page.hasMore;
       _loadMoreError = null;
+      _applyHeaderCounts(page);
       _applyAutoExpiry();
     } else {
       _error = ticketsResult.failureOrNull?.message;
@@ -219,6 +236,7 @@ class TicketProvider extends ChangeNotifier {
       final page = result.valueOrNull ?? TicketPage.empty;
       _page = page.page;
       _hasMorePages = page.hasMore;
+      _applyHeaderCounts(page);
       _appendPage(page.items);
     } else {
       _loadMoreError = result.failureOrNull?.message ?? '';
@@ -238,6 +256,16 @@ class TicketProvider extends ChangeNotifier {
     _applyAutoExpiry();
   }
 
+  /// Updates the home header counters from a freshly fetched [page]. The
+  /// backend echoes `total`/`open`/`inProgress` on every window of the
+  /// envelope; a field left null (older backend, or absent from one response)
+  /// keeps the previously known value rather than resetting to zero.
+  void _applyHeaderCounts(TicketPage page) {
+    _headerAssigned = page.total ?? _headerAssigned;
+    _headerOpen = page.open ?? _headerOpen;
+    _headerInProgress = page.inProgress ?? _headerInProgress;
+  }
+
   /// Drops everything that belonged to the signed-out agent — tickets, stats
   /// and, crucially, [loadedAgentId], the id [registerAttemptSyncHandler]'s
   /// replay refreshes against. Called on logout (see
@@ -251,6 +279,9 @@ class TicketProvider extends ChangeNotifier {
 
   void _clearAgentScopedState() {
     _all = [];
+    _headerAssigned = 0;
+    _headerOpen = 0;
+    _headerInProgress = 0;
     _stats = ShiftStats.empty;
     _error = null;
     _hasLoaded = false;
@@ -368,24 +399,6 @@ class TicketProvider extends ChangeNotifier {
   }
 
   int countFor(TicketFilter filter) => ticketsFor(filter).length;
-
-  // Derived live from `_all` (not the one-shot `_stats` snapshot) so the
-  // header recounts on every notifyListeners() — e.g. right after
-  // submitAttempt() changes a ticket's status.
-
-  /// Header card 1 (ASSIGNED): every ticket the API returned for this agent,
-  /// whatever its status — the agent's whole workload, not just the untouched
-  /// ones.
-  int get totalCount => _all.length;
-
-  /// Header card 2 (OPEN): tickets not yet started — wire status `assigned`.
-  int get openCount =>
-      _all.where((t) => t.status == TicketStatus.assigned).length;
-
-  /// Header card 3 (PROGRESS): strictly the tickets the agent has started —
-  /// wire status `in_progress`.
-  int get inProgressCount =>
-      _all.where((t) => t.status == TicketStatus.inProgress).length;
 
   /// Recomputes road distance from the agent to every BP (PRD §4.8).
   ///
