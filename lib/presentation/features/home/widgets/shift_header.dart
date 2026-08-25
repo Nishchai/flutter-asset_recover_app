@@ -14,6 +14,8 @@ class ShiftHeader extends StatelessWidget {
     required this.assigned,
     required this.open,
     required this.inProgress,
+    required this.completed,
+    required this.pendingVerification,
     required this.onToggleShift,
   });
 
@@ -30,6 +32,14 @@ class ShiftHeader extends StatelessWidget {
 
   /// Tickets the agent has started. From the envelope's `inProgress` counter.
   final int inProgress;
+
+  /// Tickets closed (incl. auto-closed/unrecoverable). From the envelope's
+  /// `closed` counter.
+  final int completed;
+
+  /// Tickets awaiting coordinator approval. From the envelope's
+  /// `pendingApproval` counter.
+  final int pendingVerification;
   final ValueChanged<bool> onToggleShift;
 
   String _greetingKey() {
@@ -143,10 +153,14 @@ class ShiftHeader extends StatelessWidget {
               Row(
                 children: [
                   _stat(l.t('stats.assigned'), assigned, highlight: true),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 8),
                   _stat(l.t('stats.open'), open),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 8),
                   _stat(l.t('stats.inProgress'), inProgress),
+                  const SizedBox(width: 8),
+                  _stat(l.t('stats.pendingVerification'), pendingVerification),
+                  const SizedBox(width: 8),
+                  _stat(l.t('stats.completed'), completed),
                 ],
               ),
             ],

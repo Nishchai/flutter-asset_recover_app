@@ -25,6 +25,9 @@ enum TicketStatus {
       case 'closed':
         return TicketStatus.closed;
       case 'unrecoverable':
+      // Backend-driven auto-closure (e.g. SLA/inactivity) — same terminal,
+      // "Completed" state as a manually closed/unrecoverable ticket.
+      case 'autoclosed':
         return TicketStatus.unrecoverable;
       case 'assigned':
       default:

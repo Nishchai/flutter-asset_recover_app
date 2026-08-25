@@ -14,6 +14,7 @@ class TicketPage {
     this.open,
     this.inProgress,
     this.closed,
+    this.pendingApproval,
   });
 
   /// No tickets and nothing further to fetch — the state before a first load.
@@ -39,6 +40,11 @@ class TicketPage {
   final int? open;
   final int? inProgress;
   final int? closed;
+
+  /// Awaiting coordinator approval (backend's `pendingApproval`) — feeds the
+  /// home header's Pending Verification card the same way [closed] feeds
+  /// Completed.
+  final int? pendingApproval;
 
   /// Whether another page is worth fetching.
   ///

@@ -75,11 +75,6 @@ class ProfileScreen extends StatelessWidget {
               title: l.t('profile.autoLogout', {'hours': config.autoLogoutHours}),
               palette: palette,
             ),
-            _InfoTile(
-              icon: Icons.cloud_outlined,
-              title: '${l.t('profile.environment')}: ${config.env.label}',
-              palette: palette,
-            ),
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,

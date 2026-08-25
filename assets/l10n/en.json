@@ -59,9 +59,11 @@
   "endShift.trouble": "Trouble ending shift?",
   "endShift.contactSupport": "Contact Support",
 
-  "stats.assigned": "ASSIGNED",
+  "stats.assigned": "TOTAL",
   "stats.open": "OPEN",
   "stats.inProgress": "PROGRESS",
+  "stats.pendingVerification": "PENDING",
+  "stats.completed": "COMPLETED",
 
   "filter.all": "All",
   "filter.allTasks": "All Tasks",

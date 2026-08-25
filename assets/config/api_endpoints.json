@@ -3,7 +3,7 @@
 
   "auth": {
     "_comment_commonLogin": "SM-Partners directory lookup — step 1 of login, called the moment the agent submits their mobile number. Lives on its own host, so it carries an ABSOLUTE URL (used verbatim: no apiBaseUrl prefix, no agentId param). `appName` is fixed per app and travels in the URL; ApiTicketRepository appends `userMobilenumber`. A success (status 200 with a `data` block) gates the OTP send; the returned `data` is the real agent record.",
-    "commonLogin": "GET https://sm-partners-api.azurewebsites.net/api/v1/commonLogin?appName=INDOFAST_PARTNER",
+    "commonLogin": "GET https://sm-partners-api.azurewebsites.net/api/v1/commonLogin?appName=INDOFAST_ASSET_RECOVERY",
     "requestOtp": "POST /auth/otp/request",
     "verifyOtp": "POST /auth/otp/verify", 
     "refresh": "POST /auth/refresh",

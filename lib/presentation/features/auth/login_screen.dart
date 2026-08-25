@@ -21,7 +21,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   /// How long "Resend OTP" stays locked after a code is sent.
-  static const _resendCooldown = Duration(seconds: 30);
+  static const _resendCooldown = Duration(seconds: 60);
 
   final _mobile = TextEditingController(text: '');
   final _otp = TextEditingController();
@@ -307,7 +307,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       button: true,
                       enabled: resendReady,
                       child: TextButton(
-                        // Greyed out and non-actionable until the 30s countdown
+                        // Greyed out and non-actionable until the 60s countdown
                         // reaches 0, so the agent can't spam the OTP endpoint.
                         onPressed: resendReady ? _resendOtp : null,
                         style: TextButton.styleFrom(

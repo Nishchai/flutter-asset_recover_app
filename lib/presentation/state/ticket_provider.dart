@@ -17,10 +17,10 @@ import 'package:asset_recovery_app/domain/usecases/submit_attempt_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/ticket_pickup_usecase.dart';
 import 'package:flutter/foundation.dart';
 
-/// Home tabs (item 1): All Tasks (every ticket the API returned, any status) /
-/// In Progress/Open (anything not finished — Open, started, or pending
-/// verification) / Completed (closed or unrecoverable).
-enum TicketFilter { allTasks, inProgress, completed }
+/// Home tabs (item 1): Open (wire status `assigned` — nothing done yet) /
+/// In Progress (started work) / Pending Verification (outcome submitted,
+/// awaiting AC approval) / Completed (closed or unrecoverable).
+enum TicketFilter { open, inProgress, pendingVerification, completed }
 
 /// Presentation state for the ticket list. Talks to the domain exclusively
 /// through use cases; applies the home filters + sorting and refreshes
@@ -78,6 +78,8 @@ class TicketProvider extends ChangeNotifier {
   int _headerAssigned = 0;
   int _headerOpen = 0;
   int _headerInProgress = 0;
+  int _headerCompleted = 0;
+  int _headerPendingVerification = 0;
   ShiftStats _stats = ShiftStats.empty;
   String _sort = 'distance';
   String? _lastAgentId;
@@ -118,6 +120,13 @@ class TicketProvider extends ChangeNotifier {
 
   /// Header card 3 (PROGRESS): `tickets.assigned`'s `inProgress`.
   int get inProgressCount => _headerInProgress;
+
+  /// Header card 4 (COMPLETED): `tickets.assigned`'s `closed`.
+  int get completedCount => _headerCompleted;
+
+  /// Header card 5 (PENDING VERIFICATION): `tickets.assigned`'s
+  /// `pendingApproval`.
+  int get pendingVerificationCount => _headerPendingVerification;
   ShiftStats get stats => _stats;
   List<String> get availableSorts =>
       _config.stringList('taskList.availableSorts');
@@ -264,6 +273,8 @@ class TicketProvider extends ChangeNotifier {
     _headerAssigned = page.total ?? _headerAssigned;
     _headerOpen = page.open ?? _headerOpen;
     _headerInProgress = page.inProgress ?? _headerInProgress;
+    _headerCompleted = page.closed ?? _headerCompleted;
+    _headerPendingVerification = page.pendingApproval ?? _headerPendingVerification;
   }
 
   /// Drops everything that belonged to the signed-out agent — tickets, stats
@@ -282,6 +293,8 @@ class TicketProvider extends ChangeNotifier {
     _headerAssigned = 0;
     _headerOpen = 0;
     _headerInProgress = 0;
+    _headerCompleted = 0;
+    _headerPendingVerification = 0;
     _stats = ShiftStats.empty;
     _error = null;
     _hasLoaded = false;
@@ -319,18 +332,14 @@ class TicketProvider extends ChangeNotifier {
     final now = DateTime.now();
     final filtered = _all.where((t) {
       switch (filter) {
-        case TicketFilter.allTasks:
-          // Every ticket the tickets API returned for this agent, whatever its
-          // status — the In Progress / Completed tabs are the narrowed views.
-          return true;
+        case TicketFilter.open:
+          return t.status == TicketStatus.assigned;
         case TicketFilter.inProgress:
-          // Everything still to finish: Open (wire status `assigned` — nothing
-          // done on it yet), started work, and outcomes (Recovered / FIR-Lost)
-          // still awaiting AC approval, since the Field Agent never closes a
-          // ticket directly.
-          return t.status == TicketStatus.inProgress ||
-              t.status == TicketStatus.assigned ||
-              t.status == TicketStatus.pending;
+          return t.status == TicketStatus.inProgress;
+        case TicketFilter.pendingVerification:
+          // Outcome (Recovered / FIR-Lost) submitted, awaiting AC approval —
+          // the Field Agent never closes a ticket directly.
+          return t.status == TicketStatus.pending;
         case TicketFilter.completed:
           return t.status == TicketStatus.closed ||
               t.status == TicketStatus.unrecoverable;

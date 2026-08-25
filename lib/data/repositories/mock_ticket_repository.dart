@@ -445,7 +445,13 @@ class MockTicketRepository implements TicketRepository {
       total: mine.length,
       open: mine.where((t) => t.status == TicketStatus.assigned).length,
       inProgress: mine.where((t) => t.status == TicketStatus.inProgress).length,
-      closed: mine.where((t) => t.status == TicketStatus.closed).length,
+      closed: mine
+          .where((t) =>
+              t.status == TicketStatus.closed ||
+              t.status == TicketStatus.unrecoverable,)
+          .length,
+      pendingApproval:
+          mine.where((t) => t.status == TicketStatus.pending).length,
     ),);
   }
 

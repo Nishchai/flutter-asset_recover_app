@@ -220,7 +220,8 @@ class ApiTicketRepository implements TicketRepository {
       total: (envelope['total'] as num?)?.toInt(), // MAP: total -> home header ASSIGNED card
       open: (envelope['open'] as num?)?.toInt(), // MAP: open -> home header OPEN card
       inProgress: (envelope['inProgress'] as num?)?.toInt(), // MAP: inProgress -> home header PROGRESS card
-      closed: (envelope['closed'] as num?)?.toInt(), // MAP: closed
+      closed: (envelope['closed'] as num?)?.toInt(), // MAP: closed -> home header COMPLETED card
+      pendingApproval: (envelope['pendingApproval'] as num?)?.toInt(), // MAP: pendingApproval -> home header PENDING VERIFICATION card
     );
   }
 

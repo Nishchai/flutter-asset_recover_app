@@ -14,7 +14,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 /// Home screen (Figma): dark shift header + stats, then a filterable list of
-/// assigned tickets (All Tasks / In Progress-Open / Completed).
+/// assigned tickets (Open / In Progress / Pending Verification / Completed).
 class TaskListScreen extends StatefulWidget {
   const TaskListScreen({super.key});
 
@@ -23,7 +23,7 @@ class TaskListScreen extends StatefulWidget {
 }
 
 class _TaskListScreenState extends State<TaskListScreen> {
-  TicketFilter _filter = TicketFilter.allTasks;
+  TicketFilter _filter = TicketFilter.open;
 
   /// Drives the scroll paging: the next page is requested once the agent is
   /// within this many pixels of the end of the loaded tickets, so the following
@@ -33,14 +33,16 @@ class _TaskListScreenState extends State<TaskListScreen> {
   final ScrollController _scroll = ScrollController();
 
   static const _filterOrder = [
-    TicketFilter.allTasks,
+    TicketFilter.open,
     TicketFilter.inProgress,
+    TicketFilter.pendingVerification,
     TicketFilter.completed,
   ];
 
   static const _filterKey = {
-    TicketFilter.allTasks: 'filter.allTasks',
-    TicketFilter.inProgress: 'filter.inProgressPending',
+    TicketFilter.open: 'filter.open',
+    TicketFilter.inProgress: 'filter.inProgress',
+    TicketFilter.pendingVerification: 'filter.pendingVerification',
     TicketFilter.completed: 'filter.completed',
   };
 
@@ -192,6 +194,8 @@ class _TaskListScreenState extends State<TaskListScreen> {
             assigned: tickets.totalCount,
             open: tickets.openCount,
             inProgress: tickets.inProgressCount,
+            completed: tickets.completedCount,
+            pendingVerification: tickets.pendingVerificationCount,
             onToggleShift: _onToggleShift,
           ),
           Expanded(
