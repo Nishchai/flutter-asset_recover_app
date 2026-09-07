@@ -38,6 +38,7 @@
   "login.verifyOtp": "Verify OTP",
   "login.changeNumber": "Change mobile number",
   "login.demoHint": "Demo mode — any 10-digit mobile number and 6-digit OTP works.",
+  "login.noInternet": "Please check your internet connection and try again",
 
   "greeting.morning": "Good Morning!",
   "greeting.afternoon": "Good Afternoon!",

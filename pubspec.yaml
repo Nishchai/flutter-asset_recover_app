@@ -1,5 +1,5 @@
 name: asset_recovery_app
-description: >-
+description: >
   Asset Recovery — Field Agent mobile application (SUN Mobility / Smart Network).
   Config-driven Flutter app for identifying, tracking and recovering at-risk /
   theft battery packs (BPs). Phase 1 — Retail customer recovery workflows.

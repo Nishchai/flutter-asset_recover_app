@@ -1,7 +1,9 @@
 import 'dart:async';
 
 import 'package:asset_recovery_app/core/di/app_services.dart';
+import 'package:asset_recovery_app/core/di/injector.dart';
 import 'package:asset_recovery_app/core/localization/app_localizations.dart';
+import 'package:asset_recovery_app/core/services/connectivity_service.dart';
 import 'package:asset_recovery_app/core/theme/app_theme.dart';
 import 'package:asset_recovery_app/core/utils/validators.dart';
 import 'package:asset_recovery_app/presentation/features/auth/widgets/otp_input.dart';
@@ -100,9 +102,15 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _submitMobile() async {
     final l = AppLocalizations.of(context);
+    final auth = context.read<AuthProvider>();
     final value = _mobile.text.trim();
     if (!Validators.isValidMobile(value)) {
       setState(() => _mobileError = l.t('validation.invalidMobile'));
+      return;
+    }
+    if (!await sl<ConnectivityService>().isOnline()) {
+      if (!mounted) return;
+      setState(() => _mobileError = l.t('login.noInternet'));
       return;
     }
     setState(() => _mobileError = null);
@@ -110,7 +118,6 @@ class _LoginScreenState extends State<LoginScreen> {
     // AuthProvider moves to AuthStatus.otpSent and this screen rebuilds into
     // the OTP step below; on failure no OTP was sent, so show WHY the number
     // was rejected (the backend's `reason`) inline on the field.
-    final auth = context.read<AuthProvider>();
     final ok = await auth.requestOtp(value);
     if (!mounted) return;
     if (ok) {
