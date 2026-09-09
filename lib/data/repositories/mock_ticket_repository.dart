@@ -543,6 +543,7 @@ class MockTicketRepository implements TicketRepository {
         bpId: bp.bpId,
         vehicleType: bp.vehicleType,
         vehicleRegNo: bp.vehicleRegNo,
+        vehicleId: bp.vehicleId,
         soc: bp.soc,
         attemptCount: bp.attemptCount,
       ),

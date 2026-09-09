@@ -16,6 +16,7 @@ import 'package:asset_recovery_app/domain/entities/geo_point.dart';
 import 'package:asset_recovery_app/domain/usecases/get_agent_route_usecase.dart';
 import 'package:asset_recovery_app/presentation/features/ticket_detail/ticket_detail_screen.dart';
 import 'package:asset_recovery_app/presentation/state/auth_provider.dart';
+import 'package:asset_recovery_app/presentation/state/ticket_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
@@ -99,6 +100,11 @@ class _MapScreenState extends State<MapScreen> {
   /// The bpId whose "Start navigation" is still resolving (device fix +
   /// Directions lookup), or null when none is — drives that button's spinner.
   String? _navigatingBpId;
+
+  /// [RouteStop.ticketNumber] of the stop whose "View details" is still
+  /// resolving — [_openDetails] paging [TicketProvider] in to find it — or
+  /// null when none is. Drives that stop's spinner (popup card or panel row).
+  String? _resolvingTicketNumber;
 
   /// The single-BP navigation leg currently drawn on the map (focused mode
   /// only), or null. Set by [_startNavigation].
@@ -328,7 +334,9 @@ class _MapScreenState extends State<MapScreen> {
                           _StopPopupCard(
                             stop: stops[popupIndex],
                             palette: palette,
-                            onOpen: () => _openDetails(stops[popupIndex]),
+                            resolving: stops[popupIndex].ticketNumber ==
+                                _resolvingTicketNumber,
+                            onOpen: () => unawaited(_openDetails(stops[popupIndex])),
                             onClose: () => setState(() => _popupIndex = -1),
                           ),
                           const SizedBox(height: 8),
@@ -346,6 +354,7 @@ class _MapScreenState extends State<MapScreen> {
                             // don't leave both on screen.
                             _popupIndex = -1;
                           }),
+                          resolvingTicketNumber: _resolvingTicketNumber,
                           onViewDetails: _openDetails,
                           onOpenExternal: (stop) => _openExternalDirections(
                               stop.location, _deviceLocation,),
@@ -362,11 +371,39 @@ class _MapScreenState extends State<MapScreen> {
   /// Opens the ticket behind [stop]. The detail screen resolves its ticket
   /// through [TicketProvider.byId], which is keyed by the human ticket number
   /// ([Ticket.ticketId]) — not the route's `ticketId` UUID.
-  void _openDetails(RouteStop stop) => Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => TicketDetailScreen(ticketId: stop.ticketNumber),
-        ),
-      );
+  ///
+  /// [stop] comes from `agent.route`, which hands back the WHOLE day's route in
+  /// one go; [TicketProvider] backs it by `tickets.assigned`, which the Tasks
+  /// tab pages in [TicketProvider.pageSize] at a time. A stop further down the
+  /// route than the Tasks tab has scrolled would otherwise dead-end the detail
+  /// screen on "Something went wrong" even though the ticket is real — so
+  /// before pushing, page [TicketProvider] in (loading it for the first time if
+  /// the agent hasn't opened Tasks at all this session) until the stop's ticket
+  /// turns up or the server is out of pages.
+  Future<void> _openDetails(RouteStop stop) async {
+    if (_resolvingTicketNumber == stop.ticketNumber) return;
+    final tickets = context.read<TicketProvider>();
+    if (tickets.byId(stop.ticketNumber) == null) {
+      setState(() => _resolvingTicketNumber = stop.ticketNumber);
+      if (tickets.loadedAgentId == null) {
+        final agentId = context.read<AuthProvider>().agent?.id ?? '';
+        if (agentId.isNotEmpty) await tickets.load(agentId);
+      }
+      while (mounted &&
+          tickets.byId(stop.ticketNumber) == null &&
+          tickets.hasMorePages) {
+        await tickets.loadMore();
+      }
+      if (!mounted) return;
+      setState(() => _resolvingTicketNumber = null);
+    }
+    if (!mounted) return;
+    unawaited(Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => TicketDetailScreen(ticketId: stop.ticketNumber),
+      ),
+    ),);
+  }
 
   /// "Start navigation" on the focused-BP card: draws the drivable route from
   /// the agent's current position to [destination] on this screen's own map.
@@ -1034,12 +1071,18 @@ class _StopPopupCard extends StatelessWidget {
     required this.palette,
     required this.onOpen,
     required this.onClose,
+    this.resolving = false,
   });
 
   final RouteStop stop;
   final AppPalette palette;
   final VoidCallback onOpen;
   final VoidCallback onClose;
+
+  /// True while [onOpen] is paging [TicketProvider] in to find this stop's
+  /// ticket — see [_MapScreenState._openDetails]. Swaps the chevron for a
+  /// spinner and blocks a repeat tap until it settles.
+  final bool resolving;
 
   @override
   Widget build(BuildContext context) {
@@ -1050,7 +1093,7 @@ class _StopPopupCard extends StatelessWidget {
       elevation: 6,
       shadowColor: Colors.black.withValues(alpha: 0.2),
       child: InkWell(
-        onTap: onOpen,
+        onTap: resolving ? null : onOpen,
         borderRadius: BorderRadius.circular(14),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
@@ -1078,7 +1121,18 @@ class _StopPopupCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right, color: palette.primaryDark),
+              if (resolving)
+                Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: palette.primaryDark,),
+                  ),
+                )
+              else
+                Icon(Icons.chevron_right, color: palette.primaryDark),
               IconButton(
                 onPressed: onClose,
                 icon: const Icon(Icons.close, size: 18),
@@ -1108,6 +1162,7 @@ class _RouteStopsPanel extends StatefulWidget {
     required this.onToggle,
     required this.onViewDetails,
     required this.onOpenExternal,
+    this.resolvingTicketNumber,
   });
 
   final List<RouteStop> stops;
@@ -1123,6 +1178,11 @@ class _RouteStopsPanel extends StatefulWidget {
   final ValueChanged<int> onToggle;
   final ValueChanged<RouteStop> onViewDetails;
   final ValueChanged<RouteStop> onOpenExternal;
+
+  /// [RouteStop.ticketNumber] of the stop whose "View details" is still
+  /// paging [TicketProvider] in to find it, or null when none is — see
+  /// [_MapScreenState._openDetails].
+  final String? resolvingTicketNumber;
 
   @override
   State<_RouteStopsPanel> createState() => _RouteStopsPanelState();
@@ -1248,6 +1308,8 @@ class _RouteStopsPanelState extends State<_RouteStopsPanel> {
                                 stop: widget.stops[i],
                                 palette: palette,
                                 expanded: i == widget.selectedIndex,
+                                resolving: widget.stops[i].ticketNumber ==
+                                    widget.resolvingTicketNumber,
                                 onToggle: () => widget.onToggle(i),
                                 onViewDetails: () =>
                                     widget.onViewDetails(widget.stops[i]),
@@ -1333,6 +1395,7 @@ class _StopRow extends StatelessWidget {
     required this.onToggle,
     required this.onViewDetails,
     required this.onOpenExternal,
+    this.resolving = false,
   });
 
   final RouteStop stop;
@@ -1341,6 +1404,11 @@ class _StopRow extends StatelessWidget {
   final VoidCallback onToggle;
   final VoidCallback onViewDetails;
   final VoidCallback onOpenExternal;
+
+  /// True while [onViewDetails] is paging [TicketProvider] in to find this
+  /// stop's ticket — see [_MapScreenState._openDetails]. Spins the "View
+  /// details" button instead of leaving it looking unresponsive.
+  final bool resolving;
 
   @override
   Widget build(BuildContext context) {
@@ -1418,8 +1486,15 @@ class _StopRow extends StatelessWidget {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: onViewDetails,
-                      icon: const Icon(Icons.info_outline, size: 16),
+                      onPressed: resolving ? null : onViewDetails,
+                      icon: resolving
+                          ? SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: palette.onSurface,),
+                            )
+                          : const Icon(Icons.info_outline, size: 16),
                       label: Text(l.t('map.viewDetails')),
                     ),
                   ),

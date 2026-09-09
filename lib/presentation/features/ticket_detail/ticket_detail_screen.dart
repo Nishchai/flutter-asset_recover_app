@@ -104,7 +104,12 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       backgroundColor: palette.background,
       body: Column(
         children: [
-          _Header(ticket: ticket, bp: bp, palette: palette, lastSeen: lastSeen),
+          _Header(
+              ticket: ticket,
+              bp: bp,
+              palette: palette,
+              lastSeen: lastSeen,
+              detail: _detail,),
           Expanded(
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
@@ -188,6 +193,7 @@ class _Header extends StatelessWidget {
     required this.bp,
     required this.palette,
     required this.lastSeen,
+    this.detail,
   });
   final Ticket ticket;
   final Battery bp;
@@ -196,6 +202,17 @@ class _Header extends StatelessWidget {
   /// "Last Seen" coordinates (see [resolveLastSeenPoint]) forwarded to the live
   /// tracking page as its `lat`/`lng` params.
   final GeoPoint lastSeen;
+
+  /// Full ticket detail from `tickets.fullDetail`, when it has arrived. Source
+  /// of the "VIN" readout's `battery.vehicleId`.
+  final TicketDetail? detail;
+
+  /// VIN — the `tickets.fullDetail` response's `battery.vehicleId` wins; falls
+  /// back to the list-summary [Battery.vehicleId] until the detail fetch lands.
+  String _vehicleId() {
+    final fromDetail = detail?.battery?.vehicleId ?? '';
+    return fromDetail.isNotEmpty ? fromDetail : bp.vehicleId;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -255,7 +272,7 @@ class _Header extends StatelessWidget {
                       fontSize: 24,
                       fontWeight: FontWeight.bold,),),
               const SizedBox(height: 4),
-              Text('${l.t('detail.vin')} - ${bp.vin}',
+              Text('${l.t('detail.vin')} - ${_vehicleId()}',
                   style: TextStyle(color: palette.onDark, fontSize: 13),),
               const SizedBox(height: 12),
               Wrap(
@@ -420,6 +437,13 @@ class _CaseDetailsCard extends StatelessWidget {
     return soc == null ? '—' : '${soc.toStringAsFixed(0)}%';
   }
 
+  /// VIN — the `tickets.fullDetail` response's `battery.vehicleId` wins; falls
+  /// back to the list-summary [Battery.vehicleId] until the detail fetch lands.
+  String _vehicleId() {
+    final fromDetail = detail?.battery?.vehicleId ?? '';
+    return fromDetail.isNotEmpty ? fromDetail : bp.vehicleId;
+  }
+
   String _statusLabel(AppLocalizations l) {
     switch (ticket.status) {
       case TicketStatus.assigned:
@@ -448,9 +472,9 @@ class _CaseDetailsCard extends StatelessWidget {
       (l.t('caseDetails.caseCreated'), Formatters.date(ticket.createdAt)),
       (l.t('caseDetails.caseSource'), _dash(ticket.caseSource.isEmpty ? null : ticket.caseSource)),
       (l.t('caseDetails.caseType'), bp.caseType),
-      (l.t('detail.vin'), _dash(bp.vehicleRegNo.isEmpty ? null : bp.vehicleRegNo)),
+      (l.t('detail.vin'), _dash(_vehicleId().isEmpty ? null : _vehicleId())),
       (l.t('caseDetails.vehicleType'), _dash(bp.vehicleType.isEmpty ? null : bp.vehicleType)),
-      (l.t('caseDetails.vehicleId'), _dash(bp.vehicleId.isEmpty ? null : bp.vehicleId)),
+      (l.t('caseDetails.vehicleRegNo'), _dash(bp.vehicleRegNo.isEmpty ? null : bp.vehicleRegNo)),
       (l.t('caseDetails.customerName'), bp.customer.name),
       (l.t('caseDetails.customerPhone'), bp.customer.maskedMobile()),
       (l.t('caseDetails.zone'), _dash(bp.zone.isEmpty ? null : bp.zone)),

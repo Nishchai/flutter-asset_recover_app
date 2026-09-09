@@ -114,7 +114,7 @@
   "caseDetails.caseSource": "Case Source",
   "caseDetails.caseType": "Case Type",
   "caseDetails.vehicleType": "Vehicle Type",
-  "caseDetails.vehicleId": "Vehicle ID",
+  "caseDetails.vehicleRegNo": "Vehicle Reg No",
   "caseDetails.customerName": "Customer Name",
   "caseDetails.customerPhone": "Customer Phone",
   "caseDetails.zone": "Zone",
