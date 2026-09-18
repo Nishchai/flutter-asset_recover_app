@@ -182,6 +182,12 @@
   "qr.wrongBattery": "Wrong battery — serial does not match",
   "qr.cameraUnavailable": "Camera unavailable — enter the serial manually",
 
+  "qrResult.matched": "Result matched",
+  "qrResult.ticket": "Ticket",
+  "qrResult.status": "status",
+  "qrResult.scannedAt": "Scanned At",
+  "qrResult.proceed": "Proceed",
+
   "field.call_status": "What happened on the call?",
   "field.proof_hint": "GPS & timestamp auto-embedded",
   "field.calling_remark": "What did the customer say?",
@@ -346,5 +352,7 @@
   "attempt.visitRecorded": "Visit recorded",
   "attempt.visitNotSynced": "Saved on this device — the visit couldn't be sent to the server",
   "attempt.callRecorded": "Call recorded",
-  "attempt.callNotSynced": "Saved on this device — the call couldn't be sent to the server"
+  "attempt.callNotSynced": "Saved on this device — the call couldn't be sent to the server",
+  "attempt.outOfRangeTitle": "Out of Range",
+  "attempt.outOfRangeMessage": "Come closer to the battery's location to submit this outcome."
 }

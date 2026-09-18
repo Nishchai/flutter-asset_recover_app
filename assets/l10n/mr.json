@@ -89,6 +89,8 @@
   "attempt.callNotSynced": "या डिव्हाइसवर सेव्ह — कॉल सर्व्हरवर पाठवता आला नाही",
   "attempt.visitRecorded": "भेट नोंदवली",
   "attempt.visitNotSynced": "या डिव्हाइसवर सेव्ह — भेट सर्व्हरवर पाठवता आली नाही",
+  "attempt.outOfRangeTitle": "क्षेत्राबाहेर",
+  "attempt.outOfRangeMessage": "हा निकाल सबमिट करण्यासाठी बॅटरीच्या स्थानाजवळ जा.",
   "call.durationSeconds": "{seconds} से.",
   "call.endCall": "कॉल समाप्त करा",
   "call.historicalRecordings": "मागील कॉल रेकॉर्डिंग",

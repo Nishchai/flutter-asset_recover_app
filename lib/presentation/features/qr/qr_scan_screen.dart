@@ -144,13 +144,6 @@ class _QrScanScreenState extends State<QrScanScreen> {
             const SizedBox(height: 8),
             Text(l.t('qr.scanningFor'),
                 style: TextStyle(color: palette.mutedDark, fontSize: 14),),
-            const SizedBox(height: 4),
-            Text(widget.battery.bpId,
-                style: TextStyle(
-                  color: palette.primary,
-                  fontSize: 26,
-                  fontWeight: FontWeight.bold,
-                ),),
             const SizedBox(height: 28),
             // Live-camera viewfinder
             Container(
@@ -281,7 +274,6 @@ class _QrScanScreenState extends State<QrScanScreen> {
           controller: controller,
           autofocus: true,
           textCapitalization: TextCapitalization.characters,
-          decoration: InputDecoration(hintText: widget.battery.bpId),
           onSubmitted: (v) => Navigator.of(ctx).pop(v.trim()),
         ),
         actions: [

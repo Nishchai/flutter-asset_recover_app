@@ -89,6 +89,8 @@
   "attempt.callNotSynced": "ఈ పరికరంలో సేవ్ చేయబడింది — కాల్‌ను సర్వర్‌కు పంపలేకపోయాము",
   "attempt.visitRecorded": "సందర్శన నమోదైంది",
   "attempt.visitNotSynced": "ఈ పరికరంలో సేవ్ చేయబడింది — సందర్శనను సర్వర్‌కు పంపలేకపోయాము",
+  "attempt.outOfRangeTitle": "పరిధి వెలుపల",
+  "attempt.outOfRangeMessage": "ఈ ఫలితాన్ని సమర్పించడానికి బ్యాటరీ స్థానానికి దగ్గరగా వెళ్లండి.",
   "call.durationSeconds": "{seconds}సె",
   "call.endCall": "కాల్ ముగించు",
   "call.historicalRecordings": "మునుపటి కాల్ రికార్డింగ్‌లు",

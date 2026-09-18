@@ -89,6 +89,8 @@
   "attempt.callNotSynced": "ಈ ಸಾಧನದಲ್ಲಿ ಉಳಿಸಲಾಗಿದೆ — ಕರೆಯನ್ನು ಸರ್ವರ್‌ಗೆ ಕಳುಹಿಸಲಾಗಿಲ್ಲ",
   "attempt.visitRecorded": "ಭೇಟಿ ದಾಖಲಾಗಿದೆ",
   "attempt.visitNotSynced": "ಈ ಸಾಧನದಲ್ಲಿ ಉಳಿಸಲಾಗಿದೆ — ಭೇಟಿಯನ್ನು ಸರ್ವರ್‌ಗೆ ಕಳುಹಿಸಲಾಗಿಲ್ಲ",
+  "attempt.outOfRangeTitle": "ವ್ಯಾಪ್ತಿಯಿಂದ ಹೊರಗಿದೆ",
+  "attempt.outOfRangeMessage": "ಈ ಫಲಿತಾಂಶವನ್ನು ಸಲ್ಲಿಸಲು ಬ್ಯಾಟರಿಯ ಸ್ಥಳಕ್ಕೆ ಹತ್ತಿರ ಹೋಗಿ.",
   "call.durationSeconds": "{seconds}ಸೆ",
   "call.endCall": "ಕರೆ ಅಂತ್ಯಗೊಳಿಸಿ",
   "call.historicalRecordings": "ಹಿಂದಿನ ಕರೆ ರೆಕಾರ್ಡಿಂಗ್‌ಗಳು",

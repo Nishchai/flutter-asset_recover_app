@@ -1016,6 +1016,31 @@ class AttemptController extends ChangeNotifier {
     return opt?.boolExtra('requiresScan') ?? false;
   }
 
+  /// How close the agent must be to the battery's live telemetry location to
+  /// save the "Visit BP Location" section or submit a "Recovered" outcome.
+  static const double bpLocationGeofenceRadiusMeters = 100;
+
+  /// Geo-fence check against the battery's live telemetry location
+  /// (`battery.getBatteryDetails`' lastLatitude/lastLongitude) — used before
+  /// the "Visit BP Location" section save (only when `visitStatus` is
+  /// "battery_found") and before the "Recovered" outcome (Update Status)
+  /// submit. Distinct from [isProofWithinGeofence], which checks the
+  /// recovery proof photo against the cached [Battery.lastKnownLocation].
+  ///
+  /// Returns true (nothing to enforce) when the telemetry carries no
+  /// location or the device can't produce a current fix.
+  Future<bool> isWithinBpLocationRange() async {
+    final target = batteryDetail?.location;
+    if (target == null) return true;
+    final current = await _location.currentLocation();
+    if (!current.hasFix) return true;
+    return _location.isWithinGeofence(
+      current,
+      target,
+      bpLocationGeofenceRadiusMeters,
+    );
+  }
+
   String _buildRemark() {
     final parts = <String>[];
     final calling = (_values['callingRemark'] as String?)?.trim();

@@ -149,6 +149,27 @@ class _AttemptSectionScreenState extends State<AttemptSectionScreen>
         if (!context.mounted || verified != true) return;
       }
 
+      if (controller.selectedOutcome == 'recovered') {
+        final withinRange = await controller.isWithinBpLocationRange();
+        if (!context.mounted) return;
+        if (!withinRange) {
+          await showDialog<void>(
+            context: context,
+            builder: (_) => AlertDialog(
+              title: Text(l.t('attempt.outOfRangeTitle')),
+              content: Text(l.t('attempt.outOfRangeMessage')),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(l.t('common.close')),
+                ),
+              ],
+            ),
+          );
+          return;
+        }
+      }
+
       final tickets = context.read<TicketProvider>();
       final error = await controller.submitOutcome(tickets, l.t);
       if (!context.mounted) return;
@@ -173,6 +194,33 @@ class _AttemptSectionScreenState extends State<AttemptSectionScreen>
         ..pop()
         ..pop(); // back out of the hub too — the outcome closes this attempt cycle.
       return;
+    }
+
+    // The agent must be physically at the battery's live telemetry location
+    // to log this visit — same 100m geo-fence the "Recovered" outcome
+    // enforces — but only when they're reporting the battery as found;
+    // the other visit outcomes (not found, inaccessible, other) don't
+    // require the agent to be on top of the battery's last-known spot.
+    if (widget.section.id == 'location_visit' &&
+        controller.value('visitStatus') == 'battery_found') {
+      final withinRange = await controller.isWithinBpLocationRange();
+      if (!context.mounted) return;
+      if (!withinRange) {
+        await showDialog<void>(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: Text(l.t('attempt.outOfRangeTitle')),
+            content: Text(l.t('attempt.outOfRangeMessage')),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text(l.t('common.close')),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
     }
 
     final error = await controller.saveSection(widget.section, l.t);
