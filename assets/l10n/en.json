@@ -254,9 +254,10 @@
   "opt.call.wrong_number": "Wrong Number",
   "opt.call.error": "Error",
 
-  "opt.bpLocation.battery_found": "Battery Found",
+  "opt.bpLocation.battery_found_recovered": "Battery Found – Recovered",
+  "opt.bpLocation.battery_found_not_recovered_denied": "Battery Found – Not Recovered: Customer Denied Pickup",
   "opt.bpLocation.battery_not_found": "Battery Not Found",
-  "opt.bpLocation.location_inaccessible": "Location Inaccessible",
+  "opt.bpLocation.restricted_entry": "Restricted Entry",
   "opt.bpLocation.other": "Other",
 
   "opt.visit.done": "Yes, I saw a customer",

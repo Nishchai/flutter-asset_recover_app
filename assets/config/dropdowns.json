@@ -12,9 +12,10 @@
 
   "_bpLocationStatus_comment": "What happened at the BP's physical location (battery-centric, not customer-centric — item Rule 8b).",
   "bpLocationStatus": [
-    { "value": "battery_found", "labelKey": "opt.bpLocation.battery_found" },
+    { "value": "battery_found_recovered", "labelKey": "opt.bpLocation.battery_found_recovered" },
+    { "value": "battery_found_not_recovered_denied", "labelKey": "opt.bpLocation.battery_found_not_recovered_denied" },
     { "value": "battery_not_found", "labelKey": "opt.bpLocation.battery_not_found" },
-    { "value": "location_inaccessible", "labelKey": "opt.bpLocation.location_inaccessible" },
+    { "value": "restricted_entry", "labelKey": "opt.bpLocation.restricted_entry" },
     { "value": "other", "labelKey": "opt.bpLocation.other" }
   ],
 

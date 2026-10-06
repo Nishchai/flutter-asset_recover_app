@@ -1023,7 +1023,8 @@ class AttemptController extends ChangeNotifier {
   /// Geo-fence check against the battery's live telemetry location
   /// (`battery.getBatteryDetails`' lastLatitude/lastLongitude) — used before
   /// the "Visit BP Location" section save (only when `visitStatus` is
-  /// "battery_found") and before the "Recovered" outcome (Update Status)
+  /// "battery_found_recovered" or "battery_found_not_recovered_denied") and
+  /// before the "Recovered" outcome (Update Status)
   /// submit. Distinct from [isProofWithinGeofence], which checks the
   /// recovery proof photo against the cached [Battery.lastKnownLocation].
   ///
@@ -1238,9 +1239,10 @@ class AttemptController extends ChangeNotifier {
   /// absent from this map are sent verbatim, so only the values whose app
   /// spelling differs from the service member need an entry here.
   ///
-  /// `bpLocationStatus` (`battery_found`, `battery_not_found`,
-  /// `location_inaccessible`, `other`) is deliberately absent: the service is
-  /// adding those members under the same names, so all four go out verbatim.
+  /// `bpLocationStatus` (`battery_found_recovered`,
+  /// `battery_found_not_recovered_denied`, `battery_not_found`,
+  /// `restricted_entry`, `other`) is deliberately absent: the service is
+  /// adding those members under the same names, so all five go out verbatim.
   ///
   /// `callStatus` (`connected`, `not_responding`, `call_disconnected`,
   /// `switched_off`, `wrong_number`, `error`) is absent for the same reason —

@@ -199,11 +199,15 @@ class _AttemptSectionScreenState extends State<AttemptSectionScreen>
 
     // The agent must be physically at the battery's live telemetry location
     // to log this visit — same 100m geo-fence the "Recovered" outcome
-    // enforces — but only when they're reporting the battery as found;
-    // the other visit outcomes (not found, inaccessible, other) don't
-    // require the agent to be on top of the battery's last-known spot.
+    // enforces — but only when they're reporting the battery as found
+    // (recovered, or not recovered because the customer denied pickup); the
+    // other visit outcomes (not found, restricted entry, other) don't require
+    // the agent to be on top of the battery's last-known spot.
     if (widget.section.id == 'location_visit' &&
-        controller.value('visitStatus') == 'battery_found') {
+        const {
+          'battery_found_recovered',
+          'battery_found_not_recovered_denied',
+        }.contains(controller.value('visitStatus'))) {
       final withinRange = await controller.isWithinBpLocationRange();
       if (!context.mounted) return;
       if (!withinRange) {
