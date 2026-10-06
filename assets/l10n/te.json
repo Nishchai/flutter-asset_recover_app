@@ -246,6 +246,7 @@
   "opt.help.none": "ఏదీ లేదు",
   "opt.help.over_call": "కాల్ ద్వారా",
   "opt.outcome.customer_not_cooperating": "కస్టమర్ సహకరించడం లేదు",
+  "opt.outcome.customer_will_take_swap": "కస్టమర్ స్వాప్ తీసుకుంటారు",
   "opt.outcome.fir": "FIR",
   "opt.outcome.not_found_refused": "కనుగొనబడలేదు / తిరస్కరించారు",
   "opt.sort.distance": "దూరం",

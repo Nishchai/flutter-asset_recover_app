@@ -93,8 +93,13 @@ void main() {
   test('Swap is never an FA-selectable outcome (system/TIU-detected) and FIR '
       'is separate from Not Found/Refused (Rules 1, 2, 6)', () {
     final outcomeOptions = env.config.options('outcome').map((o) => o.value);
-    expect(outcomeOptions,
-        ['recovered', 'fir', 'not_found_refused', 'customer_not_cooperating'],);
+    expect(outcomeOptions, [
+      'recovered',
+      'fir',
+      'not_found_refused',
+      'customer_not_cooperating',
+      'customer_will_take_swap',
+    ]);
   });
 
   test('battery remark is hidden for FIR (Rule 3) and for Customer Not '

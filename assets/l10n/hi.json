@@ -324,6 +324,7 @@
   "opt.firReason.fir_filed_awaiting_ac_review": "एफआईआर दर्ज — एसी समीक्षा लंबित",
   "opt.firReason.other": "अन्य",
   "opt.outcome.customer_not_cooperating": "ग्राहक सहयोग नहीं कर रहा",
+  "opt.outcome.customer_will_take_swap": "ग्राहक स्वैप लेगा",
   "opt.outcome.fir": "एफआईआर",
   "opt.outcome.not_found_refused": "नहीं मिला / अस्वीकृत",
   "opt.sort.distance": "दूरी",

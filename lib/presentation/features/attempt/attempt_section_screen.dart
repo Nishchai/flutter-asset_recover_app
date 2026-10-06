@@ -8,6 +8,7 @@ import 'package:asset_recovery_app/domain/entities/form_field_config.dart';
 import 'package:asset_recovery_app/presentation/features/attempt/dynamic_field.dart';
 import 'package:asset_recovery_app/presentation/features/map/map_screen.dart';
 import 'package:asset_recovery_app/presentation/features/qr/qr_scan_screen.dart';
+import 'package:asset_recovery_app/presentation/shared/mark_ticket_in_progress.dart';
 import 'package:asset_recovery_app/presentation/shared/widgets/pill_button.dart';
 import 'package:asset_recovery_app/presentation/state/attempt_controller.dart';
 import 'package:asset_recovery_app/presentation/state/ticket_provider.dart';
@@ -229,6 +230,11 @@ class _AttemptSectionScreenState extends State<AttemptSectionScreen>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
       return;
     }
+    // Submitting an attempt from Call Customer, Visit BP Location or Visit
+    // Customer Address means the agent is now working the case, so move the
+    // ticket to `inProgress`. Only after a successful save — a validation
+    // failure returned above and never reaches here.
+    unawaited(markTicketInProgress(controller.ticketId));
     // The call and visit sections also POST their attempt to the attempts
     // service. The draft is saved either way, so say plainly which of the two
     // happened instead of a blanket "Saved" that hides a rejected submission.

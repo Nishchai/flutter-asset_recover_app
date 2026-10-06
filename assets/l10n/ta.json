@@ -246,6 +246,7 @@
   "opt.help.none": "எதுவுமில்லை",
   "opt.help.over_call": "அழைப்பு மூலம்",
   "opt.outcome.customer_not_cooperating": "வாடிக்கையாளர் ஒத்துழைக்கவில்லை",
+  "opt.outcome.customer_will_take_swap": "வாடிக்கையாளர் ஸ்வாப் எடுப்பார்",
   "opt.outcome.fir": "FIR",
   "opt.outcome.not_found_refused": "கிடைக்கவில்லை / மறுத்தது",
   "opt.sort.distance": "தூரம்",

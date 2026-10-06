@@ -36,12 +36,20 @@ void main() {
     // Swap is intentionally absent — it's system/TIU-detected, never a
     // Field Agent choice (Rule 1). FIR and Not Found/Refused ("Lost" folded
     // in) are separate (Rule 2); Customer Not Cooperating is a distinct
-    // terminal outcome (Rule 6). 4 outcomes are FA-selectable.
+    // terminal outcome (Rule 6). Customer Will Take Swap records the
+    // customer's intent only — the swap itself is still system-detected.
+    // 5 outcomes are FA-selectable.
     final outcomes = config.options('outcome');
-    expect(outcomes, hasLength(4));
+    expect(outcomes, hasLength(5));
     expect(
       outcomes.map((o) => o.value),
-      ['recovered', 'fir', 'not_found_refused', 'customer_not_cooperating'],
+      [
+        'recovered',
+        'fir',
+        'not_found_refused',
+        'customer_not_cooperating',
+        'customer_will_take_swap',
+      ],
     );
     final recovered = config.optionByValue('outcome', 'recovered')!;
     expect(recovered.stringExtra('resolution'), 'Recovered');
@@ -50,6 +58,11 @@ void main() {
 
     final notCooperating = config.optionByValue('outcome', 'customer_not_cooperating')!;
     expect(notCooperating.boolExtra('requiresApproval'), isFalse);
+
+    final willTakeSwap = config.optionByValue('outcome', 'customer_will_take_swap')!;
+    expect(willTakeSwap.stringExtra('resolution'), 'Customer Will Take Swap');
+    expect(willTakeSwap.boolExtra('terminal'), isFalse);
+    expect(willTakeSwap.boolExtra('requiresApproval'), isFalse);
   });
 
   test('test environment forces deterministic seed + mock data', () {

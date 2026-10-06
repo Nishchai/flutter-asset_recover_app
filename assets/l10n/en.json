@@ -268,6 +268,7 @@
   "opt.outcome.fir": "FIR",
   "opt.outcome.not_found_refused": "Not Found / Refused",
   "opt.outcome.customer_not_cooperating": "Customer Not Cooperating",
+  "opt.outcome.customer_will_take_swap": "Customer Will Take Swap",
 
   "opt.help.over_call": "Over Call",
   "opt.help.field_visit": "Field Visit",

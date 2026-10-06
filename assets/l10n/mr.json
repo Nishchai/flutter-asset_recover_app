@@ -246,6 +246,7 @@
   "opt.help.none": "काहीही नाही",
   "opt.help.over_call": "कॉलवरून",
   "opt.outcome.customer_not_cooperating": "ग्राहक सहकार्य करत नाही",
+  "opt.outcome.customer_will_take_swap": "ग्राहक स्वॅप घेईल",
   "opt.outcome.fir": "FIR",
   "opt.outcome.not_found_refused": "सापडले नाही / नकार दिला",
   "opt.sort.distance": "अंतर",

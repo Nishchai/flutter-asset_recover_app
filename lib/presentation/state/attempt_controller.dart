@@ -1171,7 +1171,8 @@ class AttemptController extends ChangeNotifier {
         attemptType: _submissionAttemptType,
         // The app's snake_case outcome vocabulary (dropdowns.json `outcome`)
         // already matches the attempts service's allowed enum values verbatim
-        // (recovered, fir, not_found_refused, customer_not_cooperating), so we
+        // (recovered, fir, not_found_refused, customer_not_cooperating,
+        // customer_will_take_swap), so we
         // send it raw. The service 422s "Invalid outcome" on anything else.
         outcome: selectedOutcome,
         attemptedAt: _updateStatusOpenedAt ?? DateTime.now(),

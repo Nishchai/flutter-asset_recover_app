@@ -621,7 +621,8 @@ class MockTicketRepository implements TicketRepository {
       ticket.closedAt = attempt.createdAt;
       ticket.reason = 'Customer Not Cooperating — handed to central team';
     } else {
-      // Not Found / Refused — non-terminal, case remains open for further attempts.
+      // Not Found / Refused and Customer Will Take Swap — non-terminal, case
+      // remains open for further attempts (the swap itself is system-detected).
       ticket.status = TicketStatus.inProgress;
     }
     _drafts.remove(bpId);

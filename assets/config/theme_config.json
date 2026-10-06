@@ -41,6 +41,7 @@
     "FIR": "#E5484D",
     "Not Found / Refused": "#E6A312",
     "Customer Not Cooperating": "#6B7280",
+    "Customer Will Take Swap": "#E6A312",
     "Auto-expired": "#6B7280"
   },
   "typography": {

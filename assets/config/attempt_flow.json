@@ -241,7 +241,7 @@
           "optionsRef": "customerRemarkReason",
           "required": false,
           "requiredFlag": "business.customerRemarkRequiredForRefusal",
-          "visibleWhen": { "field": "outcome", "in": ["not_found_refused", "customer_not_cooperating"] }
+          "visibleWhen": { "field": "outcome", "in": ["not_found_refused", "customer_not_cooperating", "customer_will_take_swap"] }
         },
         {
           "id": "customerRemarkNote",
@@ -249,7 +249,7 @@
           "labelKey": "field.customer_remark_note",
           "maxLines": 2,
           "required": false,
-          "visibleWhen": { "field": "outcome", "in": ["not_found_refused", "customer_not_cooperating"] }
+          "visibleWhen": { "field": "outcome", "in": ["not_found_refused", "customer_not_cooperating", "customer_will_take_swap"] }
         }
       ]
     }

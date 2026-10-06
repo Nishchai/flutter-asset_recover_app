@@ -18,12 +18,13 @@
     { "value": "other", "labelKey": "opt.bpLocation.other" }
   ],
 
-  "_outcome_comment": "Swap (Organic/Assisted) is system/TIU-detected (Rule 1) and is NEVER a Field Agent choice — intentionally absent from this list. FIR and Lost are separate from each other; Lost is folded into Not Found / Refused (Rule 2). Customer Not Cooperating is a distinct terminal outcome the FA can close directly, handing the case to the central team (Rule 6).",
+  "_outcome_comment": "Swap (Organic/Assisted) is system/TIU-detected (Rule 1) and is NEVER a Field Agent choice — intentionally absent from this list. FIR and Lost are separate from each other; Lost is folded into Not Found / Refused (Rule 2). Customer Not Cooperating is a distinct terminal outcome the FA can close directly, handing the case to the central team (Rule 6). Customer Will Take Swap is the FA recording the customer's stated intent to swap — non-terminal; the swap itself is still detected by the system.",
   "outcome": [
     { "value": "recovered", "labelKey": "opt.outcome.recovered", "resolution": "Recovered", "terminal": true, "requiresApproval": true, "requiresOtp": true, "requiresScan": true },
     { "value": "fir", "labelKey": "opt.outcome.fir", "resolution": "FIR", "terminal": true, "requiresApproval": true, "requiresDocument": true },
     { "value": "not_found_refused", "labelKey": "opt.outcome.not_found_refused", "resolution": "Not Found / Refused", "terminal": false, "requiresApproval": false },
-    { "value": "customer_not_cooperating", "labelKey": "opt.outcome.customer_not_cooperating", "resolution": "Customer Not Cooperating", "terminal": true, "requiresApproval": false }
+    { "value": "customer_not_cooperating", "labelKey": "opt.outcome.customer_not_cooperating", "resolution": "Customer Not Cooperating", "terminal": true, "requiresApproval": false },
+    { "value": "customer_will_take_swap", "labelKey": "opt.outcome.customer_will_take_swap", "resolution": "Customer Will Take Swap", "terminal": false, "requiresApproval": false }
   ],
 
   "helpingFactor": [

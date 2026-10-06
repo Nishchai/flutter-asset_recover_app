@@ -246,6 +246,7 @@
   "opt.help.none": "ಯಾವುದೂ ಇಲ್ಲ",
   "opt.help.over_call": "ಕರೆ ಮೂಲಕ",
   "opt.outcome.customer_not_cooperating": "ಗ್ರಾಹಕರು ಸಹಕರಿಸುತ್ತಿಲ್ಲ",
+  "opt.outcome.customer_will_take_swap": "ಗ್ರಾಹಕರು ಸ್ವಾಪ್ ತೆಗೆದುಕೊಳ್ಳುತ್ತಾರೆ",
   "opt.outcome.fir": "FIR",
   "opt.outcome.not_found_refused": "ಸಿಗಲಿಲ್ಲ / ನಿರಾಕರಿಸಲಾಗಿದೆ",
   "opt.sort.distance": "ದೂರ",

@@ -10,8 +10,7 @@ import 'package:asset_recovery_app/domain/usecases/update_ticket_status_usecase.
 const _inProgressStatus = 'inProgress';
 
 /// Ticket numbers with an in-flight `tickets.status` request — guards against a
-/// second PATCH from a double tap, and against the ticket detail CTA and a hub
-/// action card racing each other. Deliberately in-flight only, NOT a
+/// second PATCH from a double tap on Save. Deliberately in-flight only, NOT a
 /// once-per-ticket memo: every "agent started working" signal should reach the
 /// backend, and the PATCH is idempotent.
 final _statusUpdatesInFlight = <String>{};
@@ -19,10 +18,10 @@ final _statusUpdatesInFlight = <String>{};
 /// Moves [ticketId] to `inProgress` on the backend (`tickets.status` —
 /// `PATCH /tickets/status`, body `{ticketId, status}`).
 ///
-/// Fired from every entry point that means the Field Agent has started working
-/// the case: the ticket detail screen's Scan QR and Ticket Actions CTAs, and
-/// each action card in [TicketActionsHub] (Call Customer, Visit BP Location,
-/// Visit Customer Address).
+/// Fired only after the Field Agent successfully submits an attempt from one of
+/// the action screens — Call Customer, Visit BP Location or Visit Customer
+/// Address. Not fired for Update Status, which closes the case rather than
+/// starting it.
 ///
 /// [ticketId] is the ticket number shown as "Case ID" on the detail screen.
 ///

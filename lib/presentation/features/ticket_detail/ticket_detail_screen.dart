@@ -16,7 +16,6 @@ import 'package:asset_recovery_app/domain/usecases/get_battery_detail_usecase.da
 import 'package:asset_recovery_app/domain/usecases/get_ticket_full_detail_usecase.dart';
 import 'package:asset_recovery_app/presentation/features/attempt/ticket_actions_hub.dart';
 import 'package:asset_recovery_app/presentation/features/map/map_screen.dart';
-import 'package:asset_recovery_app/presentation/shared/mark_ticket_in_progress.dart';
 import 'package:asset_recovery_app/presentation/shared/widgets/info_chip.dart';
 import 'package:asset_recovery_app/presentation/shared/widgets/photo_gallery_viewer.dart';
 import 'package:asset_recovery_app/presentation/shared/widgets/pill_button.dart';
@@ -1169,7 +1168,6 @@ class _Actions extends StatelessWidget {
               onPressed: () {
                 // No attempt cap: an agent may log as many attempts as a BP
                 // needs, so the hub always opens.
-                unawaited(markTicketInProgress(ticket.ticketId));
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) => TicketActionsHub(

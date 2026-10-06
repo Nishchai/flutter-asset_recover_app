@@ -14,7 +14,6 @@ import 'package:asset_recovery_app/domain/usecases/get_live_location_usecase.dar
 import 'package:asset_recovery_app/domain/usecases/submit_attempt_record_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/update_customer_details_usecase.dart';
 import 'package:asset_recovery_app/presentation/features/attempt/attempt_section_screen.dart';
-import 'package:asset_recovery_app/presentation/shared/mark_ticket_in_progress.dart';
 import 'package:asset_recovery_app/presentation/state/attempt_controller.dart';
 import 'package:asset_recovery_app/presentation/state/auth_provider.dart';
 import 'package:asset_recovery_app/presentation/state/ticket_provider.dart';
@@ -210,13 +209,6 @@ class _ActionCard extends StatelessWidget {
         ),
         trailing: const Icon(Icons.chevron_right),
         onTap: () {
-          // Opening any of the three action cards (Call Customer, Visit BP
-          // Location, Visit Customer Address) means the agent has started
-          // working the case, so move the ticket to `inProgress`. Not fired for
-          // the Outcome card, which closes the case rather than starting it.
-          if (!isOutcome) {
-            unawaited(markTicketInProgress(controller.ticketId));
-          }
           Navigator.of(context).push(
             MaterialPageRoute<void>(
               builder: (_) => ChangeNotifierProvider.value(
