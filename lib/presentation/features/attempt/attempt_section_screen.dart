@@ -117,6 +117,33 @@ class _AttemptSectionScreenState extends State<AttemptSectionScreen>
     );
   }
 
+  /// Shown when the agent is outside the battery's 100m geo-fence. Unlike a
+  /// hard block, the agent can choose "Proceed Anyway" — the override is then
+  /// flagged to the coordinator on the attempt's own submission, not silently
+  /// allowed. Returns true when the agent chose to proceed.
+  Future<bool> _confirmOutOfRange(BuildContext context, AppLocalizations l) async {
+    final controller = context.read<AttemptController>();
+    final proceed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(l.t('attempt.outOfRangeTitle')),
+        content: Text(l.t('attempt.outOfRangeMessage')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(l.t('common.close')),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(l.t('attempt.proceedAnyway')),
+          ),
+        ],
+      ),
+    );
+    if (proceed == true) controller.markGeofenceOverridden();
+    return proceed ?? false;
+  }
+
   Future<void> _onSave(BuildContext context) async {
     final controller = context.read<AttemptController>();
     final l = AppLocalizations.of(context);
@@ -153,22 +180,8 @@ class _AttemptSectionScreenState extends State<AttemptSectionScreen>
       if (controller.selectedOutcome == 'recovered') {
         final withinRange = await controller.isWithinBpLocationRange();
         if (!context.mounted) return;
-        if (!withinRange) {
-          await showDialog<void>(
-            context: context,
-            builder: (_) => AlertDialog(
-              title: Text(l.t('attempt.outOfRangeTitle')),
-              content: Text(l.t('attempt.outOfRangeMessage')),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: Text(l.t('common.close')),
-                ),
-              ],
-            ),
-          );
-          return;
-        }
+        if (!withinRange && !await _confirmOutOfRange(context, l)) return;
+        if (!context.mounted) return;
       }
 
       final tickets = context.read<TicketProvider>();
@@ -210,22 +223,7 @@ class _AttemptSectionScreenState extends State<AttemptSectionScreen>
         }.contains(controller.value('visitStatus'))) {
       final withinRange = await controller.isWithinBpLocationRange();
       if (!context.mounted) return;
-      if (!withinRange) {
-        await showDialog<void>(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: Text(l.t('attempt.outOfRangeTitle')),
-            content: Text(l.t('attempt.outOfRangeMessage')),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: Text(l.t('common.close')),
-              ),
-            ],
-          ),
-        );
-        return;
-      }
+      if (!withinRange && !await _confirmOutOfRange(context, l)) return;
     }
 
     final error = await controller.saveSection(widget.section, l.t);

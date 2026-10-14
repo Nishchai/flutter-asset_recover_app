@@ -872,8 +872,12 @@ class AttemptController extends ChangeNotifier {
         if (recordsOwnAttempt(section.id))
           'submittedToService': lastSectionSubmittedToService,
         if (sectionStatus.isNotEmpty) 'sectionStatus': sectionStatus,
+        ..._geofenceFlagMetadata(),
       },
     ),);
+    // The flag above was built from this save's override, if any — clear it
+    // now so a later, in-range section save never inherits it.
+    _geofenceOverridden = false;
     return null;
   }
 
@@ -1042,6 +1046,21 @@ class AttemptController extends ChangeNotifier {
     );
   }
 
+  /// Set when the agent chooses "Proceed Anyway" on the out-of-range dialog
+  /// (see [isWithinBpLocationRange]). Read by [_submissionMetadata] and
+  /// [_sectionMetadata] so it rides along on that attempt's `metadata` and
+  /// audit-log entry as `geofenceFlag`, making it visible to the coordinator;
+  /// [submitOutcome] and [saveSection] reset it once the submit they raised it
+  /// for is done, so it never leaks onto a later, in-range submission.
+  bool _geofenceOverridden = false;
+
+  void markGeofenceOverridden() => _geofenceOverridden = true;
+
+  /// Coordinator-visible flag text for an attempt submitted outside the 100m
+  /// geo-fence, or an empty map when the agent was in range.
+  Map<String, dynamic> _geofenceFlagMetadata() =>
+      _geofenceOverridden ? {'geofenceFlag': 'Agent >100m away from Lat/Long'} : {};
+
   String _buildRemark() {
     final parts = <String>[];
     final calling = (_values['callingRemark'] as String?)?.trim();
@@ -1151,6 +1170,7 @@ class AttemptController extends ChangeNotifier {
   Map<String, dynamic> _submissionMetadata() => {
         for (final f in outcomeSection.fields)
           if (f.id != 'outcome' && _values[f.id] != null) f.id: _values[f.id],
+        ..._geofenceFlagMetadata(),
       };
 
   /// Builds the [AttemptSubmission] from the Update Status screen state.
@@ -1266,6 +1286,7 @@ class AttemptController extends ChangeNotifier {
         'customerName': battery.customer.name,
         for (final f in section.fields)
           if (f.type != 'proof' && _values[f.id] != null) f.id: _values[f.id],
+        ..._geofenceFlagMetadata(),
       };
 
   /// Builds the [AttemptSubmission] for a visit [section].
@@ -1392,10 +1413,14 @@ class AttemptController extends ChangeNotifier {
           'resolution': resolution,
           'submittedToService': lastOutcomeSubmittedToService,
           'queued': lastOutcomeWasQueued,
+          ..._geofenceFlagMetadata(),
         },
       ),);
       return null;
     } finally {
+      // Built into the submission/audit metadata above, if raised — clear it
+      // so a later, in-range submit never inherits it.
+      _geofenceOverridden = false;
       _submitting = false;
       notifyListeners();
     }

@@ -356,5 +356,6 @@
   "attempt.callRecorded": "Call recorded",
   "attempt.callNotSynced": "Saved on this device — the call couldn't be sent to the server",
   "attempt.outOfRangeTitle": "Out of Range",
-  "attempt.outOfRangeMessage": "Come closer to the battery's location to submit this outcome."
+  "attempt.outOfRangeMessage": "You are more than 100m away from the assigned Lat/Long.",
+  "attempt.proceedAnyway": "Proceed Anyway"
 }
