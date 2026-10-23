@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:asset_recovery_app/core/error/result.dart';
 import 'package:asset_recovery_app/core/services/audit_log_service.dart';
+import 'package:asset_recovery_app/core/services/location_service.dart';
 import 'package:asset_recovery_app/core/services/session_store.dart';
 import 'package:asset_recovery_app/core/utils/ist_time.dart';
 import 'package:asset_recovery_app/domain/entities/agent.dart';
+import 'package:asset_recovery_app/domain/entities/audit_event.dart';
 import 'package:asset_recovery_app/domain/entities/partner_login_data.dart';
 import 'package:asset_recovery_app/domain/usecases/login_otp_usecase.dart';
 import 'package:flutter/foundation.dart';
@@ -35,6 +37,7 @@ class AuthProvider extends ChangeNotifier {
     this._verifyOtp,
     this._auditLog,
     this._sessionStore,
+    this._location,
   )   : _agent = _sessionStore.current?.agent,
         _status = _sessionStore.current == null
             ? AuthStatus.loggedOut
@@ -46,6 +49,7 @@ class AuthProvider extends ChangeNotifier {
   final VerifyLoginOtpUseCase _verifyOtp;
   final AuditLogService _auditLog;
   final SessionStore _sessionStore;
+  final LocationService _location;
 
   AuthStatus _status;
   Agent? _agent;
@@ -122,11 +126,15 @@ class AuthProvider extends ChangeNotifier {
         // `SessionManager`.
         unawaited(() async {
           try {
+            // Minted fresh for this sign-in and carried unchanged through to
+            // `logout` (see `PersistedSession.transactionId`), so every audit
+            // entry in between — this one included — shares one id.
             await _sessionStore.save(PersistedSession(
               authToken: login.accessToken,
               agent: login.agent,
               profile: login.profile,
               loginAt: nowIst(),
+              transactionId: AuditEvent.newTransactionId(),
             ),);
           } finally {
             // Emitted only AFTER the token mint succeeded and the session is in
@@ -137,12 +145,17 @@ class AuthProvider extends ChangeNotifier {
             // the offline queue for nothing). The mint itself already gates
             // this: `VerifyLoginOtpUseCase` fails the whole login if it fails,
             // so reaching here at all means there IS a token. Queued for retry
-            // by AuditLogService if the send still fails.
+            // by AuditLogService if the send still fails. [transactionId] is
+            // left to default to the session's own, just saved above.
+            final gps = await _location.currentLocation();
             await _auditLog.log(
               agentId: login.agent.id,
               action: 'login_success',
               entityType: 'agent',
               entityId: login.agent.id,
+              metadata: gps.hasFix
+                  ? {'latitude': gps.lat, 'longitude': gps.lng}
+                  : const {},
             );
           }
         }(),);
@@ -197,15 +210,22 @@ class AuthProvider extends ChangeNotifier {
     }
     notifyListeners();
     // Emitted BEFORE the session is cleared, and deliberately so: the request
-    // is built (token + agentId) synchronously inside this call, so the logout
-    // event still carries the credential of the agent it belongs to. Queued for
-    // retry by AuditLogService if it fails.
+    // is built (token + agentId) synchronously inside the `log` call below, so
+    // the logout event still carries the credential of the agent it belongs
+    // to. [_sessionStore.clear] is awaited only after `log` has been invoked
+    // (NOT after it completes — `unawaited` below), so the GPS fetch's own
+    // delay sits entirely before the credential is torn down, never after.
+    // Queued for retry by AuditLogService if it fails.
     if (agentId != null) {
+      final gps = await _location.currentLocation();
       unawaited(_auditLog.log(
         agentId: agentId,
         action: 'logout',
         entityType: 'agent',
         entityId: agentId,
+        metadata: gps.hasFix
+            ? {'latitude': gps.lat, 'longitude': gps.lng}
+            : const {},
       ),);
     }
     await _sessionStore.clear();

@@ -21,11 +21,22 @@ class PersistedSession {
     required this.agent,
     this.profile,
     this.loginAt,
+    this.transactionId,
   });
 
   final String authToken;
   final Agent agent;
   final PartnerLoginData? profile;
+
+  /// Correlates every audit-log entry emitted during this sign-in — including
+  /// `login_success` and the `logout` that ends it — under one id (see
+  /// `AuditLogService.log`). Minted once at sign-in (`AuthProvider.login`) and
+  /// carried unchanged for the life of the session; the next sign-in mints a
+  /// fresh one.
+  ///
+  /// Null only for a session persisted by a build from before this existed,
+  /// which falls back to a per-event id in that case.
+  final String? transactionId;
 
   /// The IST wall-clock moment the OTP was verified — the anchor of the fixed
   /// auto-logout window (see [sessionRemaining]). Written once, at sign-in, and
@@ -74,12 +85,14 @@ class PersistedSession {
     Agent? agent,
     PartnerLoginData? profile,
     DateTime? loginAt,
+    String? transactionId,
   }) =>
       PersistedSession(
         authToken: authToken ?? this.authToken,
         agent: agent ?? this.agent,
         profile: profile ?? this.profile,
         loginAt: loginAt ?? this.loginAt,
+        transactionId: transactionId ?? this.transactionId,
       );
 }
 
@@ -207,6 +220,7 @@ class SecureSessionStore extends SessionStore {
   static const _agentKey = 'session.agent';
   static const _profileKey = 'session.profile';
   static const _loginAtKey = 'session.loginAt';
+  static const _transactionIdKey = 'session.transactionId';
 
   final FlutterSecureStorage _storage;
 
@@ -228,6 +242,7 @@ class SecureSessionStore extends SessionStore {
             ? PartnerLoginData.fromJson(decodedProfile)
             : null,
         loginAt: istFromIso(await _storage.read(key: _loginAtKey)),
+        transactionId: await _storage.read(key: _transactionIdKey),
       );
     } catch (e, st) {
       // A rotated/invalidated keystore key (device restore, "clear data" on
@@ -260,6 +275,12 @@ class SecureSessionStore extends SessionStore {
     } else {
       await _storage.write(key: _loginAtKey, value: loginAt.toIso8601String());
     }
+    final transactionId = session.transactionId;
+    if (transactionId == null) {
+      await _storage.delete(key: _transactionIdKey);
+    } else {
+      await _storage.write(key: _transactionIdKey, value: transactionId);
+    }
   }
 
   @override
@@ -271,6 +292,7 @@ class SecureSessionStore extends SessionStore {
     await _storage.delete(key: _agentKey);
     await _storage.delete(key: _profileKey);
     await _storage.delete(key: _loginAtKey);
+    await _storage.delete(key: _transactionIdKey);
   }
 }
 

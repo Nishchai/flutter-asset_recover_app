@@ -818,9 +818,10 @@ class AttemptController extends ChangeNotifier {
   static const _genericSectionActivity = 'attempt_section_saved';
 
   /// What the agent reported on [sectionId]'s own status dropdown
-  /// (`callStatus` / `visitStatus` / `homeVisitStatus`) — the single most useful
-  /// piece of context on that screen's audit entry. Empty when the section has
-  /// no status field or the agent left it blank.
+  /// (`callStatus` / `visitStatus` / `homeVisitStatus`) — logged as `outcome`
+  /// on that screen's audit entry, the same key [submitOutcome] uses, so all
+  /// four actions report their user-selected result under one name. Empty
+  /// when the section has no status field or the agent left it blank.
   String _sectionStatusValue(String sectionId) {
     final field = _sectionAttempts[sectionId]?.outcomeField;
     if (field == null) return '';
@@ -869,15 +870,24 @@ class AttemptController extends ChangeNotifier {
         'ticketId': ticketId,
         // Only the sections that POST an attempt have a service result to
         // report; on the others a `false` here would read as a failed send.
-        if (recordsOwnAttempt(section.id))
+        if (recordsOwnAttempt(section.id)) ...{
           'submittedToService': lastSectionSubmittedToService,
-        if (sectionStatus.isNotEmpty) 'sectionStatus': sectionStatus,
+          // Same coordinates sent in the attempt submission's own
+          // latitude/longitude — rides along here too so the coordinator sees
+          // where the agent was without cross-referencing the attempts record.
+          if (_lastSectionGps?.hasFix ?? false) ...{
+            'latitude': _lastSectionGps!.lat,
+            'longitude': _lastSectionGps!.lng,
+          },
+        },
+        if (sectionStatus.isNotEmpty) 'outcome': sectionStatus,
         ..._geofenceFlagMetadata(),
       },
     ),);
     // The flag above was built from this save's override, if any — clear it
     // now so a later, in-range section save never inherits it.
     _geofenceOverridden = false;
+    _geofenceDistanceMeters = null;
     return null;
   }
 
@@ -1039,11 +1049,11 @@ class AttemptController extends ChangeNotifier {
     if (target == null) return true;
     final current = await _location.currentLocation();
     if (!current.hasFix) return true;
-    return _location.isWithinGeofence(
-      current,
-      target,
-      bpLocationGeofenceRadiusMeters,
-    );
+    // Captured (not just the in/out verdict) so an out-of-range override can
+    // report exactly how far the agent was, not just that they were "away" —
+    // see [_geofenceFlagMetadata]'s `actual_distance_away`.
+    _geofenceDistanceMeters = current.haversineMeters(target);
+    return _geofenceDistanceMeters! <= bpLocationGeofenceRadiusMeters;
   }
 
   /// Set when the agent chooses "Proceed Anyway" on the out-of-range dialog
@@ -1054,12 +1064,25 @@ class AttemptController extends ChangeNotifier {
   /// for is done, so it never leaks onto a later, in-range submission.
   bool _geofenceOverridden = false;
 
+  /// The distance [isWithinBpLocationRange] measured on its most recent check
+  /// — whether or not the agent ended up overriding it. Read alongside
+  /// [_geofenceOverridden] by [_geofenceFlagMetadata] as `actual_distance_away`.
+  /// Null until the first check runs, or when the battery's telemetry/the
+  /// device's fix made a check impossible.
+  double? _geofenceDistanceMeters;
+
   void markGeofenceOverridden() => _geofenceOverridden = true;
 
-  /// Coordinator-visible flag text for an attempt submitted outside the 100m
-  /// geo-fence, or an empty map when the agent was in range.
-  Map<String, dynamic> _geofenceFlagMetadata() =>
-      _geofenceOverridden ? {'geofenceFlag': 'Agent >100m away from Lat/Long'} : {};
+  /// Coordinator-visible flag text (plus the measured distance, in whole
+  /// metres) for an attempt submitted outside the 100m geo-fence, or an empty
+  /// map when the agent was in range.
+  Map<String, dynamic> _geofenceFlagMetadata() => _geofenceOverridden
+      ? {
+          'geofenceFlag': 'Agent >100m away from Lat/Long',
+          if (_geofenceDistanceMeters != null)
+            'actual_distance_away': _geofenceDistanceMeters!.round(),
+        }
+      : {};
 
   String _buildRemark() {
     final parts = <String>[];
@@ -1259,18 +1282,26 @@ class AttemptController extends ChangeNotifier {
   /// absent from this map are sent verbatim, so only the values whose app
   /// spelling differs from the service member need an entry here.
   ///
-  /// `bpLocationStatus` (`battery_found_recovered`,
-  /// `battery_found_not_recovered_denied`, `battery_not_found`,
-  /// `restricted_entry`, `other`) is deliberately absent: the service is
-  /// adding those members under the same names, so all five go out verbatim.
+  /// `bpLocationStatus` — the service added these members under different
+  /// spellings than the app's dropdown, confirmed from a 422 "Invalid
+  /// outcome" body listing its accepted set: `battery_found`,
+  /// `battery_not_present`, `not_found`, `location_inaccessible`. Only
+  /// `other` already matches and passes through verbatim.
   ///
   /// `callStatus` (`connected`, `not_responding`, `call_disconnected`,
-  /// `switched_off`, `wrong_number`, `error`) is absent for the same reason —
-  /// the Call Customer dropdown value is sent exactly as configured. If the
-  /// service hasn't added these members yet it will 422 "Invalid outcome"; map
-  /// the app value to whatever it does accept here rather than editing
-  /// `dropdowns.json`, which is what the agent sees.
+  /// `switched_off`, `wrong_number`, `error`) is absent because the service
+  /// accepts those spellings verbatim — the Call Customer dropdown value is
+  /// sent exactly as configured. If the service hasn't added these members
+  /// yet it will 422 "Invalid outcome"; map the app value to whatever it
+  /// does accept here rather than editing `dropdowns.json`, which is what
+  /// the agent sees.
   static const Map<String, String> _visitOutcomeWireValues = {
+    // bpLocationStatus — the service spells these four differently from the
+    // app; `other` already matches its member and passes through.
+    'battery_found_recovered': 'battery_found',
+    'battery_found_not_recovered_denied': 'battery_not_present',
+    'battery_not_found': 'not_found',
+    'restricted_entry': 'location_inaccessible',
     // homeVisitStatus — the service spells these two differently from the app.
     // "Yes, I saw a customer" and "Customer Not Available"; the third option,
     // `address_not_found`, already matches its member and passes through.
@@ -1331,6 +1362,13 @@ class AttemptController extends ChangeNotifier {
   /// is saved locally either way.
   bool lastSectionSubmittedToService = false;
 
+  /// The GPS point [_submitSectionAttempt] sent with the last section
+  /// submission — read by [saveSection] so the action's audit-log entry
+  /// carries the same coordinates as the attempt itself. Null before any
+  /// section has recorded its own attempt (e.g. [_submitAttemptRecord] not
+  /// wired).
+  GeoPoint? _lastSectionGps;
+
   /// POSTs [section]'s attempt. Mirrors [_submitAttemptToService]: the use case
   /// wraps errors in a [Result] so this never throws, and a failure is logged
   /// rather than blocking the agent's local save.
@@ -1351,6 +1389,7 @@ class AttemptController extends ChangeNotifier {
     final proofGps =
         proofFieldId == null ? null : _proofs[proofFieldId]?.location;
     final gps = await _bestKnownPosition(preferred: proofGps);
+    _lastSectionGps = gps;
     final submission = buildSectionAttemptSubmission(
       section: section,
       completedAt: DateTime.now(),
@@ -1378,6 +1417,13 @@ class AttemptController extends ChangeNotifier {
   /// so the UI confirms it outright — even if the ticket-side write behind
   /// [lastOutcomeWasQueued] had to be queued.
   bool lastOutcomeSubmittedToService = false;
+
+  /// The GPS point [_submitAttemptToService] sent with the last outcome
+  /// submission — read by [submitOutcome] so the action's audit-log entry
+  /// carries the same coordinates as the attempt itself. Null before any
+  /// outcome has been submitted to the service (e.g. [_submitAttemptRecord]
+  /// not wired).
+  GeoPoint? _lastOutcomeGps;
 
   /// Validates + submits the Outcome action, finalizing the attempt and
   /// clearing the draft. Returns a localized error, or null on success (check
@@ -1413,6 +1459,13 @@ class AttemptController extends ChangeNotifier {
           'resolution': resolution,
           'submittedToService': lastOutcomeSubmittedToService,
           'queued': lastOutcomeWasQueued,
+          // Same coordinates sent in the attempt submission's own
+          // latitude/longitude — rides along here too so the coordinator sees
+          // where the agent was without cross-referencing the attempts record.
+          if (_lastOutcomeGps?.hasFix ?? false) ...{
+            'latitude': _lastOutcomeGps!.lat,
+            'longitude': _lastOutcomeGps!.lng,
+          },
           ..._geofenceFlagMetadata(),
         },
       ),);
@@ -1421,6 +1474,7 @@ class AttemptController extends ChangeNotifier {
       // Built into the submission/audit metadata above, if raised — clear it
       // so a later, in-range submit never inherits it.
       _geofenceOverridden = false;
+      _geofenceDistanceMeters = null;
       _submitting = false;
       notifyListeners();
     }
@@ -1435,6 +1489,7 @@ class AttemptController extends ChangeNotifier {
     if (submit == null) return false; // not wired (e.g. unit tests) — skip.
     final completedAt = DateTime.now();
     final gps = await _bestKnownPosition();
+    _lastOutcomeGps = gps;
     final submission =
         buildAttemptSubmission(completedAt: completedAt, gps: gps);
     final result = await submit(submission);

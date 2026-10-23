@@ -36,7 +36,10 @@ class AuditLogService {
   /// [startedAt] marks the beginning of a longer activity; for the
   /// instantaneous actions the app logs, leaving it null timestamps both ends
   /// at "now". [transactionId] correlates several entries belonging to one
-  /// operation — omitted, each entry gets its own.
+  /// operation — omitted, this defaults to the signed-in session's own id
+  /// (`PersistedSession.transactionId`, minted once at login and carried
+  /// through to logout) so every entry in a session shares one id; with
+  /// nobody signed in, each entry gets its own.
   Future<void> log({
     required String agentId,
     required String action,
@@ -57,7 +60,9 @@ class AuditLogService {
       details: metadata,
     );
     final event = AuditEvent(
-      transactionId: transactionId ?? AuditEvent.newTransactionId(),
+      transactionId: transactionId ??
+          _session.current?.transactionId ??
+          AuditEvent.newTransactionId(),
       userId: agentId,
       userName: userName ?? _signedInUserName,
       activityStartDate: startedAt ?? now,

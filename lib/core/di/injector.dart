@@ -262,7 +262,7 @@ Future<void> configureDependencies({
   unawaited(syncQueue.init());
 
   // --- Presentation state (fresh instance per provider scope) ---------------
-  sl.registerFactory(() => AuthProvider(sl(), sl(), sl(), sl()));
+  sl.registerFactory(() => AuthProvider(sl(), sl(), sl(), sl(), sl()));
   sl.registerFactory(() => TicketProvider(
         getAssigned: sl(),
         getStats: sl(),
