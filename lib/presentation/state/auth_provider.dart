@@ -141,6 +141,8 @@ class AuthProvider extends ChangeNotifier {
             await _auditLog.log(
               agentId: login.agent.id,
               action: 'login_success',
+              entityType: 'agent',
+              entityId: login.agent.id,
             );
           }
         }(),);
@@ -199,7 +201,12 @@ class AuthProvider extends ChangeNotifier {
     // event still carries the credential of the agent it belongs to. Queued for
     // retry by AuditLogService if it fails.
     if (agentId != null) {
-      unawaited(_auditLog.log(agentId: agentId, action: 'logout'));
+      unawaited(_auditLog.log(
+        agentId: agentId,
+        action: 'logout',
+        entityType: 'agent',
+        entityId: agentId,
+      ),);
     }
     await _sessionStore.clear();
   }

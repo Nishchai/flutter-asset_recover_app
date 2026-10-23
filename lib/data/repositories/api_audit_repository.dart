@@ -27,6 +27,16 @@ class ApiAuditRepository implements AuditRepository {
       throw ApiException('No auditLogBaseUrl configured for '
           '${_config.env.environment}');
     }
-    await _api.call('audit.log', body: event.toJson(), baseUrl: baseUrl);
+    final res = await _api.call('audit.log', body: event.toJson(), baseUrl: baseUrl);
+    // The audit host answers a rejected event with HTTP 200 and an
+    // `isError`/`responseException` envelope instead of a non-2xx status, so
+    // `ApiClient.call` sees it as success. Surface it as a failure here so
+    // AuditLogService queues the entry for retry instead of dropping it.
+    if (res is Map && res['isError'] == true) {
+      throw ApiException(
+        res['responseException'] as String? ?? 'Audit log rejected the event',
+        statusCode: res['statusCode'] as int?,
+      );
+    }
   }
 }
