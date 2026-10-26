@@ -28,6 +28,16 @@
     { "value": "customer_will_take_swap", "labelKey": "opt.outcome.customer_will_take_swap", "resolution": "Customer Will Take Swap", "terminal": false, "requiresApproval": false }
   ],
 
+  "mobileRelation": [
+    { "value": "self_secondary", "labelKey": "opt.mobileRelation.self_secondary" },
+    { "value": "work", "labelKey": "opt.mobileRelation.work" },
+    { "value": "home", "labelKey": "opt.mobileRelation.home" },
+    { "value": "spouse_partner", "labelKey": "opt.mobileRelation.spouse_partner" },
+    { "value": "parent_guardian", "labelKey": "opt.mobileRelation.parent_guardian" },
+    { "value": "emergency_contact", "labelKey": "opt.mobileRelation.emergency_contact" },
+    { "value": "other", "labelKey": "opt.mobileRelation.other" }
+  ],
+
   "helpingFactor": [
     { "value": "over_call", "labelKey": "opt.help.over_call" },
     { "value": "field_visit", "labelKey": "opt.help.field_visit" },

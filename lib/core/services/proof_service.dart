@@ -3,17 +3,22 @@ import 'dart:io';
 import 'package:asset_recovery_app/core/config/config_service.dart';
 import 'package:asset_recovery_app/core/services/location_service.dart';
 import 'package:asset_recovery_app/domain/entities/enums.dart';
+import 'package:asset_recovery_app/domain/entities/form_field_config.dart';
 import 'package:asset_recovery_app/domain/entities/proof.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:image_picker/image_picker.dart';
 
-/// Captures geo-tagged, timestamped proof images (PRD §4.3).
+/// Captures geo-tagged, timestamped proof artifacts (PRD §4.3) — a photo by
+/// default, or, for a [FormFieldConfig.source] of `gallery`/`file`, whatever
+/// that field picks instead (a photo-library screenshot, or an arbitrary file
+/// such as an mp3/mp4 call recording).
 ///
-/// [CameraProofService] opens the real device camera (Rule 9); [StubProofService]
-/// fabricates a proof record instead, kept around for tests / environments
-/// without a camera (e.g. some emulator configurations).
+/// [CameraProofService] opens the real device camera/picker (Rule 9);
+/// [StubProofService] fabricates a proof record instead, kept around for
+/// tests / environments without a camera (e.g. some emulator configurations).
 abstract class ProofService {
-  Future<Proof> capture(ProofKind kind);
+  Future<Proof> capture(FormFieldConfig field);
 }
 
 /// Thrown when the user backs out of the camera without taking a photo.
@@ -33,12 +38,55 @@ class CameraProofService implements ProofService {
   final ImagePicker _picker;
 
   @override
-  Future<Proof> capture(ProofKind kind) async {
-    final file = await _picker.pickImage(source: ImageSource.camera, imageQuality: 85);
-    if (file == null) throw ProofCaptureCancelled();
+  Future<Proof> capture(FormFieldConfig field) async {
+    final kind = proofKindFromString(field.proofKind);
+    final path = await _pickPath(field);
+    if (path == null) throw ProofCaptureCancelled();
     final loc = await _location.currentLocation();
-    final path = await _compress(file.path);
     return Proof(kind: kind, localPath: path, capturedAt: DateTime.now(), location: loc);
+  }
+
+  /// Picks the source file per [FormFieldConfig.source]: the camera (default,
+  /// also compressed per [_compress]), the photo library (`gallery`), or a
+  /// file restricted to [FormFieldConfig.fileType]/[FormFieldConfig.acceptExtensions]
+  /// (`file`, e.g. an audio-only call recording — never compressed). Null
+  /// means the agent backed out of the picker.
+  Future<String?> _pickPath(FormFieldConfig field) async {
+    if (field.source == 'file') {
+      final type = _fileTypeFor(field);
+      final result = await FilePicker.pickFiles(
+        type: type,
+        allowedExtensions: type == FileType.custom ? field.acceptExtensions : null,
+      );
+      return result?.files.single.path;
+    }
+    final imageSource =
+        field.source == 'gallery' ? ImageSource.gallery : ImageSource.camera;
+    final file = await _picker.pickImage(source: imageSource, imageQuality: 85);
+    if (file == null) return null;
+    return _compress(file.path);
+  }
+
+  /// The system picker's own type filter — e.g. `audio` rejects a video file
+  /// outright (by its real type, not just its extension), which a
+  /// [FormFieldConfig.acceptExtensions] allow-list can't guarantee on its own.
+  /// Falls back to `custom` (extension allow-list) when [FormFieldConfig.fileType]
+  /// isn't set, or `any` when neither is.
+  FileType _fileTypeFor(FormFieldConfig field) {
+    switch (field.fileType) {
+      case 'audio':
+        return FileType.audio;
+      case 'video':
+        return FileType.video;
+      case 'image':
+        return FileType.image;
+      case 'media':
+        return FileType.media;
+      case 'custom':
+        return FileType.custom;
+      default:
+        return field.acceptExtensions == null ? FileType.any : FileType.custom;
+    }
   }
 
   /// Re-encodes to `proof.imageMinWidthPx` / a JPEG quality tuned to land
@@ -77,12 +125,14 @@ class StubProofService implements ProofService {
   int _counter = 0;
 
   @override
-  Future<Proof> capture(ProofKind kind) async {
+  Future<Proof> capture(FormFieldConfig field) async {
+    final kind = proofKindFromString(field.proofKind);
     final loc = await _location.currentLocation();
     _counter++;
+    final ext = field.source == 'file' ? (field.acceptExtensions?.first ?? 'mp3') : 'jpg';
     return Proof(
       kind: kind,
-      localPath: 'mock://proof/${kind.name}_$_counter.jpg',
+      localPath: 'mock://proof/${kind.name}_$_counter.$ext',
       capturedAt: DateTime.now(),
       location: loc,
     );

@@ -26,11 +26,39 @@
           "featureFlag": "features.customerDetailUpdate"
         },
         {
+          "id": "newCustomerMobileRelation",
+          "type": "dropdown",
+          "labelKey": "field.new_mobile_relation",
+          "optionsRef": "mobileRelation",
+          "required": true,
+          "featureFlag": "features.customerDetailUpdate",
+          "visibleWhen": { "field": "newCustomerMobile", "notEmpty": true }
+        },
+        {
           "id": "callingRemark",
           "type": "textarea",
           "labelKey": "field.calling_remark",
           "hintKey": "field.calling_remark_hint",
           "maxLines": 4,
+          "required": false
+        },
+        {
+          "id": "callRecordingScreenshot",
+          "type": "proof",
+          "labelKey": "field.call_recording_screenshot",
+          "hintKey": "field.call_recording_screenshot_hint",
+          "proofKind": "call",
+          "source": "gallery",
+          "required": false
+        },
+        {
+          "id": "callRecordingFile",
+          "type": "proof",
+          "labelKey": "field.call_recording_file",
+          "hintKey": "field.call_recording_file_hint",
+          "proofKind": "callRecording",
+          "source": "file",
+          "fileType": "audio",
           "required": false
         }
       ]

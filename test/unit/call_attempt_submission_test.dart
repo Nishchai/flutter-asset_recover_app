@@ -105,7 +105,11 @@ void main() {
       ..markSectionOpened('call')
       ..setValue('callStatus', status)
       ..setValue('callingRemark', remark);
-    if (mobile != null) c.setValue('newCustomerMobile', mobile);
+    if (mobile != null) {
+      c
+        ..setValue('newCustomerMobile', mobile)
+        ..setValue('newCustomerMobileRelation', 'self_secondary');
+    }
   }
 
   test('the call section records its own attempt, like the visit sections', () {

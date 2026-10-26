@@ -62,6 +62,9 @@ class AzureBlobUploadService implements BlobUploadService {
     final lower = blobName.toLowerCase();
     if (lower.endsWith('.png')) return 'image/png';
     if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+    if (lower.endsWith('.mp3')) return 'audio/mpeg';
+    if (lower.endsWith('.mp4')) return 'video/mp4';
+    if (lower.endsWith('.m4a')) return 'audio/mp4';
     return 'application/octet-stream';
   }
 }

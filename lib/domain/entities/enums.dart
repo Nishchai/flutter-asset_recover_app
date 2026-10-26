@@ -84,8 +84,10 @@ BpState bpStateFromString(String? v) {
   }
 }
 
-/// The kind of proof attached to an attempt step.
-enum ProofKind { call, visit, home, recovery, document }
+/// The kind of proof attached to an attempt step. `callRecording` is the
+/// agent-attached mp3/mp4 of a call (distinct from `call`, the call-recording
+/// screenshot) — both optional, unlike every other kind here.
+enum ProofKind { call, visit, home, recovery, document, callRecording }
 
 /// RBAC role (PRD §6/§7 — Web App/coordinator-side dashboard owns the full
 /// permission matrix; this mobile app only ever runs as [fieldAgent] in Phase
@@ -114,6 +116,8 @@ ProofKind proofKindFromString(String? v) {
       return ProofKind.recovery;
     case 'document':
       return ProofKind.document;
+    case 'callRecording':
+      return ProofKind.callRecording;
     case 'call':
     default:
       return ProofKind.call;

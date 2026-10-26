@@ -20,7 +20,6 @@ import 'package:asset_recovery_app/domain/entities/battery_detail.dart';
 import 'package:asset_recovery_app/domain/entities/call_recording.dart';
 import 'package:asset_recovery_app/domain/entities/customer_details_update.dart';
 import 'package:asset_recovery_app/domain/entities/draft_attempt.dart';
-import 'package:asset_recovery_app/domain/entities/enums.dart';
 import 'package:asset_recovery_app/domain/entities/form_field_config.dart';
 import 'package:asset_recovery_app/domain/entities/geo_point.dart';
 import 'package:asset_recovery_app/domain/entities/proof.dart';
@@ -275,6 +274,10 @@ class AttemptController extends ChangeNotifier {
       final allowed = (rule['in'] as List).map((e) => e.toString()).toSet();
       return dependent != null && allowed.contains(dependent.toString());
     }
+    if (rule.containsKey('notEmpty')) {
+      final hasValue = dependent is String && dependent.trim().isNotEmpty;
+      return (rule['notEmpty'] as bool? ?? true) ? hasValue : !hasValue;
+    }
     return true;
   }
 
@@ -370,8 +373,7 @@ class AttemptController extends ChangeNotifier {
   // --- Proof capture (geo-tagged, geo-fence validated) -----------------------
 
   Future<Proof> captureProof(FormFieldConfig f) async {
-    final kind = proofKindFromString(f.proofKind);
-    final captured = await _proof.capture(kind);
+    final captured = await _proof.capture(f);
     _proofs[f.id] = captured;
     notifyListeners();
     // Push the image to blob storage in the background so the capture UX is
@@ -416,7 +418,11 @@ class AttemptController extends ChangeNotifier {
         .toUtc()
         .toIso8601String()
         .replaceAll(RegExp(r'[:.]'), '-');
-    final ext = proof.localPath.toLowerCase().endsWith('.png') ? 'png' : 'jpg';
+    // Preserves the source file's own extension (jpg/png for a photo, mp3/mp4
+    // for an attached call recording) rather than assuming it's always an
+    // image — only falls back to jpg when the local path carries none.
+    final dot = proof.localPath.lastIndexOf('.');
+    final ext = dot == -1 ? 'jpg' : proof.localPath.substring(dot + 1).toLowerCase();
     return 'proofs/$ticketId/${battery.bpId}/${proof.kind.name}_$ts.$ext';
   }
 

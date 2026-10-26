@@ -35,6 +35,21 @@ class DynamicField extends StatelessWidget {
           captured: controller.proofFor(field.id) != null,
           palette: palette,
           hint: field.hintKey == null ? null : l.t(field.hintKey!),
+          icon: switch (field.source) {
+            'gallery' => Icons.image_outlined,
+            'file' => Icons.attach_file,
+            _ => null,
+          },
+          actionLabelKey: switch (field.source) {
+            'gallery' => 'proof.chooseFromGallery',
+            'file' => 'proof.attachFile',
+            _ => null,
+          },
+          doneLabelKey: switch (field.source) {
+            'gallery' => 'proof.chosenFromGallery',
+            'file' => 'proof.fileAttached',
+            _ => null,
+          },
           onTap: () => controller.captureProof(field),
         );
       case 'otp':

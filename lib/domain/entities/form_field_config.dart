@@ -21,6 +21,9 @@ class FormFieldConfig {
     this.maxLength,
     this.digitsOnly = false,
     this.proofKind,
+    this.source,
+    this.acceptExtensions,
+    this.fileType,
   });
 
   final String id;
@@ -36,7 +39,9 @@ class FormFieldConfig {
   /// Dotted config path whose boolean value gates this field's existence.
   final String? featureFlag;
 
-  /// Conditional visibility rule, e.g. {field: outcome, in: [refused]}.
+  /// Conditional visibility rule, e.g. {field: outcome, in: [refused]} or
+  /// {field: newCustomerMobile, notEmpty: true} (visible once that field has
+  /// a non-blank value).
   final Map<String, dynamic>? visibleWhen;
 
   /// For readonly fields — which derived value to display.
@@ -54,6 +59,24 @@ class FormFieldConfig {
   /// unrestricted so decimals remain typable.
   final bool digitsOnly;
   final String? proofKind;
+
+  /// `proof` fields only: where the file comes from — `camera` (default,
+  /// unset), `gallery` (image picker's photo library), or `file` (arbitrary
+  /// file via the system picker, restricted to [acceptExtensions]).
+  final String? source;
+
+  /// `proof` fields with `source: file` only — the extensions the system
+  /// file picker offers (e.g. `['mp3', 'mp4']`). Ignored when [fileType] is
+  /// set to anything other than `custom`.
+  final List<String>? acceptExtensions;
+
+  /// `proof` fields with `source: file` only — which category the system
+  /// file picker restricts to: `audio`, `video`, `image`, `media` (image or
+  /// video) or `custom` (the default when [acceptExtensions] is set — matches
+  /// those extensions only). Unlike filtering by extension, this is enforced
+  /// by the OS picker itself against the file's real type, so an audio-only
+  /// field can't be satisfied by a renamed video file.
+  final String? fileType;
 
   factory FormFieldConfig.fromJson(Map<String, dynamic> json) =>
       FormFieldConfig(
@@ -74,6 +97,10 @@ class FormFieldConfig {
         maxLength: (json['maxLength'] as num?)?.toInt(),
         digitsOnly: json['digitsOnly'] as bool? ?? false,
         proofKind: json['proofKind'] as String?,
+        source: json['source'] as String?,
+        acceptExtensions:
+            (json['acceptExtensions'] as List?)?.map((e) => e.toString()).toList(),
+        fileType: json['fileType'] as String?,
       );
 }
 

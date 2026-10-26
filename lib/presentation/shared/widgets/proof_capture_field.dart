@@ -13,6 +13,9 @@ class ProofCaptureField extends StatelessWidget {
     required this.palette,
     this.required = false,
     this.hint,
+    this.icon,
+    this.actionLabelKey,
+    this.doneLabelKey,
   });
 
   final String label;
@@ -21,6 +24,16 @@ class ProofCaptureField extends StatelessWidget {
   final AppPalette palette;
   final bool required;
   final String? hint;
+
+  /// Overrides the "not captured yet" icon (default: a camera) — e.g. a
+  /// gallery or attach-file glyph for a field that doesn't use the camera.
+  /// The "captured" checkmark is always shown once a file is picked.
+  final IconData? icon;
+
+  /// Overrides `proof.capture`/`proof.captured` ("Take Photo"/"Photo
+  /// captured") for a field that doesn't take a photo — e.g. "Attach File".
+  final String? actionLabelKey;
+  final String? doneLabelKey;
 
   @override
   Widget build(BuildContext context) {
@@ -53,12 +66,16 @@ class ProofCaptureField extends StatelessWidget {
             child: Column(
               children: [
                 Icon(
-                  captured ? Icons.check_circle_outline : Icons.photo_camera_outlined,
+                  captured
+                      ? Icons.check_circle_outline
+                      : (icon ?? Icons.photo_camera_outlined),
                   color: color,
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  captured ? l.t('proof.captured') : l.t('proof.capture'),
+                  captured
+                      ? l.t(doneLabelKey ?? 'proof.captured')
+                      : l.t(actionLabelKey ?? 'proof.capture'),
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     color: captured ? palette.success : palette.onSurface,
