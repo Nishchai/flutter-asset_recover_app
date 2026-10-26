@@ -39,6 +39,7 @@ class _AttemptSectionScreenState extends State<AttemptSectionScreen>
   /// once (the platform pushes the whole lifecycle, not just the end).
   SimCallState? _lastSimCallState;
   int _recordingsAtCallStart = 0;
+  AttemptController? _callController;
 
   @override
   void initState() {
@@ -64,6 +65,12 @@ class _AttemptSectionScreenState extends State<AttemptSectionScreen>
       // watch the controller so a finished call is reported to the agent.
       WidgetsBinding.instance.addObserver(this);
       controller.addListener(_onSimCallStateChanged);
+      // Stored so dispose() can remove the listener without looking up the
+      // ancestor via context — by the time dispose() runs (e.g. when the
+      // whole hub subtree unmounts together), this widget's own element may
+      // already be deactivated, which makes any context.read/Provider.of
+      // ancestor lookup throw even though the provider itself is still alive.
+      _callController = controller;
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -79,9 +86,7 @@ class _AttemptSectionScreenState extends State<AttemptSectionScreen>
   void dispose() {
     if (widget.section.id == 'call') {
       WidgetsBinding.instance.removeObserver(this);
-      // read() is safe here: the provider outlives this screen (it lives on the
-      // hub), and dispose() runs before it is torn down.
-      context.read<AttemptController>().removeListener(_onSimCallStateChanged);
+      _callController?.removeListener(_onSimCallStateChanged);
     }
     super.dispose();
   }

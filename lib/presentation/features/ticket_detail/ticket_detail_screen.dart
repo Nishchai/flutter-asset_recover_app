@@ -24,6 +24,7 @@ import 'package:asset_recovery_app/presentation/state/auth_provider.dart';
 import 'package:asset_recovery_app/presentation/state/ticket_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// BP detail (Figma Navigation flow): dark header, SLA-critical banner,
 /// customer + battery attributes, attempt history, and the recovery CTAs.
@@ -815,7 +816,13 @@ class _AttemptTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final urls = attempt.proofUrls;
+    // `proofUrls` mixes real image proofs with the call section's audio
+    // recording file (`callRecordingFile`, `fileType: "audio"` in
+    // attempt_flow.json) — forcing the audio URL through Image.network left
+    // it rendering as a blank/broken second tile, so it's split out and
+    // rendered as its own tappable "Recording" tile instead.
+    final urls = attempt.proofUrls.where((u) => !_isAudioUrl(u)).toList();
+    final recordingUrls = attempt.proofUrls.where(_isAudioUrl).toList();
     final type = _attemptTypeLabel(attempt.attemptType);
     final outcome = _humanizeWireValue(attempt.outcome);
     final batteryRemark = _humanizeWireValue(attempt.batteryRemarkReason);
@@ -908,8 +915,8 @@ class _AttemptTile extends StatelessWidget {
               ),
           ],
         ),
-        // Proof photos.
-        if (urls.isNotEmpty) ...[
+        // Proof photos and/or the call section's recording file.
+        if (urls.isNotEmpty || recordingUrls.isNotEmpty) ...[
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,
@@ -924,10 +931,64 @@ class _AttemptTile extends StatelessWidget {
                   heroTagPrefix: attempt.id,
                   palette: palette,
                 ),
+              for (final url in recordingUrls)
+                _RecordingTile(url: url, palette: palette),
             ],
           ),
         ],
       ],
+    );
+  }
+}
+
+/// Matches the call section's `callRecordingFile` proof (an audio upload,
+/// `fileType: "audio"` in attempt_flow.json) by extension so it can be routed
+/// to [_RecordingTile] instead of [_ProofImage] — Image.network can't decode
+/// it, which is what made the second "photo" on a call attempt show blank.
+bool _isAudioUrl(String url) {
+  final path = Uri.tryParse(url)?.path ?? url;
+  final lower = path.toLowerCase();
+  const audioExtensions = ['.mp3', '.m4a', '.wav', '.aac', '.ogg'];
+  return audioExtensions.any(lower.endsWith);
+}
+
+/// A tappable tile for the call section's recorded-call audio file — opened
+/// in an external player/browser rather than decoded as an image.
+class _RecordingTile extends StatelessWidget {
+  const _RecordingTile({required this.url, required this.palette});
+
+  final String url;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => unawaited(
+        launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+      ),
+      child: Container(
+        width: 240,
+        height: 64,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: palette.chipBg,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.mic_outlined, color: palette.muted),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Call Recording',
+                style: TextStyle(color: palette.onSurface, fontSize: 12),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            Icon(Icons.open_in_new, size: 16, color: palette.muted),
+          ],
+        ),
+      ),
     );
   }
 }
