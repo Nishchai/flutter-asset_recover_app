@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:asset_recovery_app/core/di/app_services.dart';
 import 'package:asset_recovery_app/core/localization/app_localizations.dart';
 import 'package:asset_recovery_app/core/theme/app_theme.dart';
+import 'package:asset_recovery_app/domain/entities/ticket.dart';
 import 'package:asset_recovery_app/presentation/features/home/widgets/end_shift_sheet.dart';
 import 'package:asset_recovery_app/presentation/features/home/widgets/shift_header.dart';
 import 'package:asset_recovery_app/presentation/features/home/widgets/ticket_card.dart';
@@ -24,6 +25,8 @@ class TaskListScreen extends StatefulWidget {
 
 class _TaskListScreenState extends State<TaskListScreen> {
   TicketFilter _filter = TicketFilter.open;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   /// Drives the scroll paging: the next page is requested once the agent is
   /// within this many pixels of the end of the loaded tickets, so the following
@@ -71,7 +74,18 @@ class _TaskListScreenState extends State<TaskListScreen> {
     _scroll
       ..removeListener(_onScroll)
       ..dispose();
+    _searchController.dispose();
     super.dispose();
+  }
+
+  /// Matches [query] against a ticket's id or any of its battery (BP) ids,
+  /// case-insensitively — the two identifiers an agent is likely to have on
+  /// hand when hunting for a specific case in a long list.
+  bool _matchesSearch(Ticket ticket, String query) {
+    if (query.isEmpty) return true;
+    final q = query.toLowerCase();
+    if (ticket.ticketId.toLowerCase().contains(q)) return true;
+    return ticket.batteries.any((bp) => bp.bpId.toLowerCase().contains(q));
   }
 
   /// Requests the next page once the agent scrolls within
@@ -228,6 +242,16 @@ class _TaskListScreenState extends State<TaskListScreen> {
                       ],
                     ),
                   ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                    child: _TicketSearchField(
+                      controller: _searchController,
+                      hint: l.t('home.searchHint'),
+                      palette: palette,
+                      onChanged: (value) =>
+                          setState(() => _searchQuery = value.trim()),
+                    ),
+                  ),
                   _FilterBar(
                     order: _filterOrder,
                     selected: _filter,
@@ -260,7 +284,10 @@ class _TaskListScreenState extends State<TaskListScreen> {
   Widget _buildList(BuildContext context, TicketProvider tickets,
       AppPalette palette, AppServices services,) {
     final l = AppLocalizations.of(context);
-    final items = tickets.ticketsFor(_filter);
+    final filtered = tickets.ticketsFor(_filter);
+    final items = _searchQuery.isEmpty
+        ? filtered
+        : filtered.where((t) => _matchesSearch(t, _searchQuery)).toList();
 
     // Whatever this tab shows, the loaded window may not cover it — check after
     // layout whether more pages are needed to make the list scrollable at all.
@@ -280,8 +307,12 @@ class _TaskListScreenState extends State<TaskListScreen> {
           Center(
             child: tickets.loadingMore
                 ? CircularProgressIndicator(color: palette.primary)
-                : Text(l.t('home.empty'),
-                    style: TextStyle(color: palette.muted),),
+                : Text(
+                    l.t(_searchQuery.isEmpty
+                        ? 'home.empty'
+                        : 'home.searchNoResults',),
+                    style: TextStyle(color: palette.muted),
+                  ),
           ),
         ],
       );
@@ -374,6 +405,63 @@ class _PagingFooter extends StatelessWidget {
               ? CircularProgressIndicator(
                   strokeWidth: 2.2, color: palette.primary,)
               : null,
+        ),
+      ),
+    );
+  }
+}
+
+/// Search box under the "My Tickets" heading — filters the currently
+/// selected tab by ticket id or battery (BP) id as the agent types.
+class _TicketSearchField extends StatelessWidget {
+  const _TicketSearchField({
+    required this.controller,
+    required this.hint,
+    required this.palette,
+    required this.onChanged,
+  });
+
+  final TextEditingController controller;
+  final String hint;
+  final AppPalette palette;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      onChanged: onChanged,
+      style: TextStyle(color: palette.onSurface, fontSize: 14),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: TextStyle(color: palette.muted, fontSize: 14),
+        prefixIcon: Icon(Icons.search, color: palette.muted, size: 20),
+        suffixIcon: ValueListenableBuilder<TextEditingValue>(
+          valueListenable: controller,
+          builder: (context, value, _) => value.text.isEmpty
+              ? const SizedBox.shrink()
+              : IconButton(
+                  icon: Icon(Icons.close, color: palette.muted, size: 18),
+                  onPressed: () {
+                    controller.clear();
+                    onChanged('');
+                  },
+                ),
+        ),
+        filled: true,
+        fillColor: palette.surface,
+        contentPadding: const EdgeInsets.symmetric(vertical: 10),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: palette.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: palette.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: palette.primary),
         ),
       ),
     );

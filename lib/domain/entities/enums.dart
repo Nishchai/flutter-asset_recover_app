@@ -23,6 +23,10 @@ enum TicketStatus {
       case 'pendingverification':
         return TicketStatus.pending;
       case 'closed':
+      // QC-approved terminal outcomes (coordinator has signed off on the
+      // recovery/FIR) — same "Completed" bucket as a plain closed ticket.
+      case 'recoveredqcdone':
+      case 'firqcdone':
         return TicketStatus.closed;
       case 'unrecoverable':
       // Backend-driven auto-closure (e.g. SLA/inactivity) — same terminal,

@@ -171,13 +171,13 @@ void main() {
     expect(sent.phonePrimary, originalMobile);
     expect(bp.customer.mobile, '9998887776');
     // This screen edits no address — those go up as the contract's explicit
-    // nulls, and the body carries no metadata.
+    // nulls. The relation picked for the new number rides in metadata.
     final body = sent.toJson();
     expect(body['addressLine1'], isNull);
     expect(body['city'], isNull);
     expect(body['state'], isNull);
     expect(body['pincode'], isNull);
-    expect(body.containsKey('metadata'), isFalse);
+    expect(body['metadata'], {'mobileRelation': 'self_secondary'});
   });
 
   test('no customer PATCH when the agent left the mobile field alone',

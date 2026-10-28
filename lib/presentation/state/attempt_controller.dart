@@ -906,7 +906,8 @@ class AttemptController extends ChangeNotifier {
   /// The new number rides as `phoneSecondary`; `phonePrimary` stays the number
   /// parsed off the ticket detail, since that is the key the by-phone route
   /// identifies the record by. This screen edits no address, so those fields go
-  /// up as the contract's explicit nulls.
+  /// up as the contract's explicit nulls. The relation the agent picked for
+  /// the new number ("Self", "Spouse", etc.) rides in `metadata.mobileRelation`.
   ///
   /// No-ops when the agent left the field blank or retyped the number the
   /// customer already has — nothing to patch, and the explicit nulls would
@@ -921,6 +922,10 @@ class AttemptController extends ChangeNotifier {
       customerId: ticketDetail?.customer?.id ?? '',
       phonePrimary: customerPrimaryPhone,
       phoneSecondary: mobile,
+      metadata: {
+        if (_entered('newCustomerMobileRelation') != null)
+          'mobileRelation': _entered('newCustomerMobileRelation'),
+      },
     );
     // Mirror the edit locally first (offline-first UX — the agent's input is
     // never silently lost), then confirm against the server or queue for retry.

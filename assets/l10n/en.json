@@ -45,6 +45,8 @@
   "greeting.evening": "Good Evening!",
   "home.hello": "Hello,",
   "home.myTickets": "My Tickets",
+  "home.searchHint": "Search by ticket ID or battery ID",
+  "home.searchNoResults": "No tickets match your search",
   "home.empty": "No tickets in this view",
   "home.loadMoreFailed": "Couldn't load more tickets",
 

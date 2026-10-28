@@ -190,6 +190,8 @@
   "home.empty": "ఈ వీక్షణలో టికెట్లు లేవు",
   "home.hello": "నమస్తే,",
   "home.myTickets": "నా టికెట్లు",
+  "home.searchHint": "టికెట్ ఐడి లేదా బ్యాటరీ ఐడి ద్వారా శోధించండి",
+  "home.searchNoResults": "మీ శోధనకు సరిపోలే టికెట్లు లేవు",
   "hub.status.done": "పూర్తయింది",
   "hub.status.empty": "ప్రారంభించలేదు",
   "hub.status.partial": "ప్రోగ్రెస్‌లో",

@@ -10,6 +10,8 @@
   "greeting.evening": "शुभ संध्या!",
   "home.hello": "नमस्ते,",
   "home.myTickets": "मेरे टिकट",
+  "home.searchHint": "टिकट आईडी या बैटरी आईडी से खोजें",
+  "home.searchNoResults": "आपकी खोज से कोई टिकट मेल नहीं खाता",
   "home.empty": "इस दृश्य में कोई टिकट नहीं",
   "shift.active": "शिफ्ट सक्रिय",
   "shift.inactive": "शिफ्ट निष्क्रिय",

@@ -190,6 +190,8 @@
   "home.empty": "या दृश्यात कोणतीही तिकिटे नाहीत",
   "home.hello": "नमस्कार,",
   "home.myTickets": "माझी तिकिटे",
+  "home.searchHint": "तिकीट आयडी किंवा बॅटरी आयडीने शोधा",
+  "home.searchNoResults": "तुमच्या शोधाशी कोणतेही तिकीट जुळत नाही",
   "hub.status.done": "पूर्ण झाले",
   "hub.status.empty": "सुरू केलेले नाही",
   "hub.status.partial": "प्रगतीपथावर",

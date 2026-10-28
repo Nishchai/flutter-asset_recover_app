@@ -190,6 +190,8 @@
   "home.empty": "ಈ ವೀಕ್ಷಣೆಯಲ್ಲಿ ಯಾವುದೇ ಟಿಕೆಟ್‌ಗಳಿಲ್ಲ",
   "home.hello": "ನಮಸ್ಕಾರ,",
   "home.myTickets": "ನನ್ನ ಟಿಕೆಟ್‌ಗಳು",
+  "home.searchHint": "ಟಿಕೆಟ್ ಐಡಿ ಅಥವಾ ಬ್ಯಾಟರಿ ಐಡಿ ಮೂಲಕ ಹುಡುಕಿ",
+  "home.searchNoResults": "ನಿಮ್ಮ ಹುಡುಕಾಟಕ್ಕೆ ಯಾವುದೇ ಟಿಕೆಟ್ ಹೊಂದಿಕೆಯಾಗುತ್ತಿಲ್ಲ",
   "hub.status.done": "ಮುಗಿದಿದೆ",
   "hub.status.empty": "ಪ್ರಾರಂಭಿಸಿಲ್ಲ",
   "hub.status.partial": "ಪ್ರಗತಿಯಲ್ಲಿ",

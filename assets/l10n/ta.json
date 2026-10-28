@@ -190,6 +190,8 @@
   "home.empty": "இந்தப் பார்வையில் டிக்கெட்டுகள் இல்லை",
   "home.hello": "வணக்கம்,",
   "home.myTickets": "என் டிக்கெட்டுகள்",
+  "home.searchHint": "டிக்கெட் ஐடி அல்லது பேட்டரி ஐடி மூலம் தேடவும்",
+  "home.searchNoResults": "உங்கள் தேடலுக்கு பொருந்தும் டிக்கெட் இல்லை",
   "hub.status.done": "முடிந்தது",
   "hub.status.empty": "தொடங்கவில்லை",
   "hub.status.partial": "செயலில்",
