@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Flutter needs INTERNET for hot reload / debugging in debug builds. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Local dev against plain-HTTP backend (10.0.2.2). Never in release. -->
+    <application android:usesCleartextTraffic="true" />
 </manifest>

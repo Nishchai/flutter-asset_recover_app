@@ -12,10 +12,6 @@
     <!-- QR scan + geo-tagged proof photos (PRD §4.9 / §4.3). -->
     <uses-permission android:name="android.permission.CAMERA" />
 
-    <!-- In-app calling via Ozonetel (Rule 8a) — needed once the real Cloud
-         Agent SDK is wired in; the current stub doesn't use the mic. -->
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />
-
     <!-- In-app SIM call from the Call Customer screen (Rule 8a). CALL_PHONE
          lets "Start Call" dial the customer on the device SIM directly
          (ACTION_CALL) instead of handing off to the dialer app; READ_PHONE_STATE
@@ -34,11 +30,9 @@
     <application
         android:label="Asset Recovery"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher"
-        android:usesCleartextTraffic="true">
-        <!-- Cleartext allowed for local dev/emulator testing against a plain-HTTP
-             backend (10.0.2.2). Real deployments use HTTPS apiBaseUrl values,
-             so this has no effect once prod.json is used. -->
+        android:icon="@mipmap/ic_launcher">
+        <!-- Cleartext HTTP is allowed only in debug/profile builds (see
+             src/debug and src/profile manifests). Release is HTTPS-only. -->
 
         <activity
             android:name=".MainActivity"
