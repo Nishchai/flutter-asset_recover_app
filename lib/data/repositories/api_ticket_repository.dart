@@ -1,5 +1,6 @@
 import 'dart:developer' as developer;
 
+import 'package:asset_recovery_app/core/config/reviewer_access.dart';
 import 'package:asset_recovery_app/core/services/api_client.dart';
 import 'package:asset_recovery_app/data/datasources/gupshup_otp_datasource.dart';
 import 'package:asset_recovery_app/domain/entities/agent.dart';
@@ -138,13 +139,19 @@ class ApiTicketRepository implements TicketRepository {
   }
 
   @override
-  Future<void> requestLoginOtp(String mobile) =>
-      _gupshup.sendOtp(mobile);
+  Future<void> requestLoginOtp(String mobile) {
+    // Store-reviewer account: no SMS is sent, the fixed code is used instead.
+    if (ReviewerAccess.isReviewer(mobile)) return Future.value();
+    return _gupshup.sendOtp(mobile);
+  }
 
   @override
   Future<Agent> verifyLoginOtp(String mobile, String otp) async {
     // Gupshup validates the code itself; it does NOT return an app session.
-    final matched = await _gupshup.verifyOtp(mobile, otp);
+    // The reviewer pair skips Gupshup entirely (see [ReviewerAccess]); any
+    // other code for that number still goes through the normal verification.
+    final matched = ReviewerAccess.accepts(mobile, otp) ||
+        await _gupshup.verifyOtp(mobile, otp);
     if (!matched) {
       throw ApiException('Invalid or expired OTP');
     }
