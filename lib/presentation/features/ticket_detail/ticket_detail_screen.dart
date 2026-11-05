@@ -4,6 +4,7 @@ import 'package:asset_recovery_app/core/di/app_services.dart';
 import 'package:asset_recovery_app/core/di/injector.dart';
 import 'package:asset_recovery_app/core/error/result.dart';
 import 'package:asset_recovery_app/core/localization/app_localizations.dart';
+import 'package:asset_recovery_app/core/services/sync_queue_service.dart';
 import 'package:asset_recovery_app/core/theme/app_theme.dart';
 import 'package:asset_recovery_app/core/utils/formatters.dart';
 import 'package:asset_recovery_app/domain/entities/battery.dart';
@@ -63,15 +64,43 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     // response, kept as [Ticket.caseId]); fall back to the ticket number if the
     // UUID isn't populated (e.g. mock data).
     final uuid = ticket.caseId.isNotEmpty ? ticket.caseId : ticket.ticketId;
+    _detailId = uuid;
     _loadDetail(uuid);
     // The battery telemetry endpoint is keyed by the BP id from the ticket.
     _loadBatteryDetail(ticket.primaryBp.bpId);
   }
 
+  /// Key [_loadDetail] was started with, kept so the screen can refetch after
+  /// an attempt is recorded.
+  String _detailId = '';
+
   Future<void> _loadDetail(String uuid) async {
+    // Attempts made offline sit on the sync queue until they are replayed, and
+    // the history below is read from the server — so give a pending flush a
+    // moment to land first, or the new attempt would be missing from the list.
+    await _flushPendingSync();
+    if (!mounted) return;
     final result = await sl<GetTicketFullDetailUseCase>()(uuid);
     if (!mounted || result.isErr) return;
     setState(() => _detail = result.valueOrNull);
+  }
+
+  Future<void> _flushPendingSync() async {
+    final queue = sl<SyncQueueService>();
+    if (queue.pendingCount == 0) return;
+    try {
+      await queue.drain().timeout(const Duration(seconds: 8));
+    } catch (_) {
+      // Still offline or slow — show what the server has; the queue keeps
+      // retrying in the background.
+    }
+  }
+
+  /// The Ticket Actions hub was closed: a new attempt may have been recorded
+  /// (or queued), so reload the detail instead of leaving the old history up.
+  Future<void> _refreshAfterAttempt() {
+    if (_detailId.isEmpty) return Future.value();
+    return _loadDetail(_detailId);
   }
 
   Future<void> _loadBatteryDetail(String bpId) async {
@@ -149,7 +178,8 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                 bp: bp,
                 palette: palette,
                 batteryDetail: _batteryDetail,
-                detail: _detail,),
+                detail: _detail,
+                onReturned: _refreshAfterAttempt,),
         ],
       ),
     );
@@ -1189,10 +1219,15 @@ class _Actions extends StatelessWidget {
     required this.palette,
     this.batteryDetail,
     this.detail,
+    this.onReturned,
   });
   final Ticket ticket;
   final Battery bp;
   final AppPalette palette;
+
+  /// Called when the Ticket Actions hub is popped, so the detail screen can
+  /// refresh its attempt history.
+  final Future<void> Function()? onReturned;
 
   /// Battery telemetry fetched on this screen, handed to the Ticket Actions hub
   /// so the Visit BP Location section reuses the same last lat/long + last TIU
@@ -1226,10 +1261,10 @@ class _Actions extends StatelessWidget {
               l.t('detail.ticketActions'),
               palette: palette,
               trailingArrow: true,
-              onPressed: () {
+              onPressed: () async {
                 // No attempt cap: an agent may log as many attempts as a BP
                 // needs, so the hub always opens.
-                Navigator.of(context).push(
+                await Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) => TicketActionsHub(
                           ticketId: ticket.ticketId,
@@ -1239,6 +1274,8 @@ class _Actions extends StatelessWidget {
                         ),
                   ),
                 );
+                // A section save or the outcome may have added an attempt.
+                unawaited(onReturned?.call());
               },
             ),
           ),

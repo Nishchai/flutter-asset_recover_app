@@ -5,6 +5,7 @@ import 'dart:math';
 
 import 'package:asset_recovery_app/core/config/config_service.dart';
 import 'package:asset_recovery_app/core/error/result.dart';
+import 'package:asset_recovery_app/core/services/attempt_record_sync.dart';
 import 'package:asset_recovery_app/core/services/audit_log_service.dart';
 import 'package:asset_recovery_app/core/services/blob_upload_service.dart';
 import 'package:asset_recovery_app/core/services/location_service.dart';
@@ -1414,9 +1415,41 @@ class AttemptController extends ChangeNotifier {
         '${result.failureOrNull?.message}',
         name: 'AttemptController',
       );
+      // Offline / unreachable: keep the record (and any photo that never got a
+      // URL) on the sync queue so it still reaches the attempt history.
+      await _queueAttemptRecord(
+        submission,
+        proofFieldIds: section.fields
+            .where((f) => f.type == 'proof')
+            .map((f) => f.id),
+      );
       return false;
     }
     return true;
+  }
+
+  /// Persists [submission] on the offline sync queue (see [AttemptRecordSync]).
+  /// [proofFieldIds] scopes which captured photos still need uploading — null
+  /// means every photo on this attempt.
+  Future<void> _queueAttemptRecord(
+    AttemptSubmission submission, {
+    Iterable<String>? proofFieldIds,
+  }) async {
+    final ids = (proofFieldIds ?? _proofs.keys).toSet();
+    final pendingUploads = <Map<String, String>>[];
+    if (_blobUpload.isConfigured) {
+      for (final id in ids) {
+        final proof = _proofs[id];
+        if (proof == null || proof.remoteUrl != null) continue;
+        final local = proof.localPath;
+        if (local.isEmpty || local.startsWith('mock://')) continue;
+        pendingUploads.add({'localPath': local, 'blobName': _blobName(proof)});
+      }
+    }
+    await _syncQueue.enqueue(
+      AttemptRecordSync.type,
+      AttemptRecordSync.payload(submission, pendingUploads: pendingUploads),
+    );
   }
 
   /// True when the last [submitOutcome] call queued the write for later sync
@@ -1509,6 +1542,7 @@ class AttemptController extends ChangeNotifier {
         'attempt submission failed: ${result.failureOrNull?.message}',
         name: 'AttemptController',
       );
+      await _queueAttemptRecord(submission);
       return false;
     }
     return true;

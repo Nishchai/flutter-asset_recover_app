@@ -4,6 +4,7 @@ import 'package:asset_recovery_app/core/config/config_service.dart';
 import 'package:asset_recovery_app/core/di/app_services.dart';
 import 'package:asset_recovery_app/core/error/result.dart';
 import 'package:asset_recovery_app/core/services/api_client.dart';
+import 'package:asset_recovery_app/core/services/attempt_record_sync.dart';
 import 'package:asset_recovery_app/core/services/audit_log_service.dart';
 import 'package:asset_recovery_app/core/services/blob_upload_service.dart';
 import 'package:asset_recovery_app/core/services/connectivity_service.dart';
@@ -259,6 +260,11 @@ Future<void> configureDependencies({
     );
     if (result.isErr) throw StateError(result.failureOrNull!.message);
   });
+  // Replays recovery-attempt records (and their photos) that could not be sent
+  // while offline — the source of the ticket detail's attempt history.
+  final attemptRecordSync =
+      AttemptRecordSync(sl<TicketRepository>(), sl<BlobUploadService>());
+  syncQueue.registerHandler(AttemptRecordSync.type, attemptRecordSync.call);
   unawaited(syncQueue.init());
 
   // --- Presentation state (fresh instance per provider scope) ---------------

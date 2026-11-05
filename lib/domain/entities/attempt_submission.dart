@@ -95,4 +95,28 @@ class AttemptSubmission {
         'proofUrls': proofUrls,
         'metadata': metadata,
       };
+
+  /// Inverse of [toJson] — used to replay a submission persisted on the offline
+  /// sync queue. Timestamps round-trip through UTC ISO-8601.
+  factory AttemptSubmission.fromJson(Map<String, dynamic> json) =>
+      AttemptSubmission(
+        id: json['id'] as String,
+        ticketId: json['ticketId'] as String,
+        batteryId: json['batteryId'] as String,
+        agentId: json['agentId'] as String,
+        agentName: json['agentName'] as String? ?? '',
+        attemptType: json['attemptType'] as String,
+        outcome: json['outcome'] as String,
+        attemptedAt: DateTime.parse(json['attemptedAt'] as String),
+        completedAt: DateTime.parse(json['completedAt'] as String),
+        latitude: (json['latitude'] as num).toDouble(),
+        longitude: (json['longitude'] as num).toDouble(),
+        customerPresent: json['customerPresent'] as bool? ?? false,
+        notes: json['notes'] as String? ?? '',
+        proofUrls: (json['proofUrls'] as List? ?? const [])
+            .map((e) => e.toString())
+            .toList(),
+        metadata: Map<String, dynamic>.from(
+            json['metadata'] as Map? ?? const <String, dynamic>{},),
+      );
 }

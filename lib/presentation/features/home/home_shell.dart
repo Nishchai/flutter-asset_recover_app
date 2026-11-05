@@ -7,6 +7,7 @@ import 'package:asset_recovery_app/core/localization/app_localizations.dart';
 import 'package:asset_recovery_app/core/services/location_service.dart';
 import 'package:asset_recovery_app/core/services/session_manager.dart';
 import 'package:asset_recovery_app/core/services/session_store.dart';
+import 'package:asset_recovery_app/core/services/sync_queue_service.dart';
 import 'package:asset_recovery_app/domain/usecases/update_agent_location_usecase.dart';
 import 'package:asset_recovery_app/presentation/features/home/task_list_screen.dart';
 import 'package:asset_recovery_app/presentation/features/map/map_screen.dart';
@@ -115,6 +116,9 @@ class _HomeShellState extends State<HomeShell>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      // The network may have come back while the app was in the background;
+      // the connectivity event alone can fire before the API is reachable.
+      unawaited(sl<SyncQueueService>().drain());
       unawaited(_ensureLocationThenReport());
     } else {
       _locationTimer?.cancel();

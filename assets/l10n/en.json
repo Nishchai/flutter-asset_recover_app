@@ -371,9 +371,9 @@
   "attempt.pendingApproval": "Submitted — pending coordinator approval",
   "attempt.closed": "Ticket closed",
   "attempt.visitRecorded": "Visit recorded",
-  "attempt.visitNotSynced": "Saved on this device — the visit couldn't be sent to the server",
+  "attempt.visitNotSynced": "Saved on this device — the visit will sync automatically once you're back online",
   "attempt.callRecorded": "Call recorded",
-  "attempt.callNotSynced": "Saved on this device — the call couldn't be sent to the server",
+  "attempt.callNotSynced": "Saved on this device — the call will sync automatically once you're back online",
   "attempt.outOfRangeTitle": "Out of Range",
   "attempt.outOfRangeMessage": "You are more than 100m away from the assigned Lat/Long.",
   "attempt.proceedAnyway": "Proceed Anyway"
