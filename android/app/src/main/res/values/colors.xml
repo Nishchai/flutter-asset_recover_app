@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- SUN Mobility acid-yellow brand background for the adaptive launcher icon. -->
-    <color name="ic_launcher_background">#101319</color>
+    <!-- Black background behind the SUN Mobility logo in the adaptive launcher icon. -->
+    <color name="ic_launcher_background">#000000</color>
 </resources>

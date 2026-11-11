@@ -41,7 +41,7 @@ android {
         // relies on (camera, fused location, runtime permissions) are all
         // available from API 26, so 26 is the supported floor.
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
 
         versionCode = flutter.versionCode
         versionName = flutter.versionName
