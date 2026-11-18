@@ -4,9 +4,11 @@ import 'package:asset_recovery_app/core/di/app_services.dart';
 import 'package:asset_recovery_app/core/localization/app_localizations.dart';
 import 'package:asset_recovery_app/core/theme/app_theme.dart';
 import 'package:asset_recovery_app/domain/entities/ticket.dart';
+import 'package:asset_recovery_app/domain/entities/ticket_source.dart';
 import 'package:asset_recovery_app/presentation/features/battery_movement/battery_movement_menu.dart';
 import 'package:asset_recovery_app/presentation/features/home/widgets/end_shift_sheet.dart';
 import 'package:asset_recovery_app/presentation/features/home/widgets/shift_header.dart';
+import 'package:asset_recovery_app/presentation/features/home/widgets/source_filter.dart';
 import 'package:asset_recovery_app/presentation/features/home/widgets/ticket_card.dart';
 import 'package:asset_recovery_app/presentation/features/ticket_detail/ticket_detail_screen.dart';
 import 'package:asset_recovery_app/presentation/state/auth_provider.dart';
@@ -26,6 +28,9 @@ class TaskListScreen extends StatefulWidget {
 
 class _TaskListScreenState extends State<TaskListScreen> {
   TicketFilter _filter = TicketFilter.open;
+
+  /// Source sub-filter, applied under whichever tab is selected. Empty = all.
+  Set<TicketSource> _sources = {};
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
@@ -277,6 +282,23 @@ class _TaskListScreenState extends State<TaskListScreen> {
                     palette: palette,
                     onSelect: (f) => setState(() => _filter = f),
                   ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+                    child: SourceFilterChip(
+                      selected: _sources,
+                      palette: palette,
+                      onTap: () async {
+                        final picked = await showSourceFilterSheet(
+                          context,
+                          selected: _sources,
+                          palette: palette,
+                        );
+                        if (picked != null && mounted) {
+                          setState(() => _sources = picked);
+                        }
+                      },
+                    ),
+                  ),
                   Expanded(
                     // Pull-to-refresh starts at the top of the My Tickets list
                     // (just under the header + filter tabs) and re-calls the
@@ -302,7 +324,10 @@ class _TaskListScreenState extends State<TaskListScreen> {
   Widget _buildList(BuildContext context, TicketProvider tickets,
       AppPalette palette, AppServices services,) {
     final l = AppLocalizations.of(context);
-    final filtered = tickets.ticketsFor(_filter);
+    final filtered = tickets
+        .ticketsFor(_filter)
+        .where((t) => TicketSource.anyMatches(_sources, t.caseSource))
+        .toList();
     final items = _searchQuery.isEmpty
         ? filtered
         : filtered.where((t) => _matchesSearch(t, _searchQuery)).toList();

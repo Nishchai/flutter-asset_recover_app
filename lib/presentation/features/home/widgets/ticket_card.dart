@@ -3,6 +3,7 @@ import 'package:asset_recovery_app/core/theme/app_theme.dart';
 import 'package:asset_recovery_app/core/utils/formatters.dart';
 import 'package:asset_recovery_app/domain/entities/enums.dart';
 import 'package:asset_recovery_app/domain/entities/ticket.dart';
+import 'package:asset_recovery_app/domain/entities/ticket_source.dart';
 import 'package:asset_recovery_app/presentation/shared/widgets/info_chip.dart';
 import 'package:flutter/material.dart';
 
@@ -105,6 +106,8 @@ class TicketCard extends StatelessWidget {
               children: [
                 InfoChip(label: _vehicleShort(bp.vehicleType), palette: palette),
                 InfoChip(label: _statusLabel(l), palette: palette),
+                if (_sourceLabel(l).isNotEmpty)
+                  InfoChip(label: _sourceLabel(l), palette: palette),
               ],
             ),
           ],
@@ -115,6 +118,15 @@ class TicketCard extends StatelessWidget {
 
   String _vehicleShort(String type) =>
       type.contains('-') ? type.split('-').last.trim() : type;
+
+  /// The ticket's `source` as the Source filter names it ("At-risk"), or a
+  /// tidied version of an unrecognised value. Empty when the API sent none.
+  String _sourceLabel(AppLocalizations l) {
+    final known = TicketSource.fromRaw(ticket.caseSource);
+    return known != null
+        ? l.t(known.labelKey)
+        : TicketSource.prettify(ticket.caseSource);
+  }
 
   String _statusLabel(AppLocalizations l) {
     switch (ticket.status) {
