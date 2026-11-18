@@ -78,6 +78,10 @@
   "filter.completed": "Completed",
   "filter.fleet": "Fleet",
   "filter.retail": "Retail",
+  "filter.sla7": "SLA remaining: 0 - 7 Days",
+  "filter.sla14": "SLA remaining: 7 - 14 Days",
+  "filter.sla20": "SLA remaining: 14 - 20 Days",
+  "filter.sla20Plus": "SLA remaining: 20+ Days",
 
   "sort.title": "Sort tickets by",
   "opt.sort.distance": "Distance",

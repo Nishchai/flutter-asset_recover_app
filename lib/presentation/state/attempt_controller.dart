@@ -1231,6 +1231,8 @@ class AttemptController extends ChangeNotifier {
         // customer_will_take_swap), so we
         // send it raw. The service 422s "Invalid outcome" on anything else.
         outcome: selectedOutcome,
+        // Recovered / FIR also go out as resolutionType; other outcomes omit it.
+        resolutionType: AttemptSubmission.resolutionFor(selectedOutcome),
         attemptedAt: _updateStatusOpenedAt ?? DateTime.now(),
         completedAt: completedAt,
         latitude: gps.lat,

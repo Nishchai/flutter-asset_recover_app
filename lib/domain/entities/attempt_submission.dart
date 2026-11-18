@@ -32,7 +32,20 @@ class AttemptSubmission {
     required this.notes,
     this.proofUrls = const [],
     this.metadata = const {},
+    this.resolutionType,
   });
+
+  /// Outcomes that also set the ticket's `resolutionType`.
+  static const resolutionOutcomes = {'recovered', 'fir'};
+
+  /// The `resolutionType` for [outcome]: the outcome itself for Recovered and
+  /// FIR, null (not sent) for every other outcome.
+  static String? resolutionFor(String outcome) =>
+      resolutionOutcomes.contains(outcome) ? outcome : null;
+
+  /// Sent as `resolutionType` alongside [outcome] when the agent closes the
+  /// case as Recovered or FIR; null (key omitted) otherwise.
+  final String? resolutionType;
 
   /// Client-generated attempt id (UUID v4).
   final String id;
@@ -82,6 +95,7 @@ class AttemptSubmission {
         'agentName': agentName,
         'attemptType': attemptType,
         'outcome': outcome,
+        if (resolutionType != null) 'resolutionType': resolutionType,
         'attemptedAt': attemptedAt.toUtc().toIso8601String(),
         'completedAt': completedAt.toUtc().toIso8601String(),
         // Location: top-level lat/long — backend derives the stored `location`
@@ -107,6 +121,7 @@ class AttemptSubmission {
         agentName: json['agentName'] as String? ?? '',
         attemptType: json['attemptType'] as String,
         outcome: json['outcome'] as String,
+        resolutionType: json['resolutionType'] as String?,
         attemptedAt: DateTime.parse(json['attemptedAt'] as String),
         completedAt: DateTime.parse(json['completedAt'] as String),
         latitude: (json['latitude'] as num).toDouble(),

@@ -34,6 +34,25 @@ class Ticket {
   /// "Retail". Empty when the backend doesn't send it.
   String businessType;
 
+  /// True when the backend [slaDeadline] falls `fromDays <= left < days` days
+  /// after [now]. [fromDays] null means no lower bound, so already-passed
+  /// deadlines are included. Chaining (null,7), (7,14), (14,20) gives buckets
+  /// that never overlap. False when the ticket has no deadline.
+  bool slaDueWithin(int days, DateTime now, {int? fromDays}) {
+    final deadline = slaDeadline;
+    if (deadline == null) return false;
+    final left = deadline.difference(now);
+    if (fromDays != null && left < Duration(days: fromDays)) return false;
+    return left < Duration(days: days);
+  }
+
+  /// True when the [slaDeadline] is [days] or more days after [now].
+  bool slaDueAtLeast(int days, DateTime now) {
+    final deadline = slaDeadline;
+    if (deadline == null) return false;
+    return deadline.difference(now) >= Duration(days: days);
+  }
+
   bool get isFleet => businessType.trim().toLowerCase() == 'fleet';
   bool get isRetail => businessType.trim().toLowerCase() == 'retail';
   TicketStatus status;

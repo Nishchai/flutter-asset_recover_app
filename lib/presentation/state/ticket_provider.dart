@@ -30,6 +30,10 @@ enum TicketFilter {
   completed,
   fleet,
   retail,
+  sla7,
+  sla14,
+  sla20,
+  sla20Plus,
 }
 
 /// Presentation state for the ticket list. Talks to the domain exclusively
@@ -357,6 +361,14 @@ class TicketProvider extends ChangeNotifier {
           return t.isFleet;
         case TicketFilter.retail:
           return t.isRetail;
+        case TicketFilter.sla7:
+          return t.slaDueWithin(7, now);
+        case TicketFilter.sla14:
+          return t.slaDueWithin(14, now, fromDays: 7);
+        case TicketFilter.sla20:
+          return t.slaDueWithin(20, now, fromDays: 14);
+        case TicketFilter.sla20Plus:
+          return t.slaDueAtLeast(20, now);
       }
     }).toList();
     _applySort(filtered, now);
