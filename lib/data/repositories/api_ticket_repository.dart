@@ -104,6 +104,7 @@ class ApiTicketRepository implements TicketRepository {
       daysSinceLastAttempt:
           (json['daysSinceLastAttempt'] as num?)?.toInt() ?? 0, // MAP: daysSinceLastAttempt
       batteryCount: (json['batteryCount'] as num?)?.toInt() ?? 0, // MAP: batteryCount
+      businessType: json['businessType'] as String? ?? '', // MAP: businessType -> Fleet / Retail home filter
       batteries: [battery],
     );
   }

@@ -17,7 +17,11 @@
     "routeTrackingMinDistanceMeters": 50,
     "routeTrackingMaxPoints": 500,
     "notReturnedWarningDays": 20,
-    "nearbyPickupRadiusKm": 8
+    "nearbyPickupRadiusKm": 8,
+    "batteryMovementBatteryType": 17,
+    "batteryMovementCategory": "Wheelers",
+    "batteryMovementCompletedStatuses": "3,4,5",
+    "batteryMovementPageSize": 20
   },
 
   "session": {

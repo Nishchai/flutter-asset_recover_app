@@ -25,9 +25,17 @@ class Ticket {
     this.routeCode = '',
     this.daysSinceLastAttempt = 0,
     this.batteryCount = 0,
+    this.businessType = '',
   });
 
   final String ticketId;
+
+  /// Customer segment from the tickets API (`businessType`): "Fleet" or
+  /// "Retail". Empty when the backend doesn't send it.
+  String businessType;
+
+  bool get isFleet => businessType.trim().toLowerCase() == 'fleet';
+  bool get isRetail => businessType.trim().toLowerCase() == 'retail';
   TicketStatus status;
   final DateTime createdAt;
   String assignedAgentId;
@@ -119,6 +127,7 @@ class Ticket {
         daysSinceLastAttempt:
             (json['daysSinceLastAttempt'] as num?)?.toInt() ?? 0,
         batteryCount: (json['batteryCount'] as num?)?.toInt() ?? 0,
+        businessType: json['businessType'] as String? ?? '',
         batteries: (json['batteries'] as List)
             .map((e) => Battery.fromJson(e as Map<String, dynamic>))
             .toList(),
@@ -144,6 +153,7 @@ class Ticket {
         'routeCode': routeCode,
         'daysSinceLastAttempt': daysSinceLastAttempt,
         'batteryCount': batteryCount,
+        'businessType': businessType,
         'batteries': batteries.map((b) => b.toJson()).toList(),
       };
 }

@@ -20,7 +20,17 @@ import 'package:flutter/foundation.dart';
 /// Home tabs (item 1): Open (wire status `assigned` — nothing done yet) /
 /// In Progress (started work) / Pending Verification (outcome submitted,
 /// awaiting AC approval) / Completed (closed or unrecoverable).
-enum TicketFilter { open, inProgress, pendingVerification, completed }
+///
+/// Fleet / Retail slice the same list by the ticket's `businessType`, whatever
+/// its status.
+enum TicketFilter {
+  open,
+  inProgress,
+  pendingVerification,
+  completed,
+  fleet,
+  retail,
+}
 
 /// Presentation state for the ticket list. Talks to the domain exclusively
 /// through use cases; applies the home filters + sorting and refreshes
@@ -343,6 +353,10 @@ class TicketProvider extends ChangeNotifier {
         case TicketFilter.completed:
           return t.status == TicketStatus.closed ||
               t.status == TicketStatus.unrecoverable;
+        case TicketFilter.fleet:
+          return t.isFleet;
+        case TicketFilter.retail:
+          return t.isRetail;
       }
     }).toList();
     _applySort(filtered, now);

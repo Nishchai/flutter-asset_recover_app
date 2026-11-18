@@ -17,7 +17,12 @@ class ShiftHeader extends StatelessWidget {
     required this.completed,
     required this.pendingVerification,
     required this.onToggleShift,
+    this.onInfo,
   });
+
+  /// Opens the info menu (Battery Movement Report). The icon is hidden when
+  /// null.
+  final VoidCallback? onInfo;
 
   final Agent agent;
   final AppPalette palette;
@@ -106,6 +111,13 @@ class ShiftHeader extends StatelessWidget {
                       ],
                     ),
                   ),
+                  if (onInfo != null)
+                    IconButton(
+                      onPressed: onInfo,
+                      tooltip: l.t('movement.infoTooltip'),
+                      visualDensity: VisualDensity.compact,
+                      icon: Icon(Icons.info_outline, color: palette.primary),
+                    ),
                   Switch(
                     value: shiftActive,
                     onChanged: onToggleShift,

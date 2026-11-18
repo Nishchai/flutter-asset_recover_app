@@ -4,6 +4,7 @@ import 'package:asset_recovery_app/core/di/app_services.dart';
 import 'package:asset_recovery_app/core/localization/app_localizations.dart';
 import 'package:asset_recovery_app/core/theme/app_theme.dart';
 import 'package:asset_recovery_app/domain/entities/ticket.dart';
+import 'package:asset_recovery_app/presentation/features/battery_movement/battery_movement_menu.dart';
 import 'package:asset_recovery_app/presentation/features/home/widgets/end_shift_sheet.dart';
 import 'package:asset_recovery_app/presentation/features/home/widgets/shift_header.dart';
 import 'package:asset_recovery_app/presentation/features/home/widgets/ticket_card.dart';
@@ -40,6 +41,8 @@ class _TaskListScreenState extends State<TaskListScreen> {
     TicketFilter.inProgress,
     TicketFilter.pendingVerification,
     TicketFilter.completed,
+    TicketFilter.fleet,
+    TicketFilter.retail,
   ];
 
   static const _filterKey = {
@@ -47,6 +50,8 @@ class _TaskListScreenState extends State<TaskListScreen> {
     TicketFilter.inProgress: 'filter.inProgress',
     TicketFilter.pendingVerification: 'filter.pendingVerification',
     TicketFilter.completed: 'filter.completed',
+    TicketFilter.fleet: 'filter.fleet',
+    TicketFilter.retail: 'filter.retail',
   };
 
   @override
@@ -211,6 +216,7 @@ class _TaskListScreenState extends State<TaskListScreen> {
             completed: tickets.completedCount,
             pendingVerification: tickets.pendingVerificationCount,
             onToggleShift: _onToggleShift,
+            onInfo: () => showBatteryMovementMenu(context),
           ),
           Expanded(
             child: Container(

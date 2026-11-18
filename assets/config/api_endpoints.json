@@ -46,6 +46,18 @@
     "updateById": "PATCH /customers/{id}",
     "updateByPhone": "PATCH /customers/by-phone"
   },
+  "batteryMovement": {
+    "_comment": "Battery Movement Report (modelled on the BDD tool). Relative to apiBaseUrl. Both take batteryType, queryType=Live and queryStatus (3,4,5 = completed, 1 = in progress); list also takes pageSize + pageNumber (zero-based).",
+    "list": "GET /BatteryMovementReport",
+    "count": "GET /BatteryMovementReport/GetTotalCount",
+    "search": "GET /BatteryMovementReport/SearchBattery",
+    "related": "GET /BatteryMovementReport/BatteryQuery",
+    "create": "POST /BatteryMovementReport"
+  },
+  "programType": {
+    "_comment": "Programme (vehicle category) master: code -> description (17 = Wheelers). Used to name the Category column of the Battery Movement Report. Relative to apiBaseUrl; if the gateway does not expose it there, give it its own absolute URL.",
+    "list": "GET /ProgramType"
+  },
   "qr": {
     "validate": "POST /batteries/validate-scan"
   },
@@ -69,7 +81,9 @@
   },
   "battery": {
     "_comment": "Battery Master API lives on its own host (different base URL than apiBaseUrl), so this endpoint carries an ABSOLUTE URL. ApiClient uses absolute endpoint URLs verbatim (no apiBaseUrl prefix, no agentId param) while still attaching the Bearer token. {bpId} is filled from the ticket's bpId.",
-    "getBatteryDetails": "GET https://smartnetwork.azure-api.net/battery-master-api/api/v3/WheelerBattery/SearchBattery/{bpId}"
+    "getBatteryDetails": "GET https://smartnetwork.azure-api.net/battery-master-api/api/v3/WheelerBattery/SearchBattery/{bpId}",
+    "_comment_searchBatteries": "Type-ahead for the Battery Movement Report's Request Data form: matches serial numbers for `?text=` (4+ characters, upper-cased). Same Battery Master gateway as getBatteryDetails, v2 route as used by the BDD web tool (WheelerBatteryV2). Response: {result:[{batterySerialNumber, tiuSerialNumber, ...}]}.",
+    "searchBatteries": "GET https://smartnetwork.azure-api.net/battery-master-api/api/v2/WheelerBattery/SearchBattery"
   },
   "calls": {
     "start": "POST /calls/ozonetel/click-to-call",

@@ -17,15 +17,19 @@ import 'package:asset_recovery_app/core/services/sim_call_service.dart';
 import 'package:asset_recovery_app/core/services/sync_queue_service.dart';
 import 'package:asset_recovery_app/data/datasources/gupshup_otp_datasource.dart';
 import 'package:asset_recovery_app/data/repositories/api_audit_repository.dart';
+import 'package:asset_recovery_app/data/repositories/api_battery_movement_repository.dart';
 import 'package:asset_recovery_app/data/repositories/api_ticket_repository.dart';
 import 'package:asset_recovery_app/data/repositories/mock_audit_repository.dart';
+import 'package:asset_recovery_app/data/repositories/mock_battery_movement_repository.dart';
 import 'package:asset_recovery_app/data/repositories/mock_ticket_repository.dart';
 import 'package:asset_recovery_app/domain/entities/audit_event.dart';
 import 'package:asset_recovery_app/domain/entities/customer.dart';
 import 'package:asset_recovery_app/domain/entities/customer_details_update.dart';
 import 'package:asset_recovery_app/domain/entities/form_field_config.dart';
 import 'package:asset_recovery_app/domain/repositories/audit_repository.dart';
+import 'package:asset_recovery_app/domain/repositories/battery_movement_repository.dart';
 import 'package:asset_recovery_app/domain/repositories/ticket_repository.dart';
+import 'package:asset_recovery_app/domain/usecases/battery_movement_usecases.dart';
 import 'package:asset_recovery_app/domain/usecases/call_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/draft_attempt_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/get_agent_route_usecase.dart';
@@ -47,6 +51,7 @@ import 'package:asset_recovery_app/domain/usecases/update_customer_usecase.dart'
 import 'package:asset_recovery_app/domain/usecases/update_ticket_status_usecase.dart';
 import 'package:asset_recovery_app/domain/usecases/validate_battery_scan_usecase.dart';
 import 'package:asset_recovery_app/presentation/state/auth_provider.dart';
+import 'package:asset_recovery_app/presentation/state/battery_movement_provider.dart';
 import 'package:asset_recovery_app/presentation/state/shift_provider.dart';
 import 'package:asset_recovery_app/presentation/state/ticket_provider.dart';
 import 'package:get_it/get_it.dart';
@@ -238,6 +243,31 @@ Future<void> configureDependencies({
   sl.registerLazySingleton(() => StartCallUseCase(sl()));
   sl.registerLazySingleton(() => GetCallRecordingsUseCase(sl()));
   sl.registerLazySingleton(() => GetNearbyUnassignedTicketsUseCase(sl()));
+
+  // Battery Movement Report (info menu on home). Uses the app's own apiBaseUrl;
+  // mock mode gets seeded rows so the screen works with no backend.
+  sl.registerLazySingleton<BatteryMovementRepository>(
+    () => cfg.env.useMockData
+        ? MockBatteryMovementRepository()
+        : ApiBatteryMovementRepository(
+            sl(),
+            batteryType:
+                cfg.intValue('business.batteryMovementBatteryType', fallback: 17),
+            fallbackCategory: cfg.stringValue(
+              'business.batteryMovementCategory',
+              fallback: 'Wheelers',
+            ),
+            completedStatuses: cfg.stringValue(
+              'business.batteryMovementCompletedStatuses',
+              fallback: '3,4,5',
+            ),
+          ),
+  );
+  sl.registerLazySingleton(() => GetBatteryMovementQueriesUseCase(sl()));
+  sl.registerLazySingleton(() => GetInProgressMovementQueriesUseCase(sl()));
+  sl.registerLazySingleton(() => GetRelatedMovementQueriesUseCase(sl()));
+  sl.registerLazySingleton(() => RequestBatteryMovementDataUseCase(sl()));
+  sl.registerLazySingleton(() => SearchBatteriesUseCase(sl()));
   sl.registerLazySingleton(() => PickupTicketUseCase(sl()));
 
   // --- Offline sync queue handlers (CC-04) -----------------------------------
@@ -279,6 +309,15 @@ Future<void> configureDependencies({
         syncQueue: sl(),
         getNearbyUnassigned: sl(),
         pickupTicket: sl(),
+      ),);
+  sl.registerFactory(() => BatteryMovementProvider(
+        getQueries: sl(),
+        getInProgress: sl(),
+        getRelated: sl(),
+        requestData: sl(),
+        searchBatteries: sl(),
+        pageSize:
+            cfg.intValue('business.batteryMovementPageSize', fallback: 20),
       ),);
   sl.registerFactory(() => ShiftProvider(
         requestOtp: sl(),
