@@ -8,6 +8,7 @@ class EnvironmentConfig {
     required this.environment,
     required this.label,
     required this.useMockData,
+    this.enableBatteryMovementReport = false,
     required this.apiBaseUrl,
     required this.auditLogBaseUrl,
     required this.apiTimeoutSeconds,
@@ -24,6 +25,10 @@ class EnvironmentConfig {
   final String environment;
   final String label;
   final bool useMockData;
+
+  /// Shows the Battery Movement Report info icon on the home header. Off when
+  /// the key is missing from the environment file.
+  final bool enableBatteryMovementReport;
   final String apiBaseUrl;
 
   /// Base URL of the shared platform app API that hosts the audit log
@@ -64,6 +69,8 @@ class EnvironmentConfig {
       environment: json['environment'] as String? ?? 'dev',
       label: json['label'] as String? ?? 'Development',
       useMockData: json['useMockData'] as bool? ?? true,
+      enableBatteryMovementReport:
+          json['enableBatteryMovementReport'] as bool? ?? false,
       apiBaseUrl: json['apiBaseUrl'] as String? ?? '',
       auditLogBaseUrl: json['auditLogBaseUrl'] as String? ?? '',
       apiTimeoutSeconds: (json['apiTimeoutSeconds'] as num?)?.toInt() ?? 30,

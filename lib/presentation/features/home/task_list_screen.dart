@@ -43,6 +43,10 @@ class _TaskListScreenState extends State<TaskListScreen> {
     TicketFilter.completed,
     TicketFilter.fleet,
     TicketFilter.retail,
+    TicketFilter.sla7,
+    TicketFilter.sla14,
+    TicketFilter.sla20,
+    TicketFilter.sla20Plus,
   ];
 
   static const _filterKey = {
@@ -52,6 +56,10 @@ class _TaskListScreenState extends State<TaskListScreen> {
     TicketFilter.completed: 'filter.completed',
     TicketFilter.fleet: 'filter.fleet',
     TicketFilter.retail: 'filter.retail',
+    TicketFilter.sla7: 'filter.sla7',
+    TicketFilter.sla14: 'filter.sla14',
+    TicketFilter.sla20: 'filter.sla20',
+    TicketFilter.sla20Plus: 'filter.sla20Plus',
   };
 
   @override
@@ -216,7 +224,11 @@ class _TaskListScreenState extends State<TaskListScreen> {
             completed: tickets.completedCount,
             pendingVerification: tickets.pendingVerificationCount,
             onToggleShift: _onToggleShift,
-            onInfo: () => showBatteryMovementMenu(context),
+            // Hidden unless `enableBatteryMovementReport` is true in the
+            // environment file.
+            onInfo: services.config.env.enableBatteryMovementReport
+                ? () => showBatteryMovementMenu(context)
+                : null,
           ),
           Expanded(
             child: Container(

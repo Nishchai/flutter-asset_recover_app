@@ -2,6 +2,7 @@
   "environment": "test",
   "label": "Test / QA",
   "useMockData": true,
+  "enableBatteryMovementReport": true,
   "apiBaseUrl": "https://test-asset-recovery.sunmobility.internal/api/v1",
   "apiTimeoutSeconds": 15,
   "mapsApiKey": "TEST_FAKE_MAPS_KEY",

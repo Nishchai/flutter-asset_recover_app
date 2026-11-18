@@ -2,6 +2,7 @@
   "environment": "prod",
   "label": "Production",
   "useMockData": false,
+  "enableBatteryMovementReport": false,
   "apiBaseUrl": "https://asset-recovery.sunmobility.com/api/v1",
   "_comment_auditLogBaseUrl": "Shared platform app API that hosts the audit log (POST /AuditLog). Different host from apiBaseUrl, so it is configured separately per environment.",
   "auditLogBaseUrl": "https://smartnetwork.azure-api.net/app/api/v1",
