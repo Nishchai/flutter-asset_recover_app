@@ -33,8 +33,27 @@ enum TicketFilter {
   sla7,
   sla14,
   sla20,
-  sla20Plus,
+  sla20Plus;
+
+  /// The selection after tapping [tapped]: a selected filter is cleared;
+  /// otherwise it replaces any pick from its own group and joins the others.
+  static Set<TicketFilter> toggle(Set<TicketFilter> current, TicketFilter tapped) {
+    if (current.contains(tapped)) return {...current}..remove(tapped);
+    return {...current.where((f) => f.group != tapped.group), tapped};
+  }
+
+  /// The filter's group. Filters combine across groups (a ticket must match one
+  /// pick from each group that has one) and replace each other within a group.
+  TicketFilterGroup get group => switch (this) {
+        open || inProgress || pendingVerification || completed =>
+          TicketFilterGroup.status,
+        fleet || retail => TicketFilterGroup.customerType,
+        sla7 || sla14 || sla20 || sla20Plus => TicketFilterGroup.sla,
+      };
 }
+
+/// Groups of [TicketFilter]s — see [TicketFilter.group].
+enum TicketFilterGroup { status, customerType, sla }
 
 /// Presentation state for the ticket list. Talks to the domain exclusively
 /// through use cases; applies the home filters + sorting and refreshes
@@ -342,37 +361,46 @@ class TicketProvider extends ChangeNotifier {
     }
   }
 
-  List<Ticket> ticketsFor(TicketFilter filter) {
+  List<Ticket> ticketsFor(TicketFilter filter) => ticketsForAll({filter});
+
+  /// Tickets matching EVERY filter in [filters] (Open + Fleet, Open + Fleet +
+  /// 0-7 days, ...). An empty set returns every ticket. Within one
+  /// [TicketFilterGroup] the caller keeps a single pick, so the filters of a
+  /// group are never ANDed against each other.
+  List<Ticket> ticketsForAll(Set<TicketFilter> filters) {
     final now = DateTime.now();
-    final filtered = _all.where((t) {
-      switch (filter) {
-        case TicketFilter.open:
-          return t.status == TicketStatus.assigned;
-        case TicketFilter.inProgress:
-          return t.status == TicketStatus.inProgress;
-        case TicketFilter.pendingVerification:
-          // Outcome (Recovered / FIR-Lost) submitted, awaiting AC approval —
-          // the Field Agent never closes a ticket directly.
-          return t.status == TicketStatus.pending;
-        case TicketFilter.completed:
-          return t.status == TicketStatus.closed ||
-              t.status == TicketStatus.unrecoverable;
-        case TicketFilter.fleet:
-          return t.isFleet;
-        case TicketFilter.retail:
-          return t.isRetail;
-        case TicketFilter.sla7:
-          return t.slaDueWithin(7, now);
-        case TicketFilter.sla14:
-          return t.slaDueWithin(14, now, fromDays: 7);
-        case TicketFilter.sla20:
-          return t.slaDueWithin(20, now, fromDays: 14);
-        case TicketFilter.sla20Plus:
-          return t.slaDueAtLeast(20, now);
-      }
-    }).toList();
+    final filtered =
+        _all.where((t) => filters.every((f) => _matches(t, f, now))).toList();
     _applySort(filtered, now);
     return filtered;
+  }
+
+  bool _matches(Ticket t, TicketFilter filter, DateTime now) {
+    switch (filter) {
+      case TicketFilter.open:
+        return t.status == TicketStatus.assigned;
+      case TicketFilter.inProgress:
+        return t.status == TicketStatus.inProgress;
+      case TicketFilter.pendingVerification:
+        // Outcome (Recovered / FIR-Lost) submitted, awaiting AC approval —
+        // the Field Agent never closes a ticket directly.
+        return t.status == TicketStatus.pending;
+      case TicketFilter.completed:
+        return t.status == TicketStatus.closed ||
+            t.status == TicketStatus.unrecoverable;
+      case TicketFilter.fleet:
+        return t.isFleet;
+      case TicketFilter.retail:
+        return t.isRetail;
+      case TicketFilter.sla7:
+        return t.slaDueWithin(7, now);
+      case TicketFilter.sla14:
+        return t.slaDueWithin(14, now, fromDays: 7);
+      case TicketFilter.sla20:
+        return t.slaDueWithin(20, now, fromDays: 14);
+      case TicketFilter.sla20Plus:
+        return t.slaDueAtLeast(20, now);
+    }
   }
 
   /// Closed/unrecoverable tickets, for the history view.

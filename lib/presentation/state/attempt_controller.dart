@@ -397,6 +397,9 @@ class AttemptController extends ChangeNotifier {
     if (!_blobUpload.isConfigured) return;
     final local = proof.localPath;
     if (local.isEmpty || local.startsWith('mock://')) return;
+    // Shown as a loader on the field until the blob URL comes back (or fails).
+    _uploading.add(fieldId);
+    notifyListeners();
     try {
       final url = await _blobUpload.upload(File(local), blobName: _blobName(proof));
       developer.log('Proof uploaded [$fieldId]: $url', name: 'BlobUpload');
@@ -409,8 +412,18 @@ class AttemptController extends ChangeNotifier {
     } catch (e, st) {
       developer.log('Proof upload failed [$fieldId]',
           name: 'BlobUpload', error: e, stackTrace: st,);
+    } finally {
+      _uploading.remove(fieldId);
+      notifyListeners();
     }
   }
+
+  /// Fields whose captured photo is still uploading to blob storage.
+  final Set<String> _uploading = {};
+
+  /// True while [fieldId]'s photo is being uploaded; the proof field shows a
+  /// loader and ignores taps until it finishes.
+  bool isUploading(String fieldId) => _uploading.contains(fieldId);
 
   /// Deterministic blob path for a captured proof:
   /// `proofs/<ticket>/<bp>/<kind>_<timestamp>.<ext>`.

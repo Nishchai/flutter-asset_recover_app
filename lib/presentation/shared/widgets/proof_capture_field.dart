@@ -16,7 +16,12 @@ class ProofCaptureField extends StatelessWidget {
     this.icon,
     this.actionLabelKey,
     this.doneLabelKey,
+    this.uploading = false,
   });
+
+  /// True while the captured file is uploading: a spinner replaces the icon and
+  /// the tile ignores taps until the upload finishes.
+  final bool uploading;
 
   final String label;
   final bool captured;
@@ -51,7 +56,7 @@ class ProofCaptureField extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         InkWell(
-          onTap: onTap,
+          onTap: uploading ? null : onTap,
           borderRadius: BorderRadius.circular(12),
           child: Container(
             width: double.infinity,
@@ -65,17 +70,29 @@ class ProofCaptureField extends StatelessWidget {
             ),
             child: Column(
               children: [
-                Icon(
-                  captured
-                      ? Icons.check_circle_outline
-                      : (icon ?? Icons.photo_camera_outlined),
-                  color: color,
-                ),
+                if (uploading)
+                  SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.4,
+                      color: palette.primary,
+                    ),
+                  )
+                else
+                  Icon(
+                    captured
+                        ? Icons.check_circle_outline
+                        : (icon ?? Icons.photo_camera_outlined),
+                    color: color,
+                  ),
                 const SizedBox(height: 6),
                 Text(
-                  captured
-                      ? l.t(doneLabelKey ?? 'proof.captured')
-                      : l.t(actionLabelKey ?? 'proof.capture'),
+                  uploading
+                      ? l.t('proof.uploading')
+                      : captured
+                          ? l.t(doneLabelKey ?? 'proof.captured')
+                          : l.t(actionLabelKey ?? 'proof.capture'),
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     color: captured ? palette.success : palette.onSurface,

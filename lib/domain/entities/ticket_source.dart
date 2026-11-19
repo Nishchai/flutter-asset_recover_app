@@ -4,13 +4,9 @@
 /// Matching ignores case and punctuation, so `at_risk`, `At-risk` and
 /// `AT RISK` are the same source.
 enum TicketSource {
-  amd('filter.source.amd', {'amd'}),
   theft('filter.source.theft', {'theft', 'theftdashboard'}),
   atRisk('filter.source.atRisk', {'atrisk'}),
-  freshservice('filter.source.freshservice', {'freshservice'}),
-  manual('filter.source.manual', {'manual'}),
-  erpSync('filter.source.erpSync', {'erpsync'}),
-  bulkImport('filter.source.bulkImport', {'bulkimport'});
+  manual('filter.source.manual', {'manual'});
 
   const TicketSource(this.labelKey, this._keys);
 

@@ -33,6 +33,7 @@ class DynamicField extends StatelessWidget {
           label: label,
           required: required,
           captured: controller.proofFor(field.id) != null,
+          uploading: controller.isUploading(field.id),
           palette: palette,
           hint: field.hintKey == null ? null : l.t(field.hintKey!),
           icon: switch (field.source) {

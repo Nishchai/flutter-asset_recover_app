@@ -3,15 +3,20 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('TicketSource', () {
+    test('offers only Theft, At-risk and Manual', () {
+      expect(TicketSource.values, [
+        TicketSource.theft,
+        TicketSource.atRisk,
+        TicketSource.manual,
+      ]);
+    });
+
     test('matches the API value ignoring case and punctuation', () {
       expect(TicketSource.atRisk.matches('at_risk'), isTrue);
       expect(TicketSource.atRisk.matches('AT_RISK'), isTrue);
       expect(TicketSource.atRisk.matches('At-risk'), isTrue);
-      expect(TicketSource.erpSync.matches('erp_sync'), isTrue);
-      expect(TicketSource.bulkImport.matches('Bulk import'), isTrue);
-      expect(TicketSource.freshservice.matches('FRESHSERVICE'), isTrue);
-      expect(TicketSource.amd.matches('amd'), isTrue);
       expect(TicketSource.manual.matches('Manual'), isTrue);
+      expect(TicketSource.theft.matches('THEFT'), isTrue);
     });
 
     test('theft also matches the dashboard value', () {
@@ -20,20 +25,20 @@ void main() {
     });
 
     test('different sources do not match each other', () {
-      expect(TicketSource.amd.matches('at_risk'), isFalse);
+      expect(TicketSource.theft.matches('at_risk'), isFalse);
       expect(TicketSource.manual.matches(''), isFalse);
     });
 
     test('fromRaw finds the source; prettify tidies unknown values', () {
       expect(TicketSource.fromRaw('at_risk'), TicketSource.atRisk);
-      expect(TicketSource.fromRaw('nope'), isNull);
-      expect(TicketSource.prettify('some_new-source'), 'Some new source');
+      expect(TicketSource.fromRaw('erp_sync'), isNull);
+      expect(TicketSource.prettify('erp_sync'), 'Erp sync');
       expect(TicketSource.prettify(''), '');
     });
 
     test('an empty selection matches every ticket; otherwise any pick', () {
       expect(TicketSource.anyMatches({}, 'whatever'), isTrue);
-      final picks = {TicketSource.amd, TicketSource.atRisk};
+      final picks = {TicketSource.theft, TicketSource.atRisk};
       expect(TicketSource.anyMatches(picks, 'at_risk'), isTrue);
       expect(TicketSource.anyMatches(picks, 'manual'), isFalse);
     });

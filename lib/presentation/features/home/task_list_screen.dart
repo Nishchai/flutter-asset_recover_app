@@ -27,7 +27,12 @@ class TaskListScreen extends StatefulWidget {
 }
 
 class _TaskListScreenState extends State<TaskListScreen> {
-  TicketFilter _filter = TicketFilter.open;
+  /// Selected tabs. They combine across groups (Open + Fleet) and replace each
+  /// other within a group; tapping a selected tab clears it.
+  Set<TicketFilter> _filters = {TicketFilter.open};
+
+  void _toggleFilter(TicketFilter f) =>
+      setState(() => _filters = TicketFilter.toggle(_filters, f));
 
   /// Source sub-filter, applied under whichever tab is selected. Empty = all.
   Set<TicketSource> _sources = {};
@@ -217,6 +222,11 @@ class _TaskListScreenState extends State<TaskListScreen> {
 
     return Scaffold(
       backgroundColor: palette.background,
+      // The header, title, search, tabs and Source chip are fixed-height: with
+      // the keyboard up there is not room for them and a shrunken body
+      // overflows. Keep the body full height; the list pads itself above the
+      // keyboard instead (see _buildList).
+      resizeToAvoidBottomInset: false,
       body: Column(
         children: [
           ShiftHeader(
@@ -277,10 +287,10 @@ class _TaskListScreenState extends State<TaskListScreen> {
                   ),
                   _FilterBar(
                     order: _filterOrder,
-                    selected: _filter,
+                    selected: _filters,
                     labelOf: (f) => l.t(_filterKey[f]!),
                     palette: palette,
-                    onSelect: (f) => setState(() => _filter = f),
+                    onSelect: _toggleFilter,
                   ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
@@ -324,8 +334,10 @@ class _TaskListScreenState extends State<TaskListScreen> {
   Widget _buildList(BuildContext context, TicketProvider tickets,
       AppPalette palette, AppServices services,) {
     final l = AppLocalizations.of(context);
+    // Room for the on-screen keyboard, so the last cards can scroll clear of it.
+    final keyboard = MediaQuery.viewInsetsOf(context).bottom;
     final filtered = tickets
-        .ticketsFor(_filter)
+        .ticketsForAll(_filters)
         .where((t) => TicketSource.anyMatches(_sources, t.caseSource))
         .toList();
     final items = _searchQuery.isEmpty
@@ -370,7 +382,7 @@ class _TaskListScreenState extends State<TaskListScreen> {
     return ListView.separated(
       controller: _scroll,
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+      padding: EdgeInsets.fromLTRB(20, 8, 20, 24 + keyboard),
       itemCount: items.length + (showFooter ? 1 : 0),
       separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (context, i) {
@@ -521,7 +533,7 @@ class _FilterBar extends StatelessWidget {
   });
 
   final List<TicketFilter> order;
-  final TicketFilter selected;
+  final Set<TicketFilter> selected;
   final String Function(TicketFilter) labelOf;
   final AppPalette palette;
   final ValueChanged<TicketFilter> onSelect;
@@ -540,10 +552,14 @@ class _FilterBar extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
                 decoration: BoxDecoration(
-                  color: f == selected ? palette.pillDark : palette.surface,
+                  color: selected.contains(f)
+                      ? palette.pillDark
+                      : palette.surface,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: f == selected ? palette.pillDark : palette.border,
+                    color: selected.contains(f)
+                        ? palette.pillDark
+                        : palette.border,
                   ),
                 ),
                 child: Text(
@@ -551,7 +567,9 @@ class _FilterBar extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: f == selected ? Colors.white : palette.onSurface,
+                    color: selected.contains(f)
+                        ? Colors.white
+                        : palette.onSurface,
                   ),
                 ),
               ),

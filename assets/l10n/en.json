@@ -252,6 +252,7 @@
 
   "proof.capture": "Take Photo",
   "proof.captured": "Photo captured",
+  "proof.uploading": "Uploading...",
   "proof.recapture": "Re-capture",
   "proof.subhint": "Opens camera · auto geo-tagged",
   "proof.chooseFromGallery": "Choose from Gallery",
